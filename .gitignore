@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.log
+
+# Reálné výkazy do repa nepatří — obsahují osobní údaje
+/vykazy/
+*.xls
+*.xlsx
+!tests/fixtures/*.xls

@@ -1,0 +1,17 @@
+{
+  "name": "prescasovy-panel-plana",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interaktivní panel přesčasových hodin podle středisek — závod Planá.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes http-server . -p 8080 -c-1 -o",
+    "data": "node tools/generate-demo-data.mjs",
+    "fixtures": "node tests/make-fixtures.mjs",
+    "test": "node tests/make-fixtures.mjs && node tests/import.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}
