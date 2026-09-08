@@ -273,7 +273,9 @@ window.PP = window.PP || {}
       } else {
         who = { n: name, o: id, s: center }
         last = who
-        everyone.add((id || name) + '|' + center)
+        // Do stavu osob počítáme jen řádky s osobním číslem. Sestavy mívají
+        // mezisoučty nadepsané jménem bez čísla a ty nejsou další člověk.
+        if (id) everyone.add(id + '|' + center)
       }
       if (!who.o && !who.n) continue
 
@@ -316,7 +318,9 @@ window.PP = window.PP || {}
       record: {
         period: period.period,
         rawPeriod: period.rawPeriod,
-        people: everyone.size,
+        // pojistka pro výkazy bez osobních čísel — stav nesmí být menší
+        // než počet lidí, kteří v něm mají přesčas
+        people: Math.max(everyone.size, rows.length),
         rows,
         importedAt: new Date().toISOString(),
         file: file.name,

@@ -26,6 +26,9 @@ function htmlReport() {
     rows.push([p.n, p.o, p.s, 'Přesčas evidence', p.e])
     rows.push([p.n, p.o, p.s, 'Přesčas roční součet', p.r])
     rows.push([p.n, p.o, p.s, 'Základní mzda', '168:00'])
+    // mezisoučet nadepsaný jménem, ale bez osobního čísla — nesmí se počítat
+    // jako další osoba ani jako přesčasová složka
+    rows.push([p.n, '', '', 'Celkem za osobu', '168:00'])
   }
   rows.push([NOISE.n, NOISE.o, NOISE.s, NOISE.c, NOISE.h])
   rows.push(['Celkem', '', '', '', '740:00'])
