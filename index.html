@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="cs" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Přesčasový panel Planá</title>
+<meta name="description" content="Přehled přesčasových hodin podle středisek — závod Planá.">
+<meta name="color-scheme" content="light dark">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="shell">
+  <!-- boční rail -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">PP</div>
+      <div>
+        <div class="brand-name">Přesčasy</div>
+        <div class="brand-sub">Závod Planá</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav" aria-label="Sekce panelu"></nav>
+
+    <div class="rail-foot">
+      <p class="rail-note" id="rail-note"></p>
+      <button class="theme-toggle" id="theme-toggle" type="button">
+        <span id="theme-label">Motiv: systém</span>
+        <span aria-hidden="true">◐</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- obsah -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="section-title">Přehled</h1>
+        <p class="sub" id="section-sub"></p>
+      </div>
+      <div class="month-picker">
+        <label for="month-select">Období</label>
+        <select id="month-select"></select>
+      </div>
+    </header>
+
+    <div id="demo-banner" hidden></div>
+
+    <div class="content">
+      <section class="panel" id="panel-overview" aria-labelledby="section-title"></section>
+      <section class="panel" id="panel-centers" hidden></section>
+      <section class="panel" id="panel-ranking" hidden></section>
+      <section class="panel" id="panel-year" hidden></section>
+      <section class="panel" id="panel-import" hidden></section>
+      <section class="panel" id="panel-method" hidden></section>
+    </div>
+  </main>
+</div>
+
+<!-- Klasické skripty (ne moduly), aby šel panel otevřít i přímo z disku. -->
+<script src="data/months.js"></script>
+<script src="js/util.js"></script>
+<script src="js/store.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
