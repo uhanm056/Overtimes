@@ -30,7 +30,11 @@ i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 | **Metodika** | Jak se počítá, legislativní kontext |
 
 Jsou-li načtené aspoň dva měsíce, přibude u KPI a u tabulky středisek
-srovnání s předchozím měsícem (Δ na osobu i v součtu).
+srovnání s předchozím měsícem (Δ na osobu i v součtu) a karta **Kdo přibyl
+a kdo vypadl**. Výkaz obsahuje jen lidi, kteří v měsíci přesčas skutečně měli,
+takže zmizení ze žebříčku není chyba — je to informace (dovolená, nemoc,
+odchod, nebo prostě žádný přesčas). Porovnává se osobní číslo, ne klíč se
+střediskem, aby přeřazený člověk nevyšel jako nový.
 
 ## Struktura
 
@@ -179,5 +183,6 @@ opravdu přijde `.xlsx`.
 ## Co dál
 
 * Srovnávací pohled měsíc/měsíc jako samostatná sekce, až budou 3+ měsíce
-  (delty už se počítají v `PP.compare`, zatím se zobrazují jen v Přehledu)
+  (delty i příchody/odchody už se počítají v `PP.compare`, zobrazují se zatím
+  jen v Přehledu a vždy jen proti bezprostředně předchozímu měsíci)
 * Export do Excelu přímo z panelu
