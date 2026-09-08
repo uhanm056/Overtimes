@@ -98,7 +98,12 @@ Sekce **Import výkazu** bere soubor přetažením i výběrem. Parser:
    výskytu `d.m.rrrr - d.m.rrrr`. Z něj vzniká klíč měsíce.
 6. Hodiny se čtou jako `h:mm` i jako desetinné číslo, včetně znaménka
    (`-2:30`, `12:30-`, `(12:30)`).
-7. Řádky se agregují na klíč `osobní číslo | středisko`; nepřesčasové mzdové
+7. Sestavy z mezd tisknou jméno, osobní číslo a středisko často **jen na prvním
+   řádku skupiny** a u dalších mzdových složek nechávají tyhle sloupce prázdné.
+   Takový navazující řádek přebírá identitu z předchozího — jinak by se ztratila
+   evidence i roční součet a člověk, který má přesčas jen na navazujícím řádku,
+   by ve výkazu vůbec nebyl.
+8. Řádky se agregují na klíč `osobní číslo | středisko`; nepřesčasové mzdové
    složky se přeskočí, ale člověk se započítá do stavu ve výkazu.
 
 Existující měsíc se importem **přepíše**. Naimportované měsíce jdou v seznamu
@@ -152,10 +157,11 @@ npm test
 ```
 
 `tests/make-fixtures.mjs` vyrobí vzorové výkazy — HTML tabulku s příponou
-`.xls` v kódování windows-1250 a CSV s desetinnými hodinami. `tests/import.test.mjs`
-je pak nahraje **přes reálné UI** a ověří období, počty lidí, součty, zápornou
-evidenci, součet 0 u proplaceného konta, diakritiku i chování při smazání
-importu.
+`.xls` v kódování windows-1250, CSV s desetinnými hodinami a variantu se
+sloučenými buňkami, kde je jméno jen na prvním řádku skupiny.
+`tests/import.test.mjs` je pak nahraje **přes reálné UI** a ověří období, počty
+lidí, součty, zápornou evidenci, součet 0 u proplaceného konta, diakritiku,
+dědění identity u navazujících řádků i chování při smazání importu.
 
 ## Vzhled
 
