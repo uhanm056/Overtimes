@@ -245,6 +245,11 @@ window.PP = window.PP || {}
     const everyone = new Set()      // všichni lidé ve výkazu, i bez přesčasu
     let skipped = 0
 
+    // Sestavy z mezd tisknou jméno, osobní číslo a středisko často jen na prvním
+    // řádku skupiny a další mzdové složky nechávají tyhle sloupce prázdné.
+    // Takový řádek proto přebírá identitu z předchozího, jinak by se ztratil.
+    let last = null
+
     for (let r = header.row + 1; r < matrix.length; r++) {
       const row = matrix[r]
       if (!row || !row.length) continue
@@ -252,20 +257,40 @@ window.PP = window.PP || {}
       const id = String(row[cols.id] || '').trim()
       const name = String(row[cols.name] || '').trim()
       const center = String(row[cols.center] || '').trim()
-      if (!id || !name) continue
-      // souhrnné řádky "Celkem …" na konci výkazu
-      if (/^(celkem|soucet|mezisoucet)/.test(PP.fold(name))) continue
 
-      const key = id + '|' + center
-      everyone.add(key)
+      // souhrnné řádky "Celkem …" ukončují skupinu, identita se dál nedědí
+      if (/^(celkem|soucet|mezisoucet)/.test(PP.fold(name))) { last = null; continue }
+
+      let who
+      if (!name && !id) {
+        // pokračovací řádek — bez předchozí identity ho zahodit musíme
+        if (!last) continue
+        who = last
+      } else if (!id && last && PP.fold(last.n) === PP.fold(name)) {
+        // jméno se opakuje, ale číslo je vyplněné jen jednou
+        who = { n: last.n, o: last.o, s: center || last.s }
+        last = who
+      } else {
+        who = { n: name, o: id, s: center }
+        last = who
+        // Do stavu osob počítáme jen řádky s osobním číslem. Sestavy mívají
+        // mezisoučty nadepsané jménem bez čísla a ty nejsou další člověk.
+        if (id) everyone.add(id + '|' + center)
+      }
+      if (!who.o && !who.n) continue
 
       const bucket = classify(row[cols.component])
       if (!bucket) { skipped++; continue }
 
+      const key = (who.o || who.n) + '|' + who.s
       const hours = parseHours(row[cols.hours])
       let rec = byPerson.get(key)
       if (!rec) {
-        rec = { n: name, o: /^\d+$/.test(id) ? Number(id) : id, s: center, m: 0, e: 0, t: 0, r: 0 }
+        rec = {
+          n: who.n,
+          o: /^\d+$/.test(String(who.o)) ? Number(who.o) : who.o,
+          s: who.s, m: 0, e: 0, t: 0, r: 0,
+        }
         byPerson.set(key, rec)
       }
       rec[bucket] += hours
@@ -293,7 +318,9 @@ window.PP = window.PP || {}
       record: {
         period: period.period,
         rawPeriod: period.rawPeriod,
-        people: everyone.size,
+        // pojistka pro výkazy bez osobních čísel — stav nesmí být menší
+        // než počet lidí, kteří v něm mají přesčas
+        people: Math.max(everyone.size, rows.length),
         rows,
         importedAt: new Date().toISOString(),
         file: file.name,

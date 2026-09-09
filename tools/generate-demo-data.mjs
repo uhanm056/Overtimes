@@ -64,8 +64,8 @@ const MONTHS = {
     file: 'Souctovy_vykaz_2026_07.xls',
     importedAt: '2026-08-04T07:12:00.000Z',
     total: 4625, paidShare: 0.63,
-    counts: { G100: 4, G210: 30, G220: 24, G230: 18, G310: 12, G320: 6, G410: 18, G420: 24, G430: 9, G463: 3, G510: 5, G520: 4, G610: 2, G620: 2, G630: 4, G710: 3, G720: 14 },
-    pinned: { G463: 146.95, G410: 640, G420: 590 },
+    counts: { G100: 4, G210: 28, G220: 22, G230: 16, G310: 11, G320: 7, G410: 17, G420: 24, G430: 8, G463: 3, G510: 5, G520: 4, G610: 4, G620: 4, G630: 5, G710: 5, G720: 15 },
+    pinned: { G463: 146.95, G410: 640, G420: 590, G210: 600 },
     zeroed: 3,
   },
   '2026-08': {
@@ -74,8 +74,8 @@ const MONTHS = {
     file: 'Souctovy_vykaz_2026_08.xls',
     importedAt: '2026-09-03T06:48:00.000Z',
     total: 4276, paidShare: 0.59,
-    counts: { G100: 4, G210: 30, G220: 24, G230: 18, G310: 12, G320: 8, G410: 18, G420: 26, G430: 9, G463: 3, G510: 6, G520: 4, G610: 2, G620: 2, G630: 5, G710: 3, G720: 15 },
-    pinned: { G463: 163.45, G420: 681, G410: 610 },
+    counts: { G100: 4, G210: 29, G220: 23, G230: 17, G310: 12, G320: 8, G410: 18, G420: 25, G430: 9, G463: 3, G510: 6, G520: 5, G610: 3, G620: 3, G630: 5, G710: 4, G720: 15 },
+    pinned: { G463: 163.45, G420: 681, G410: 610, G210: 620 },
     zeroed: 4,
   },
 }
@@ -86,6 +86,19 @@ SURNAMES.pop()
 const MALE = ['Jan', 'Petr', 'Josef', 'Pavel', 'Martin', 'Tomáš', 'Jaroslav', 'Miroslav', 'Zdeněk', 'František', 'Václav', 'Michal', 'Milan', 'Lukáš', 'Jiří', 'David', 'Radek', 'Ondřej', 'Roman', 'Marek']
 const FEMALE = ['Jana', 'Marie', 'Eva', 'Hana', 'Anna', 'Lenka', 'Kateřina', 'Lucie', 'Věra', 'Alena', 'Petra', 'Veronika', 'Jitka', 'Martina', 'Tereza', 'Michaela']
 const TITLES = ['', '', '', '', '', '', ', Ing.', ', Bc.', ', Mgr.', ', DiS.']
+
+/** Přechýlení příjmení. Prosté přilepení "ová" dá "Pokornýová" nebo "Bláhaová". */
+const FEMININE_EXCEPTIONS = {
+  'Vaněk': 'Vaňková', 'Staněk': 'Staňková', 'Kadlec': 'Kadlecová',
+}
+function feminine(sn) {
+  if (FEMININE_EXCEPTIONS[sn]) return FEMININE_EXCEPTIONS[sn]
+  if (/ý$/.test(sn)) return sn.slice(0, -1) + 'á'          // Černý → Černá
+  if (/a$/.test(sn)) return sn.slice(0, -1) + 'ová'        // Bláha → Bláhová
+  if (/ek$/.test(sn)) return sn.slice(0, -2) + 'ková'      // Hájek → Hájková
+  if (/ec$/.test(sn)) return sn.slice(0, -2) + 'cová'      // Němec → Němcová
+  return sn + 'ová'
+}
 
 const people = []
 let pid = 10240
@@ -99,7 +112,7 @@ for (const c of CENTERS) {
       const fn = female
         ? FEMALE[Math.floor(rnd() * FEMALE.length)]
         : MALE[Math.floor(rnd() * MALE.length)]
-      name = `${female ? sn + 'ová' : sn} ${fn}`
+      name = `${female ? feminine(sn) : sn} ${fn}`
     } while (used.has(name))
     used.add(name)
     pid += 1 + Math.floor(rnd() * 7)
@@ -138,7 +151,13 @@ function buildMonth(spec) {
   const zeroCandidates = []
 
   for (const c of CENTERS) {
-    const pool = byCenter.get(c.code).slice().sort((a, b) => b.prop - a.prop)
+    // Výběr kolísá měsíc od měsíce — kdo měl minule přesčas, nemusí ho mít teď
+    // (dovolená, nemoc, jiné vytížení). Bez toho by se sestava lidí neměnila
+    // a srovnání "kdo vypadl / kdo přibyl" by bylo prázdné.
+    const pool = byCenter.get(c.code).slice()
+      .map((p) => ({ p, key: p.prop * (0.55 + rnd() * 0.9) }))
+      .sort((a, b) => b.key - a.key)
+      .map((x) => x.p)
     const take = Math.min(spec.counts[c.code] ?? 0, pool.length)
     const sel = pool.slice(0, take)
     if (!sel.length) continue

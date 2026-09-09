@@ -30,7 +30,11 @@ i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 | **Metodika** | Jak se počítá, legislativní kontext |
 
 Jsou-li načtené aspoň dva měsíce, přibude u KPI a u tabulky středisek
-srovnání s předchozím měsícem (Δ na osobu i v součtu).
+srovnání s předchozím měsícem (Δ na osobu i v součtu) a karta **Kdo přibyl
+a kdo vypadl**. Výkaz obsahuje jen lidi, kteří v měsíci přesčas skutečně měli,
+takže zmizení ze žebříčku není chyba — je to informace (dovolená, nemoc,
+odchod, nebo prostě žádný přesčas). Porovnává se osobní číslo, ne klíč se
+střediskem, aby přeřazený člověk nevyšel jako nový.
 
 ## Struktura
 
@@ -98,7 +102,12 @@ Sekce **Import výkazu** bere soubor přetažením i výběrem. Parser:
    výskytu `d.m.rrrr - d.m.rrrr`. Z něj vzniká klíč měsíce.
 6. Hodiny se čtou jako `h:mm` i jako desetinné číslo, včetně znaménka
    (`-2:30`, `12:30-`, `(12:30)`).
-7. Řádky se agregují na klíč `osobní číslo | středisko`; nepřesčasové mzdové
+7. Sestavy z mezd tisknou jméno, osobní číslo a středisko často **jen na prvním
+   řádku skupiny** a u dalších mzdových složek nechávají tyhle sloupce prázdné.
+   Takový navazující řádek přebírá identitu z předchozího — jinak by se ztratila
+   evidence i roční součet a člověk, který má přesčas jen na navazujícím řádku,
+   by ve výkazu vůbec nebyl.
+8. Řádky se agregují na klíč `osobní číslo | středisko`; nepřesčasové mzdové
    složky se přeskočí, ale člověk se započítá do stavu ve výkazu.
 
 Existující měsíc se importem **přepíše**. Naimportované měsíce jdou v seznamu
@@ -152,10 +161,11 @@ npm test
 ```
 
 `tests/make-fixtures.mjs` vyrobí vzorové výkazy — HTML tabulku s příponou
-`.xls` v kódování windows-1250 a CSV s desetinnými hodinami. `tests/import.test.mjs`
-je pak nahraje **přes reálné UI** a ověří období, počty lidí, součty, zápornou
-evidenci, součet 0 u proplaceného konta, diakritiku i chování při smazání
-importu.
+`.xls` v kódování windows-1250, CSV s desetinnými hodinami a variantu se
+sloučenými buňkami, kde je jméno jen na prvním řádku skupiny.
+`tests/import.test.mjs` je pak nahraje **přes reálné UI** a ověří období, počty
+lidí, součty, zápornou evidenci, součet 0 u proplaceného konta, diakritiku,
+dědění identity u navazujících řádků i chování při smazání importu.
 
 ## Vzhled
 
@@ -173,5 +183,6 @@ opravdu přijde `.xlsx`.
 ## Co dál
 
 * Srovnávací pohled měsíc/měsíc jako samostatná sekce, až budou 3+ měsíce
-  (delty už se počítají v `PP.compare`, zatím se zobrazují jen v Přehledu)
+  (delty i příchody/odchody už se počítají v `PP.compare`, zobrazují se zatím
+  jen v Přehledu a vždy jen proti bezprostředně předchozímu měsíci)
 * Export do Excelu přímo z panelu

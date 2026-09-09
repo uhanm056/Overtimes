@@ -38,8 +38,9 @@ await page.waitForSelector('#drop')
 await page.setInputFiles('#file', [
   join(FIX, 'souctovy-vykaz-2026-09.xls'),
   join(FIX, 'souctovy-vykaz-2026-10.csv'),
+  join(FIX, 'souctovy-vykaz-2026-11-slouceny.xls'),
 ])
-await page.waitForFunction(() => document.querySelectorAll('#log .log-item.ok').length === 2, null, { timeout: 15000 })
+await page.waitForFunction(() => document.querySelectorAll('#log .log-item.ok').length === 3, null, { timeout: 20000 })
 
 const res = await page.evaluate(() => {
   const rec = window.PP.data.month('2026-09')
@@ -61,6 +62,20 @@ const res = await page.evaluate(() => {
     diacritics: byName('Šimek Ivan').s,
     csvTotal: Math.round(csv.total * 100) / 100,
     csvRows: csv.withOvertime,
+    // sloučené buňky: jméno jen na prvním řádku skupiny
+    merged: (() => {
+      const m = window.PP.data.month('2026-11')
+      const st = window.PP.stats(m)
+      const nov = m.rows.find((r) => r.n === 'Nováková Petra, Ing.')
+      return {
+        rows: st.withOvertime,
+        people: m.people,
+        total: Math.round(st.total * 100) / 100,
+        novakovaE: nov.e,
+        novakovaR: nov.r,
+        novakovaT: nov.t,
+      }
+    })(),
     months: window.PP.data.keys().join(','),
   }
 })
@@ -82,8 +97,16 @@ console.log('\nCSV (oddělovač ;, desetinné hodiny s čárkou):')
 check('lidí s přesčasem', res.csvRows, 5)
 check('celkem hodin', res.csvTotal, 140.33)
 
+console.log('\nSloučené buňky (jméno jen na prvním řádku skupiny):')
+check('lidí s přesčasem', res.merged.rows, 5)
+check('osob ve výkazu', res.merged.people, 6)
+check('celkem hodin', res.merged.total, 140.33)
+check('Nováková evidence (-6:30 z navazujícího řádku)', res.merged.novakovaE, -6.5)
+check('Nováková roční součet (z navazujícího řádku)', res.merged.novakovaR, 188.33)
+check('Nováková součet', res.merged.novakovaT, 34.5)
+
 console.log('\nSloučení měsíců:')
-check('pořadí měsíců', res.months, '2026-10,2026-09,2026-08,2026-07')
+check('pořadí měsíců', res.months, '2026-11,2026-10,2026-09,2026-08,2026-07')
 
 // smazání importu vrátí panel do původního stavu
 await page.click('[data-remove="2026-09"]').catch(() => {})
@@ -91,7 +114,7 @@ const months = await page.evaluate(async () => {
   await window.PP.data.removeMonth('2026-09')
   return window.PP.data.keys().join(',')
 })
-check('po smazání importu', months, '2026-10,2026-08,2026-07')
+check('po smazání importu', months, '2026-11,2026-10,2026-08,2026-07')
 
 await browser.close()
 server.close()

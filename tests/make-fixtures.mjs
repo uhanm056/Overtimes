@@ -26,6 +26,9 @@ function htmlReport() {
     rows.push([p.n, p.o, p.s, 'Přesčas evidence', p.e])
     rows.push([p.n, p.o, p.s, 'Přesčas roční součet', p.r])
     rows.push([p.n, p.o, p.s, 'Základní mzda', '168:00'])
+    // mezisoučet nadepsaný jménem, ale bez osobního čísla — nesmí se počítat
+    // jako další osoba ani jako přesčasová složka
+    rows.push([p.n, '', '', 'Celkem za osobu', '168:00'])
   }
   rows.push([NOISE.n, NOISE.o, NOISE.s, NOISE.c, NOISE.h])
   rows.push(['Celkem', '', '', '', '740:00'])
@@ -79,6 +82,29 @@ function toCp1250(text) {
   return out
 }
 
+/* Varianta, kde se jméno, osobní číslo a středisko tisknou jen na prvním řádku
+   skupiny — běžné rozvržení sestav z mezd. Navazující řádky musí identitu zdědit,
+   jinak se ztratí evidence i roční součet. */
+function mergedReport() {
+  const rows = []
+  for (const p of PEOPLE) {
+    rows.push([p.n, p.o, p.s, 'Přesčas do MEZD', p.m])
+    rows.push(['', '', '', 'Přesčas evidence', p.e])
+    rows.push(['', '', '', 'Přesčas roční součet', p.r])
+    rows.push(['', '', '', 'Základní mzda', '168:00'])
+  }
+  rows.push([NOISE.n, NOISE.o, NOISE.s, NOISE.c, NOISE.h])
+  rows.push(['Celkem', '', '', '', '740:00'])
+
+  return `<html><head><meta charset="utf-8"></head><body>
+<table>
+<tr><td colspan="5">Období: 1.11.2026 - 30.11.2026</td></tr>
+<tr><th>Příjmení a jméno</th><th>Osobní číslo</th><th>Středisko</th><th>Mzdová složka</th><th>Hodiny</th></tr>
+${rows.map((r) => '<tr>' + r.map((c) => `<td>${c}</td>`).join('') + '</tr>').join('\n')}
+</table></body></html>`
+}
+
 writeFileSync(join(DIR, 'souctovy-vykaz-2026-09.xls'), toCp1250(htmlReport()))
+writeFileSync(join(DIR, 'souctovy-vykaz-2026-11-slouceny.xls'), Buffer.from(mergedReport(), 'utf8'))
 writeFileSync(join(DIR, 'souctovy-vykaz-2026-10.csv'), toCp1250(csvReport()))
 console.log('Vzorové výkazy zapsány do tests/fixtures/')

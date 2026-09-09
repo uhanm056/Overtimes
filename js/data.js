@@ -156,12 +156,25 @@ window.PP = window.PP || {}
         dTotal: p ? c.total - p.total : null,
       }
     })
+    // Kdo mezi měsíci vypadl a kdo přibyl. Porovnává se podle osobního čísla,
+    // ne podle klíče s pobočkou — kdo změnil středisko, není nový člověk.
+    const prevIds = new Set(previous.rows.map((r) => String(r.o)))
+    const curIds = new Set(current.rows.map((r) => String(r.o)))
+    const dropped = previous.rows
+      .filter((r) => !curIds.has(String(r.o)))
+      .sort((x, y) => y.t - x.t)
+    const added = current.rows
+      .filter((r) => !prevIds.has(String(r.o)))
+      .sort((x, y) => y.t - x.t)
+
     return {
       dTotal: a.total - b.total,
       dPeople: a.withOvertime - b.withOvertime,
       dAvg: a.avg - b.avg,
       dPaidShare: a.paidShare - b.paidShare,
       centers,
+      dropped,
+      added,
     }
   }
 })(window.PP)

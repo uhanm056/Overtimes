@@ -237,6 +237,7 @@
     el.innerHTML = kpis +
       `<div class="grid two">${avgChart}${histChart}</div>` +
       `<div class="grid two">${splitChart}${findings}</div>` +
+      changesCard(cmp, prevK) +
       centerTable(s, cmp)
     bindCenterTable()
   }
@@ -275,6 +276,54 @@
         ${CFG.person.crit} h v jednom měsíci; maximum je ${hm(s.max)}.`)
     }
     return out.length ? out : ['Za tento měsíc nejsou vykázané žádné přesčasové hodiny.']
+  }
+
+  const CHANGE_LIMIT = 10
+
+  /** Seznam lidí, kteří proti minulému měsíci ve výkazu přibyli nebo z něj zmizeli. */
+  function changeList(rows, hoursLabel) {
+    if (!rows.length) return '<p class="hint" style="margin:0">Nikdo.</p>'
+    const shown = rows.slice(0, CHANGE_LIMIT)
+    return `<ul class="change-list">${shown.map((r) => `
+      <li>
+        <span class="who">${esc(r.n)}<small>${esc(r.s)}</small></span>
+        <span class="amt">${hm(r.t)}<small>${esc(hoursLabel)}</small></span>
+      </li>`).join('')}
+      ${rows.length > shown.length
+        ? `<li class="more">a další ${num(rows.length - shown.length)}</li>`
+        : ''}
+    </ul>`
+  }
+
+  function changesCard(cmp, prevK) {
+    if (!cmp) return ''
+    const { dropped, added } = cmp
+    if (!dropped.length && !added.length) return ''
+    const prev = monthShort(prevK)
+    const cur = monthShort(ui.month)
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Kdo přibyl a kdo vypadl</h2>
+        <span class="hint">proti ${esc(prev)} · porovnáno podle osobního čísla</span>
+      </div>
+      <div class="change-cols">
+        <div>
+          <h3 class="change-title">Vypadli <span class="tag good">${num(dropped.length)}</span></h3>
+          <p class="hint">V ${esc(prev)} přesčas měli, v ${esc(cur)} ho ve výkazu nemají —
+             typicky dovolená, nemoc nebo odchod.</p>
+          ${changeList(dropped, 'v ' + prev)}
+        </div>
+        <div>
+          <h3 class="change-title">Přibyli <span class="tag warn">${num(added.length)}</span></h3>
+          <p class="hint">V ${esc(prev)} ve výkazu nebyli, v ${esc(cur)} přesčas mají.</p>
+          ${changeList(added, 'v ' + cur)}
+        </div>
+      </div>
+      <p class="hint" style="margin:14px 0 0">
+        Kdo mezitím změnil středisko, se tu neobjeví — porovnává se osobní číslo, ne středisko.
+      </p>
+    </div>`
   }
 
   const CENTER_COLS = [
