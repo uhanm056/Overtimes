@@ -328,6 +328,9 @@ window.PP = window.PP || {}
     }
   }
 
+  // sdíleno s exportem — SheetJS se stahuje jen jednou, na požádání
+  PP.loadSheetJS = loadSheetJS
+
   // vystaveno kvůli testům a případnému CLI použití
   PP.parserInternals = { parseHours, classify, csvToMatrix, htmlToMatrix, findHeader, describePeriod, DATE_RANGE }
 })(window.PP)
