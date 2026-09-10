@@ -25,6 +25,7 @@ i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 | **Přehled** | KPI dlaždice, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
 | **Střediska** | Výběr střediska přes chipy, KPI střediska, TOP 5 lidí, seznam všech |
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
+| **Srovnání měsíců** | Volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
 | **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h |
 | **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
 | **Metodika** | Jak se počítá, legislativní kontext |
@@ -44,6 +45,7 @@ styles.css                  tokeny (:root + prefers-color-scheme + [data-theme])
 js/util.js                  formátování (h:mm, cs-CZ čísla), prahy, drobné DOM helpery
 js/store.js                 perzistence — localStorage nebo vlastní adaptér
 js/parser.js                čtení Součtového výkazu (xlsx / BIFF / HTML tabulka / CSV)
+js/export.js                sestavení sešitu .xlsx ke stažení
 js/data.js                  sloučení vestavěných a importovaných měsíců + statistiky
 js/app.js                   vykreslení sekcí
 data/months.js              vestavěná data (window.PP_BUILTIN_MONTHS)
@@ -113,6 +115,26 @@ Sekce **Import výkazu** bere soubor přetažením i výběrem. Parser:
 Existující měsíc se importem **přepíše**. Naimportované měsíce jdou v seznamu
 smazat; pokud pro daný měsíc existují i vestavěná data, po smazání se vrátí.
 
+## Export do Excelu
+
+Tlačítko **Export do Excelu** v horní liště stáhne sešit za vybraný měsíc
+(`Prescasy_2026-08_vs_2026-07.xlsx`) s listy:
+
+| List | Obsah |
+| --- | --- |
+| **Souhrn** | KPI měsíce, a když existuje předchozí měsíc, i delty proti němu |
+| **Střediska** | součty, průměry, pásma a Δ proti předchozímu měsíci |
+| **Lidé** | všichni s přesčasem, včetně ročního součtu a zbytku do stropu |
+| **Změny lidí** | kdo vypadl, kdo přibyl a jak se změnil každý, kdo zůstal |
+
+Hodiny jsou v sešitu **desetinná čísla**, aby se daly sčítat a filtrovat;
+u klíčových sloupců je vedle toho i tvar `h:mm`, protože v něm se výkaz čte.
+Časový formát Excelu se schválně nepoužívá — evidence bývá záporná a záporný
+čas Excel neumí zobrazit (ukáže `####`).
+
+SheetJS se stahuje z cdnjs až při prvním exportu. Bez sítě export nefunguje
+a panel to napíše vedle tlačítka.
+
 ## Perzistence
 
 Importované měsíce se ukládají do `localStorage` pod klíčem
@@ -160,6 +182,11 @@ npm install     # playwright
 npm test
 ```
 
+`tests/export.test.mjs` klikne na tlačítko exportu, zachytí stažený sešit
+a přečte ho zpátky — kontroluje listy, součty i to, že se součet sloupce
+Δ rovná změně měsíce. SheetJS se v testu bere z `node_modules`, aby test
+nezávisel na síti a testoval přitom stejnou cestu kódu jako panel.
+
 `tests/make-fixtures.mjs` vyrobí vzorové výkazy — HTML tabulku s příponou
 `.xls` v kódování windows-1250, CSV s desetinnými hodinami a variantu se
 sloučenými buňkami, kde je jméno jen na prvním řádku skupiny.
@@ -182,7 +209,5 @@ opravdu přijde `.xlsx`.
 
 ## Co dál
 
-* Srovnávací pohled měsíc/měsíc jako samostatná sekce, až budou 3+ měsíce
-  (delty i příchody/odchody už se počítají v `PP.compare`, zobrazují se zatím
-  jen v Přehledu a vždy jen proti bezprostředně předchozímu měsíci)
-* Export do Excelu přímo z panelu
+* Graf vývoje přes víc měsíců (dnes se porovnávají vždy jen dvě období)
+* Uložení vybrané dvojice měsíců do adresy, ať jde srovnání poslat odkazem

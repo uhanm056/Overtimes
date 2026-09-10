@@ -167,6 +167,16 @@ window.PP = window.PP || {}
       .filter((r) => !prevIds.has(String(r.o)))
       .sort((x, y) => y.t - x.t)
 
+    // kdo zůstal v obou měsících, seřazený podle změny přesčasu
+    const prevById = new Map(previous.rows.map((r) => [String(r.o), r]))
+    const movers = current.rows
+      .filter((r) => prevById.has(String(r.o)))
+      .map((r) => {
+        const p = prevById.get(String(r.o))
+        return { r, prev: p, d: r.t - p.t }
+      })
+      .sort((x, y) => y.d - x.d)
+
     return {
       dTotal: a.total - b.total,
       dPeople: a.withOvertime - b.withOvertime,
@@ -175,6 +185,7 @@ window.PP = window.PP || {}
       centers,
       dropped,
       added,
+      movers,
     }
   }
 })(window.PP)

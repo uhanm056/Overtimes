@@ -43,9 +43,13 @@
         <h1 id="section-title">Přehled</h1>
         <p class="sub" id="section-sub"></p>
       </div>
-      <div class="month-picker">
-        <label for="month-select">Období</label>
-        <select id="month-select"></select>
+      <div class="topbar-tools">
+        <div class="month-picker">
+          <label for="month-select">Období</label>
+          <select id="month-select"></select>
+        </div>
+        <button class="btn ghost" type="button" id="export-btn">Export do Excelu</button>
+        <span class="export-status" id="export-status" role="status"></span>
       </div>
     </header>
 
@@ -55,6 +59,7 @@
       <section class="panel" id="panel-overview" aria-labelledby="section-title"></section>
       <section class="panel" id="panel-centers" hidden></section>
       <section class="panel" id="panel-ranking" hidden></section>
+      <section class="panel" id="panel-compare" hidden></section>
       <section class="panel" id="panel-year" hidden></section>
       <section class="panel" id="panel-import" hidden></section>
       <section class="panel" id="panel-method" hidden></section>
@@ -67,6 +72,7 @@
 <script src="js/util.js"></script>
 <script src="js/store.js"></script>
 <script src="js/parser.js"></script>
+<script src="js/export.js"></script>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 </body>

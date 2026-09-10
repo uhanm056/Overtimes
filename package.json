@@ -9,9 +9,10 @@
     "start": "npx --yes http-server . -p 8080 -c-1 -o",
     "data": "node tools/generate-demo-data.mjs",
     "fixtures": "node tests/make-fixtures.mjs",
-    "test": "node tests/make-fixtures.mjs && node tests/import.test.mjs"
+    "test": "node tests/make-fixtures.mjs && node tests/import.test.mjs && node tests/export.test.mjs"
   },
   "devDependencies": {
-    "playwright": "^1.56.1"
+    "playwright": "^1.56.1",
+    "xlsx": "^0.18.5"
   }
 }

@@ -9,6 +9,7 @@
     overview: '<path d="M3 13h5v7H3zM9.5 4h5v16h-5zM16 9h5v11h-5z"/>',
     centers: '<path d="M4 20V8l6-4 6 4v12M4 20h16M14 20v-5h-4v5M20 20V11l-4-2.6"/>',
     ranking: '<path d="M6 20v-6M12 20V4M18 20v-9"/>',
+    compare: '<path d="M4 7h10M4 7l3-3M4 7l3 3M20 17H10M20 17l-3-3M20 17l-3 3"/>',
     year: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 7v5l3.2 2"/>',
     import: '<path d="M12 3v11M8 10.5l4 4 4-4M4 20h16"/>',
     method: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.6"/>',
@@ -18,6 +19,7 @@
     { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
     { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska a jeho lidí.' },
     { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
+    { id: 'compare', label: 'Srovnání měsíců', title: 'Srovnání měsíců', sub: 'Co se mezi dvěma obdobími změnilo.' },
     { id: 'year', label: 'Roční limit', title: 'Roční limit', sub: 'Kdo se blíží zákonnému stropu 416 h/rok.' },
     { id: 'import', label: 'Import výkazu', title: 'Import výkazu', sub: 'Přidání dalšího měsíce ze Součtového výkazu.' },
     { id: 'method', label: 'Metodika', title: 'Metodika', sub: 'Jak se čísla počítají a co znamenají.' },
@@ -29,6 +31,9 @@
     center: null,
     query: '',
     sort: { key: 'total', dir: 'desc' },
+    cmpSort: { key: 'dTotal', dir: 'desc' },
+    cmpA: null,          // starší z porovnávaných měsíců
+    cmpB: null,          // novější
     rankingLimit: 25,
     log: [],          // výsledky importů; přežijí překreslení panelu
   }
@@ -170,7 +175,7 @@
         cmp ? `proti ${esc(monthShort(prevK))} ${delta(cmp.dAvg)}` : 'z lidí s přesčasem',
         level(s.avg, CFG.person))}
       ${kpi('Proplaceno (MEZD)', pct(s.paidShare),
-        cmp ? `zbytek do konta ${delta(-cmp.dPaidShare, (v) => Math.round(v * 100) + ' b. b.')}` : 'zbytek roste v evidenci')}
+        cmp ? `zbytek do konta ${delta(-cmp.dPaidShare, (v) => Math.round(v * 100) + ' p. b.')}` : 'zbytek roste v evidenci')}
       ${kpi('Nad ' + CFG.person.crit + ' h za měsíc', num(s.overCrit),
         `nad ${CFG.person.warn} h: ${num(s.overWarn)}`, s.overCrit ? 'crit' : 'good')}
       ${kpi('Nad ' + CFG.year.warn + ' h ročně', num(s.year150),
@@ -295,12 +300,12 @@
     </ul>`
   }
 
-  function changesCard(cmp, prevK) {
+  function changesCard(cmp, keyA, keyB) {
     if (!cmp) return ''
     const { dropped, added } = cmp
     if (!dropped.length && !added.length) return ''
-    const prev = monthShort(prevK)
-    const cur = monthShort(ui.month)
+    const prev = monthShort(keyA)
+    const cur = monthShort(keyB || ui.month)
 
     return `<div class="card">
       <div class="card-head">
@@ -519,6 +524,134 @@
     if (more) more.addEventListener('click', () => { ui.rankingLimit += 25; renderRanking() })
   }
 
+  /* ---------- Srovnání měsíců ---------- */
+  const CMP_COLS = [
+    { key: 'name', label: 'Středisko', num: false },
+    { key: 'prevTotal', label: 'Celkem A', num: true },
+    { key: 'total', label: 'Celkem B', num: true },
+    { key: 'dTotal', label: 'Δ celkem', num: true },
+    { key: 'prevAvg', label: 'Ø A', num: true },
+    { key: 'avg', label: 'Ø B', num: true },
+    { key: 'dAvg', label: 'Δ Ø', num: true },
+  ]
+
+  function renderCompare() {
+    const el = $('#panel-compare')
+    const keys = PP.data.keys()
+    if (keys.length < 2) {
+      el.innerHTML = emptyState('Srovnání potřebuje aspoň dva měsíce. Naimportujte další výkaz.')
+      return
+    }
+
+    // výchozí dvojice: aktuální měsíc proti tomu předchozímu
+    if (!keys.includes(ui.cmpB)) ui.cmpB = keys.includes(ui.month) ? ui.month : keys[0]
+    if (!keys.includes(ui.cmpA) || ui.cmpA === ui.cmpB) {
+      const i = keys.indexOf(ui.cmpB)
+      ui.cmpA = keys[i + 1] != null ? keys[i + 1] : keys[i - 1]
+    }
+
+    const recA = PP.data.month(ui.cmpA)
+    const recB = PP.data.month(ui.cmpB)
+    const sA = PP.stats(recA)
+    const sB = PP.stats(recB)
+    const cmp = PP.compare(recB, recA)
+    const A = monthShort(ui.cmpA)
+    const B = monthShort(ui.cmpB)
+
+    const picker = `<div class="card">
+      <div class="card-head"><h2>Které měsíce porovnat</h2>
+        <span class="hint">A je starší, B novější — Δ ukazuje změnu z A na B</span></div>
+      <div class="cmp-picker">
+        <label>A <select id="cmp-a">${keys.map((k) =>
+          `<option value="${esc(k)}" ${k === ui.cmpA ? 'selected' : ''}>${esc(monthName(k))}</option>`).join('')}</select></label>
+        <span class="cmp-arrow" aria-hidden="true">→</span>
+        <label>B <select id="cmp-b">${keys.map((k) =>
+          `<option value="${esc(k)}" ${k === ui.cmpB ? 'selected' : ''}>${esc(monthName(k))}</option>`).join('')}</select></label>
+        <button class="btn ghost sm" type="button" id="cmp-swap">Prohodit</button>
+      </div>
+    </div>`
+
+    const kpis = `<div class="grid kpis">
+      ${kpi('Δ přesčas celkem', (cmp.dTotal > 0 ? '+' : '−') + h1(Math.abs(cmp.dTotal)) + ' h',
+        `${h1(sA.total)} → ${h1(sB.total)} h`, cmp.dTotal > 0 ? 'crit' : 'good')}
+      ${kpi('Δ Ø na osobu', (cmp.dAvg > 0 ? '+' : '−') + hm(Math.abs(cmp.dAvg)),
+        `${hm(sA.avg)} → ${hm(sB.avg)}`, cmp.dAvg > 0 ? 'crit' : 'good')}
+      ${kpi('Δ lidí s přesčasem', (cmp.dPeople > 0 ? '+' : '') + num(cmp.dPeople),
+        `${num(sA.withOvertime)} → ${num(sB.withOvertime)}`)}
+      ${kpi('Δ proplaceno', (cmp.dPaidShare > 0 ? '+' : '−') + Math.abs(Math.round(cmp.dPaidShare * 100)) + ' p. b.',
+        `${pct(sA.paidShare)} → ${pct(sB.paidShare)}`)}
+      ${kpi('Vypadli', num(cmp.dropped.length), `byli v ${esc(A)}, v ${esc(B)} ne`, 'good')}
+      ${kpi('Přibyli', num(cmp.added.length), `v ${esc(A)} nebyli`, cmp.added.length ? 'warn' : '')}
+    </div>`
+
+    const dir = ui.cmpSort.dir === 'asc' ? 1 : -1
+    const sk = ui.cmpSort.key
+    const rows = cmp.centers.slice().sort((x, y) => {
+      if (sk === 'name') return dir * String(x.name).localeCompare(String(y.name), 'cs')
+      return dir * ((x[sk] == null ? -Infinity : x[sk]) - (y[sk] == null ? -Infinity : y[sk]))
+    })
+
+    const table = `<div class="card">
+      <div class="card-head"><h2>Střediska</h2>
+        <span class="hint">A = ${esc(monthName(ui.cmpA))} · B = ${esc(monthName(ui.cmpB))}</span></div>
+      <div class="table-wrap"><table id="cmp-table">
+        <thead><tr>${CMP_COLS.map((c) => `<th class="sortable${c.num ? ' num' : ''}" data-key="${c.key}"
+          aria-sort="${sk === c.key ? (ui.cmpSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+          >${esc(c.label)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map((c) => `<tr>
+          <td>${esc(c.name)}</td>
+          <td class="num">${c.prevTotal == null ? '—' : h1(c.prevTotal)}</td>
+          <td class="num">${h1(c.total)}</td>
+          <td class="num">${c.dTotal == null ? '<span class="tag">nové</span>' : delta(c.dTotal, h1)}</td>
+          <td class="num">${c.prevAvg == null ? '—' : hm(c.prevAvg)}</td>
+          <td class="num">${hm(c.avg)}</td>
+          <td class="num">${c.dAvg == null ? '<span class="tag">nové</span>' : delta(c.dAvg)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    const up = cmp.movers.filter((m) => m.d > 0).slice(0, 10)
+    const down = cmp.movers.filter((m) => m.d < 0).slice(-10).reverse()
+    const moverList = (list, tone) => list.length
+      ? `<ul class="change-list">${list.map((m) => `<li>
+          <span class="who">${esc(m.r.n)}<small>${esc(m.r.s)}</small></span>
+          <span class="amt">${delta(m.d)}<small>${hm(m.prev.t)} → ${hm(m.r.t)}</small></span>
+        </li>`).join('')}</ul>`
+      : '<p class="hint" style="margin:0">Nikdo.</p>'
+
+    const movers = `<div class="card">
+      <div class="card-head"><h2>Největší změny u lidí</h2>
+        <span class="hint">jen ti, kdo jsou v obou měsících — ${num(cmp.movers.length)} lidí</span></div>
+      <div class="change-cols">
+        <div>
+          <h3 class="change-title">Nejvíc přidali <span class="tag crit">${num(cmp.movers.filter((m) => m.d > 0).length)}</span></h3>
+          <p class="hint">Přesčas jim proti ${esc(A)} narostl.</p>
+          ${moverList(up)}
+        </div>
+        <div>
+          <h3 class="change-title">Nejvíc ubrali <span class="tag good">${num(cmp.movers.filter((m) => m.d < 0).length)}</span></h3>
+          <p class="hint">Přesčas jim proti ${esc(A)} klesl.</p>
+          ${moverList(down)}
+        </div>
+      </div>
+    </div>`
+
+    el.innerHTML = picker + kpis + table + movers + changesCard(cmp, ui.cmpA, ui.cmpB)
+
+    $('#cmp-a').addEventListener('change', (e) => { ui.cmpA = e.target.value; renderCompare() })
+    $('#cmp-b').addEventListener('change', (e) => { ui.cmpB = e.target.value; renderCompare() })
+    $('#cmp-swap').addEventListener('click', () => {
+      const t = ui.cmpA; ui.cmpA = ui.cmpB; ui.cmpB = t
+      renderCompare()
+    })
+    $$('#cmp-table th.sortable').forEach((th) => th.addEventListener('click', () => {
+      const key = th.dataset.key
+      if (ui.cmpSort.key === key) ui.cmpSort.dir = ui.cmpSort.dir === 'asc' ? 'desc' : 'asc'
+      else ui.cmpSort = { key, dir: key === 'name' ? 'asc' : 'desc' }
+      renderCompare()
+    }))
+  }
+
   /* ---------- Roční limit ---------- */
   function renderYear() {
     const el = $('#panel-year')
@@ -725,6 +858,29 @@
     </div></div>`
   }
 
+  /* ---------- export do Excelu ---------- */
+  async function doExport() {
+    const btn = $('#export-btn')
+    const status = $('#export-status')
+    if (!ui.month || btn.disabled) return
+    const label = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'Exportuji…'
+    status.textContent = ''
+    status.className = 'export-status'
+    try {
+      const out = await PP.exportExcel(ui.month, previousKey())
+      status.textContent = out.name
+      status.className = 'export-status ok'
+    } catch (err) {
+      status.textContent = err && err.message ? err.message : String(err)
+      status.className = 'export-status err'
+    } finally {
+      btn.disabled = false
+      btn.textContent = label
+    }
+  }
+
   /* ---------- překreslení ---------- */
   function render() {
     renderDemoBanner()
@@ -732,6 +888,7 @@
       case 'overview': return renderOverview()
       case 'centers': return renderCenters()
       case 'ranking': return renderRanking()
+      case 'compare': return renderCompare()
       case 'year': return renderYear()
       case 'import': return renderImport()
       case 'method': return renderMethod()
@@ -765,6 +922,7 @@
       ui.center = null
       render()
     })
+    $('#export-btn').addEventListener('click', doExport)
     window.addEventListener('hashchange', () => {
       const id = location.hash.slice(1)
       if (id && id !== ui.section) go(id)
