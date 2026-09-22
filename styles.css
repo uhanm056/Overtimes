@@ -349,6 +349,35 @@ mark { background: var(--accent-soft); color: inherit; border-radius: 3px; paddi
 .export-status.err { color: var(--crit); }
 #export-btn[disabled] { opacity: .6; cursor: progress; }
 
+/* ---------- grafy vývoje ---------- */
+.metric-switch { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chart-host { position: relative; width: 100%; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+
+.chart-grid { stroke: var(--line-soft); stroke-width: 1; }
+.chart-axis { stroke: var(--line); stroke-width: 1; }
+.chart-tick { fill: var(--text-3); font-size: 11.5px; font-family: var(--font-mono); }
+.chart-line { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* prstenec v barvě povrchu odděluje body tam, kde se čáry kříží */
+.chart-dot { stroke: var(--surface); stroke-width: 2; }
+.chart-end { font-size: 11.5px; font-weight: 600; font-family: var(--font-text); }
+.chart-cross { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+
+.chart-tip {
+  position: absolute; top: 6px; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  padding: 8px 11px; font-size: 12.5px; pointer-events: none; z-index: 2;
+  min-width: 128px;
+}
+.chart-tip strong { display: block; margin-bottom: 5px; font-family: var(--font-display); }
+.chart-tip .row { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
+.chart-tip .row i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.chart-tip .nm { color: var(--text-2); }
+.chart-legend { margin-top: 14px; }
+
+.chart-tip .vl { margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
 /* ---------- srovnání měsíců ---------- */
 .cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .cmp-picker label { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }

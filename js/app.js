@@ -19,7 +19,7 @@
     { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
     { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska a jeho lidí.' },
     { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
-    { id: 'compare', label: 'Srovnání měsíců', title: 'Srovnání měsíců', sub: 'Co se mezi dvěma obdobími změnilo.' },
+    { id: 'compare', label: 'Vývoj a srovnání', title: 'Vývoj a srovnání', sub: 'Jak se přesčas vyvíjí a co se změnilo mezi dvěma obdobími.' },
     { id: 'year', label: 'Roční limit', title: 'Roční limit', sub: 'Kdo se blíží zákonnému stropu 416 h/rok.' },
     { id: 'import', label: 'Import výkazu', title: 'Import výkazu', sub: 'Přidání dalšího měsíce ze Součtového výkazu.' },
     { id: 'method', label: 'Metodika', title: 'Metodika', sub: 'Jak se čísla počítají a co znamenají.' },
@@ -32,6 +32,7 @@
     query: '',
     sort: { key: 'total', dir: 'desc' },
     cmpSort: { key: 'dTotal', dir: 'desc' },
+    metric: 'total',     // ukazatel v grafech vývoje
     cmpA: null,          // starší z porovnávaných měsíců
     cmpB: null,          // novější
     rankingLimit: 25,
@@ -524,6 +525,133 @@
     if (more) more.addEventListener('click', () => { ui.rankingLimit += 25; renderRanking() })
   }
 
+  /* ---------- Vývoj přes víc měsíců ---------- */
+  const METRICS = {
+    total: {
+      label: 'Přesčas celkem',
+      plant: (s) => s.total,
+      center: (c) => c.total,
+      format: (v) => h1(v) + ' h',
+      tick: (v) => num(v) + ' h',
+    },
+    avg: {
+      label: 'Ø na osobu',
+      plant: (s) => s.avg,
+      center: (c) => c.avg,
+      format: hm,
+    },
+    people: {
+      label: 'Lidí s přesčasem',
+      plant: (s) => s.withOvertime,
+      center: (c) => c.people,
+      format: num,
+    },
+    paid: {
+      label: 'Podíl proplacených',
+      plant: (s) => s.paidShare,
+      center: (c) => (c.total ? c.m / c.total : 0),
+      format: pct,
+      tick: pct,
+    },
+  }
+
+  /** Měsíce od nejstaršího k nejnovějšímu — graf vývoje čte čas zleva doprava. */
+  function timeline() {
+    return PP.data.keys().slice().reverse()
+  }
+
+  /** Pět největších středisek podle posledního měsíce. Barva patří středisku,
+      ne jeho pořadí, takže přepnutí ukazatele nepřebarví přeživší. */
+  function topCenters() {
+    const keys = timeline()
+    if (!keys.length) return []
+    const last = PP.stats(PP.data.month(keys[keys.length - 1]))
+    const colors = PP.seriesColors()
+    return last.byTotal.slice(0, 5).map((c, i) => ({ name: c.name, color: colors[i] }))
+  }
+
+  function metricSwitcher() {
+    return `<div class="metric-switch" role="group" aria-label="Ukazatel grafu">
+      ${Object.keys(METRICS).map((k) => `<button type="button" class="chip" data-metric="${k}"
+        aria-pressed="${k === ui.metric}">${esc(METRICS[k].label)}</button>`).join('')}
+    </div>`
+  }
+
+  /** Nakreslí oba grafy vývoje do už vykreslených karet. */
+  function drawTrends() {
+    const keys = timeline()
+    if (keys.length < 2) return
+    const M = METRICS[ui.metric] || METRICS.total
+    const labels = keys.map(monthShort)
+
+    const plantHost = $('#chart-plant')
+    if (plantHost) {
+      PP.lineChart(plantHost, {
+        labels,
+        format: M.format,
+        tickFormat: M.tick,
+        area: true,
+        height: 250,
+        ariaLabel: `Vývoj ukazatele ${M.label} za závod`,
+        series: [{
+          name: M.label,
+          color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0f9e91',
+          values: keys.map((k) => M.plant(PP.stats(PP.data.month(k)))),
+        }],
+      })
+    }
+
+    const centerHost = $('#chart-centers')
+    if (centerHost) {
+      PP.lineChart(centerHost, {
+        labels,
+        format: M.format,
+        tickFormat: M.tick,
+        endLabel: true,
+        height: 260,
+        ariaLabel: `Vývoj ukazatele ${M.label} po střediscích`,
+        series: topCenters().map((t) => ({
+          name: centerName(t.name),
+          color: t.color,
+          values: keys.map((k) => {
+            const c = PP.stats(PP.data.month(k)).centers.find((x) => x.name === t.name)
+            return c ? M.center(c) : null
+          }),
+        })),
+      })
+    }
+  }
+
+  function trendCards() {
+    const keys = timeline()
+    if (keys.length < 2) return ''
+    const M = METRICS[ui.metric] || METRICS.total
+    const first = PP.stats(PP.data.month(keys[0]))
+    const last = PP.stats(PP.data.month(keys[keys.length - 1]))
+    const from = M.plant(first)
+    const to = M.plant(last)
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Vývoj závodu</h2>
+        <span class="hint">${esc(monthShort(keys[0]))} – ${esc(monthShort(keys[keys.length - 1]))} ·
+          ${esc(M.label)}: ${esc(M.format(from))} → ${esc(M.format(to))}</span>
+      </div>
+      ${metricSwitcher()}
+      <div class="chart-host" id="chart-plant"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Vývoj středisek</h2>
+        <span class="hint">pět největších podle posledního měsíce · ${esc(M.label)}</span>
+      </div>
+      <div class="chart-host" id="chart-centers"></div>
+      <div class="legend chart-legend">${topCenters().map((t) =>
+        `<span><i class="dot" style="background:${t.color}"></i>${esc(t.name)}</span>`).join('')}</div>
+    </div>`
+  }
+
   /* ---------- Srovnání měsíců ---------- */
   const CMP_COLS = [
     { key: 'name', label: 'Středisko', num: false },
@@ -539,7 +667,7 @@
     const el = $('#panel-compare')
     const keys = PP.data.keys()
     if (keys.length < 2) {
-      el.innerHTML = emptyState('Srovnání potřebuje aspoň dva měsíce. Naimportujte další výkaz.')
+      el.innerHTML = emptyState('Vývoj a srovnání potřebují aspoň dva měsíce. Naimportujte další výkaz.')
       return
     }
 
@@ -636,7 +764,14 @@
       </div>
     </div>`
 
-    el.innerHTML = picker + kpis + table + movers + changesCard(cmp, ui.cmpA, ui.cmpB)
+    el.innerHTML = trendCards() + picker + kpis + table + movers + changesCard(cmp, ui.cmpA, ui.cmpB)
+    drawTrends()
+    PP.watchCharts(drawTrends)
+
+    $$('#panel-compare [data-metric]').forEach((b) => b.addEventListener('click', () => {
+      ui.metric = b.dataset.metric
+      renderCompare()
+    }))
 
     $('#cmp-a').addEventListener('change', (e) => { ui.cmpA = e.target.value; renderCompare() })
     $('#cmp-b').addEventListener('change', (e) => { ui.cmpB = e.target.value; renderCompare() })

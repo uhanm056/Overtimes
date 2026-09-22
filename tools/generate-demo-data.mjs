@@ -25,7 +25,11 @@ function mulberry32(a) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
-const rnd = mulberry32(20260907)
+const SEED = 20260907
+let next = mulberry32(SEED)
+const rnd = () => next()
+/** Vrátí generátor na začátek, aby šlo hledání parametrů opakovat se stejnými čísly. */
+function resetRnd() { next = mulberry32(SEED) }
 const gauss = () => {
   let u = 0, v = 0
   while (u === 0) u = rnd()
@@ -56,28 +60,48 @@ const CENTERS = [
 const label = (c) => `${c.code} ${c.name}`
 const HEAD = CENTERS.reduce((a, c) => a + c.head, 0)
 
-/* ---------- měsíce ---------- */
+/* ---------- měsíce ----------
+   Leden až srpen. Červenec a srpen mají čísla ze zadání, zbytek je dopsaná
+   historie tak, aby dávala smysl dohromady: přesčas přes rok roste, podíl
+   proplacených hodin klesá (roste konto) a Warehouse se postupně propracuje
+   na první místo.
+
+   Roční součet NENÍ zvlášť vymyšlené číslo — je to skutečný kumulativní součet
+   měsíců od ledna. Kdo si v panelu sečte měsíční sloupce, musí dostat přesně
+   hodnotu ve sloupci „Ročně“. */
 const MONTHS = {
-  '2026-07': {
-    period: '1. 7. – 31. 7. 2026',
-    rawPeriod: '1.7.2026 - 31.7.2026',
-    file: 'Souctovy_vykaz_2026_07.xls',
-    importedAt: '2026-08-04T07:12:00.000Z',
-    total: 4625, paidShare: 0.63,
+  '2026-01': { total: 1100, otPeople: 118, paidShare: 0.72, zeroed: 1,
+    pinned: { G463: 27, G420: 96, G410: 175, G210: 150 } },
+  '2026-02': { total: 1450, otPeople: 128, paidShare: 0.71, zeroed: 1,
+    pinned: { G463: 39, G420: 132, G410: 225, G210: 195 } },
+  '2026-03': { total: 1900, otPeople: 140, paidShare: 0.70, zeroed: 2,
+    pinned: { G463: 54, G420: 180, G410: 300, G210: 260 } },
+  '2026-04': { total: 2450, otPeople: 152, paidShare: 0.68, zeroed: 2,
+    pinned: { G463: 78, G420: 260, G410: 380, G210: 330 } },
+  '2026-05': { total: 3050, otPeople: 163, paidShare: 0.67, zeroed: 3,
+    pinned: { G463: 99, G420: 350, G410: 450, G210: 420 } },
+  '2026-06': { total: 3800, otPeople: 176, paidShare: 0.65, zeroed: 3,
+    pinned: { G463: 123, G420: 480, G410: 560, G210: 520 } },
+  '2026-07': { total: 4625, otPeople: 182, paidShare: 0.63, zeroed: 3,
     counts: { G100: 4, G210: 28, G220: 22, G230: 16, G310: 11, G320: 7, G410: 17, G420: 24, G430: 8, G463: 3, G510: 5, G520: 4, G610: 4, G620: 4, G630: 5, G710: 5, G720: 15 },
-    pinned: { G463: 146.95, G410: 640, G420: 590, G210: 600 },
-    zeroed: 3,
-  },
-  '2026-08': {
-    period: '1. 8. – 31. 8. 2026',
-    rawPeriod: '1.8.2026 - 31.8.2026',
-    file: 'Souctovy_vykaz_2026_08.xls',
-    importedAt: '2026-09-03T06:48:00.000Z',
-    total: 4276, paidShare: 0.59,
+    pinned: { G463: 146.95, G410: 640, G420: 590, G210: 600 } },
+  '2026-08': { total: 4276, otPeople: 189, paidShare: 0.59, zeroed: 4,
     counts: { G100: 4, G210: 29, G220: 23, G230: 17, G310: 12, G320: 8, G410: 18, G420: 25, G430: 9, G463: 3, G510: 6, G520: 5, G610: 3, G620: 3, G630: 5, G710: 4, G720: 15 },
-    pinned: { G463: 163.45, G420: 681, G410: 610, G210: 620 },
-    zeroed: 4,
-  },
+    pinned: { G463: 163.45, G420: 681, G410: 610, G210: 620 } },
+}
+
+const MONTH_KEYS = Object.keys(MONTHS).sort()
+const DAYS = { '01': 31, '02': 28, '03': 31, '04': 30, '05': 31, '06': 30, '07': 31, '08': 31 }
+
+for (const key of MONTH_KEYS) {
+  const m = Number(key.slice(5))
+  const last = DAYS[key.slice(5)]
+  Object.assign(MONTHS[key], {
+    period: `1. ${m}. – ${last}. ${m}. 2026`,
+    rawPeriod: `1.${m}.2026 - ${last}.${m}.2026`,
+    file: `Souctovy_vykaz_2026_${key.slice(5)}.xls`,
+    importedAt: `2026-${String(m + 1).padStart(2, '0')}-04T07:12:00.000Z`,
+  })
 }
 
 /* ---------- roster ---------- */
@@ -121,14 +145,46 @@ for (const c of CENTERS) {
       n: name + TITLES[Math.floor(rnd() * TITLES.length)],
       s: label(c),
       code: c.code,
-      // sklon k přesčasům — určuje, kdo se do výkazu dostane a s jakým objemem
-      prop: Math.max(0.05, 1 + gauss() * 0.55),
+      // z-skóre sklonu k přesčasům; na `prop` se převede až v build(),
+      // kde se hledá rozptyl odpovídající zadanému počtu lidí nad 150 h
+      z: gauss(),
     })
   }
 }
 
 /* ---------- rozdělení hodin v měsíci ---------- */
-function buildMonth(spec) {
+/** Nejvyšší měsíční přesčas jednotlivce. Víc už není reálné odpracovat. */
+const MONTH_CAP = 90 * 60
+
+/**
+ * Ořeže hodnoty na MONTH_CAP a přebytek rozpustí mezi ostatní ve skupině.
+ * Součet pole zůstává stejný, takže sedí i součet za středisko.
+ */
+function capWithinGroup(mins) {
+  for (let pass = 0; pass < 12; pass++) {
+    let excess = 0
+    for (let i = 0; i < mins.length; i++) {
+      if (mins[i] > MONTH_CAP) { excess += mins[i] - MONTH_CAP; mins[i] = MONTH_CAP }
+    }
+    if (!excess) return
+    const room = mins.map((v) => Math.max(0, MONTH_CAP - v))
+    const roomSum = room.reduce((a, b) => a + b, 0)
+    if (!roomSum) return          // skupina je celá na stropu, víc rozpustit nejde
+    let left = excess
+    for (let i = 0; i < mins.length && left > 0; i++) {
+      const add = Math.min(left, room[i], Math.round((room[i] / roomSum) * excess))
+      mins[i] += add
+      left -= add
+    }
+    for (let i = 0; i < mins.length && left > 0; i++) {
+      const add = Math.min(left, MONTH_CAP - mins[i])
+      mins[i] += add
+      left -= add
+    }
+  }
+}
+
+function buildMonth(spec, counts) {
   const byCenter = new Map()
   for (const c of CENTERS) byCenter.set(c.code, [])
   for (const p of people) byCenter.get(p.code).push(p)
@@ -158,7 +214,7 @@ function buildMonth(spec) {
       .map((p) => ({ p, key: p.prop * (0.55 + rnd() * 0.9) }))
       .sort((a, b) => b.key - a.key)
       .map((x) => x.p)
-    const take = Math.min(spec.counts[c.code] ?? 0, pool.length)
+    const take = Math.min(counts[c.code] ?? 0, pool.length)
     const sel = pool.slice(0, take)
     if (!sel.length) continue
 
@@ -171,6 +227,8 @@ function buildMonth(spec) {
     let big = 0
     for (let i = 1; i < mins.length; i++) if (mins[i] > mins[big]) big = i
     mins[big] += diff
+
+    capWithinGroup(mins)
 
     sel.forEach((p, i) => {
       const row = { p, code: c.code, tMin: Math.max(0, mins[i]) }
@@ -204,6 +262,15 @@ function buildMonth(spec) {
     })
   }
 
+  // rozpuštění uvolněných hodin mohlo někoho dostat nad strop — ořezat znovu
+  for (const c of CENTERS) {
+    const grp = rows.filter((r) => r.code === c.code && !zeroed.has(r))
+    if (!grp.length) continue
+    const mins = grp.map((r) => r.tMin)
+    capWithinGroup(mins)
+    grp.forEach((r, i) => { r.tMin = mins[i] })
+  }
+
   // rozpad na MEZD / evidenci
   const freeRows = rows.filter((r) => !zeroed.has(r) && r.tMin > 0)
   for (const r of freeRows) {
@@ -225,46 +292,87 @@ function buildMonth(spec) {
   return rows
 }
 
-const julRows = buildMonth(MONTHS['2026-07'])
-const augRows = buildMonth(MONTHS['2026-08'])
-
-/* ---------- roční součet ---------- */
-const byPerson = new Map()
-for (const p of people) byPerson.set(p.o, { p, jul: 0, aug: 0 })
-for (const r of julRows) byPerson.get(r.p.o).jul = r.tMin
-for (const r of augRows) byPerson.get(r.p.o).aug = r.tMin
-for (const e of byPerson.values()) e.jit = Math.max(0.35, 1 + gauss() * 0.3)
-
-function annual(k) {
-  for (const e of byPerson.values()) {
-    const base = (e.jul + e.aug) / 2
-    e.pre = Math.round(base * 6 * e.jit * k)
-    e.rJul = e.pre + e.jul
-    e.rAug = e.rJul + e.aug
-    const cap = 410 * 60
-    if (e.rAug > cap) {
-      const over = e.rAug - cap
-      e.pre = Math.max(0, e.pre - over)
-      e.rJul = e.pre + e.jul
-      e.rAug = e.rJul + e.aug
+/* ---------- počty lidí s přesčasem na střediska ----------
+   Červenec a srpen mají počty ze zadání; zbytku se dopočítají podle stavu.
+   G463 Prefix má vždy všechny tři — jeho průměr na osobu je zafixovaný. */
+function monthCounts(spec) {
+  if (spec.counts) return spec.counts
+  const out = {}
+  const rest = CENTERS.filter((c) => c.code !== 'G463')
+  const restHead = rest.reduce((a, c) => a + c.head, 0)
+  out.G463 = 3
+  let sum = 3
+  for (const c of rest) {
+    out[c.code] = Math.max(1, Math.min(c.head, Math.round(c.head * (spec.otPeople - 3) / restHead)))
+    sum += out[c.code]
+  }
+  // dorovnání na přesný počet — po jednom, od největších středisek
+  const order = rest.slice().sort((a, b) => b.head - a.head)
+  let guard = 0
+  while (sum !== spec.otPeople && guard++ < 500) {
+    for (const c of order) {
+      if (sum === spec.otPeople) break
+      if (sum < spec.otPeople && out[c.code] < c.head) { out[c.code]++; sum++ }
+      else if (sum > spec.otPeople && out[c.code] > 1) { out[c.code]--; sum-- }
     }
   }
-  return [...byPerson.values()].filter((e) => e.rAug > 150 * 60).length
+  return out
 }
-// najdi k tak, aby v srpnu bylo ~44 lidí nad 150 h ročně
-let lo = 0.2, hi = 3.5, k = 1
-for (let i = 0; i < 60; i++) {
-  k = (lo + hi) / 2
-  if (annual(k) < 44) lo = k; else hi = k
+
+/* ---------- sestavení všech měsíců ----------
+   `spread` je rozptyl sklonu k přesčasům. Čím vyšší, tím delší pravý chvost
+   a tím víc lidí se přes rok dostane nad roční prahy. Hledá se tak, aby
+   v srpnu vyšlo 44 lidí nad 150 h — což je číslo ze zadání. */
+function build(spread) {
+  for (const p of people) p.prop = Math.max(0.05, Math.exp(p.z * spread))
+
+  const months = {}
+  for (const key of MONTH_KEYS) {
+    const spec = MONTHS[key]
+    months[key] = buildMonth(spec, monthCounts(spec))
+  }
+
+  // roční součet = skutečný kumulativní součet měsíců od ledna
+  const cum = new Map()
+  for (const key of MONTH_KEYS) {
+    for (const row of months[key]) {
+      const prev = cum.get(row.p.o) || 0
+      const now = prev + row.tMin
+      cum.set(row.p.o, now)
+      row.rMin = now
+    }
+    // kdo v měsíci přesčas nemá, jeho součet se nemění — nic neděláme
+  }
+  return months
 }
-// hi je nejmenší nalezené k, které dá >= 44 lidí — počet je schodovitý,
-// takže přesně 44 nemusí být dosažitelné; bereme nejbližší shora
-annual(hi)
+
+// rnd je sdílený, takže každý běh build() posune sekvenci; pro porovnatelnost
+// se pro každý pokus resetuje na stejný seed
+function attempt(spread) {
+  resetRnd()
+  const months = build(spread)
+  const aug = months['2026-08']
+  return { months, over150: aug.filter((r) => r.rMin > 150 * 60).length }
+}
+
+let best = null
+for (let i = 0; i <= 60; i++) {
+  const spread = 0.10 + (i / 60) * 1.00
+  const a = attempt(spread)
+  const dist = Math.abs(a.over150 - 44)
+  if (!best || dist < best.dist) best = { dist, spread, ...a }
+  if (dist === 0) break
+}
+const months = best.months
+if (best.dist !== 0) {
+  console.warn(`Pozor: nad 150 h vyšlo ${best.over150}, cíl byl 44 (rozptyl ${best.spread.toFixed(3)}).`)
+}
 
 /* ---------- sestavení výstupu ---------- */
 const m2h = (min) => Math.round((min / 60) * 100) / 100
 
-function record(key, spec, rows, rKey) {
+function record(key, rows) {
+  const spec = MONTHS[key]
   const out = rows
     .map((r) => ({
       n: r.p.n,
@@ -273,7 +381,7 @@ function record(key, spec, rows, rKey) {
       m: m2h(r.mMin),
       e: m2h(r.eMin),
       t: m2h(r.tMin),
-      r: m2h(byPerson.get(r.p.o)[rKey]),
+      r: r.rExact,
     }))
     .sort((a, b) => b.t - a.t || a.n.localeCompare(b.n, 'cs'))
   return {
@@ -287,10 +395,20 @@ function record(key, spec, rows, rKey) {
   }
 }
 
-const data = {
-  '2026-07': record('2026-07', MONTHS['2026-07'], julRows, 'rJul'),
-  '2026-08': record('2026-08', MONTHS['2026-08'], augRows, 'rAug'),
+// Roční součet se skládá z už zaokrouhlených měsíčních hodnot, ne z minut —
+// kdo si v panelu sečte měsíční sloupce, musí dostat přesně hodnotu ve sloupci
+// „Ročně“, bez minutové odchylky ze zaokrouhlování.
+const running = new Map()
+for (const key of MONTH_KEYS) {
+  for (const row of months[key]) {
+    const acc = Math.round(((running.get(row.p.o) || 0) + m2h(row.tMin)) * 100) / 100
+    running.set(row.p.o, acc)
+    row.rExact = acc
+  }
 }
+
+const data = {}
+for (const key of MONTH_KEYS) data[key] = record(key, months[key])
 
 /* ---------- kontrolní výpis ---------- */
 for (const [key, rec] of Object.entries(data)) {
