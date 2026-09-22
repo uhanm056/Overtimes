@@ -99,13 +99,26 @@ check('pásma', [...pasma].sort().join(', '), 'kritické, ok, sledovat')
 
 const zmeny = asRows('Změny lidí')
 const typy = zmeny.slice(1).map((r) => r[0])
+const vypadli = typy.filter((t) => t === 'vypadl').length
+const pribyli = typy.filter((t) => t === 'přibyl').length
+const zustali = typy.filter((t) => t === 'zůstal').length
+
+// Konkrétní počty závisí na datech, ale musí sedět do počtů obou měsíců:
+// kdo byl v červenci = zůstali + vypadli; kdo je v srpnu = zůstali + přibyli.
+const cervenec = await page.evaluate(() => window.PP.stats(window.PP.data.month('2026-07')).withOvertime)
+const srpen = await page.evaluate(() => window.PP.stats(window.PP.data.month('2026-08')).withOvertime)
+
 console.log('\nList Změny lidí:')
-check('vypadli', typy.filter((t) => t === 'vypadl').length, 5)
-check('přibyli', typy.filter((t) => t === 'přibyl').length, 12)
-check('zůstali', typy.filter((t) => t === 'zůstal').length, 177)
+check('zůstali + vypadli = lidí v červenci', zustali + vypadli, cervenec)
+check('zůstali + přibyli = lidí v srpnu', zustali + pribyli, srpen)
+check('každý je právě jednou', zustali + vypadli + pribyli, zmeny.length - 1)
 // Δ musí sedět: součet změn + příchody − odchody = celková změna
 const dSum = zmeny.slice(1).reduce((a, r) => a + r[6], 0)
-check('součet Δ = změna měsíce', Math.round(dSum), Math.round(4276.1 - 4625.0))
+const dTotal = await page.evaluate(() => {
+  const t = (k) => window.PP.stats(window.PP.data.month(k)).total
+  return t('2026-08') - t('2026-07')
+})
+check('součet Δ = změna měsíce', Math.round(dSum), Math.round(dTotal))
 
 console.log('\nHlášení v panelu:')
 check('stav po exportu', await page.$eval('#export-status', (e) => e.textContent),

@@ -14,7 +14,7 @@ git clone <repo> && cd Overtimes
 open index.html            # nebo: npm start  (http-server na :8080)
 ```
 
-Panel se otevře s **ukázkovými daty** — vygenerovaným vzorkem za 7 a 8/2026.
+Panel se otevře s **ukázkovými daty** — vygenerovaným vzorkem za 1–8/2026.
 Jsou označená žlutým pruhem a jsou **syntetická**: jména, osobní čísla
 i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 
@@ -25,7 +25,7 @@ i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 | **Přehled** | KPI dlaždice, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
 | **Střediska** | Výběr střediska přes chipy, KPI střediska, TOP 5 lidí, seznam všech |
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
-| **Srovnání měsíců** | Volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
+| **Vývoj a srovnání** | Graf vývoje závodu i středisek přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
 | **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h |
 | **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
 | **Metodika** | Jak se počítá, legislativní kontext |
@@ -46,6 +46,7 @@ js/util.js                  formátování (h:mm, cs-CZ čísla), prahy, drobné
 js/store.js                 perzistence — localStorage nebo vlastní adaptér
 js/parser.js                čtení Součtového výkazu (xlsx / BIFF / HTML tabulka / CSV)
 js/export.js                sestavení sešitu .xlsx ke stažení
+js/chart.js                 spojnicové grafy vývoje (vlastní SVG, bez knihovny)
 js/data.js                  sloučení vestavěných a importovaných měsíců + statistiky
 js/app.js                   vykreslení sekcí
 data/months.js              vestavěná data (window.PP_BUILTIN_MONTHS)
@@ -81,6 +82,11 @@ Klíč měsíce je `YYYY-MM`, hodnotou záznam:
 }
 ```
 
+V ukázkových datech je `r` **skutečný kumulativní součet** měsíců od ledna —
+kdo si sečte měsíční sloupce, dostane přesně hodnotu ve sloupci „Ročně“.
+V reálném výkazu je to hodnota mzdové složky „Přesčas roční součet“, tedy co
+do ní počítá mzdový systém.
+
 **Přesčas = Přesčas do MEZD + Přesčas evidence.** Záporná evidence je odečet
 konta po proplacení — proto může někomu vyjít součet 0 i v měsíci, kdy má ve
 výkazu 40 vykázaných hodin.
@@ -114,6 +120,29 @@ Sekce **Import výkazu** bere soubor přetažením i výběrem. Parser:
 
 Existující měsíc se importem **přepíše**. Naimportované měsíce jdou v seznamu
 smazat; pokud pro daný měsíc existují i vestavěná data, po smazání se vrátí.
+
+## Grafy vývoje
+
+Sekce **Vývoj a srovnání** kreslí dva spojnicové grafy přes všechny načtené
+měsíce — za celý závod a za pět největších středisek. Přepínač nad grafem mění
+ukazatel: přesčas celkem, Ø na osobu, lidí s přesčasem, podíl proplacených.
+
+Grafy jsou vlastní SVG, žádná knihovna — panel se nemá čím rozbít offline
+a nepotřebuje build. Kreslí se do změřené šířky kontejneru, ne do škálovaného
+`viewBox`u, aby popisky měly na každé šířce stejnou velikost.
+
+Pár věcí, které nejsou samozřejmé:
+
+* **Jedna osa.** Ukazatele se přepínají, nikdy se nekreslí dva různé rozsahy
+  do jednoho grafu.
+* **Barva patří středisku, ne pořadí.** Přepnutí ukazatele přeživší nepřebarví.
+* Kategoriální paleta grafu středisek není firemní teal — ten je sémantická
+  barva (akcent). Použité odstíny jsou ověřené na rozlišitelnost při
+  barvosleposti proti světlému i tmavému povrchu panelu.
+* Koncové popisky čar se při blízkých hodnotách **rozhrnou od sebe**, jinak
+  by se překrývaly.
+* Překresluje se jen při skutečné změně šířky — jinak by překreslení změnilo
+  výšku obsahu a `ResizeObserver` by se zacyklil.
 
 ## Export do Excelu
 
@@ -209,5 +238,5 @@ opravdu přijde `.xlsx`.
 
 ## Co dál
 
-* Graf vývoje přes víc měsíců (dnes se porovnávají vždy jen dvě období)
-* Uložení vybrané dvojice měsíců do adresy, ať jde srovnání poslat odkazem
+* Uložení vybrané dvojice měsíců a ukazatele do adresy, ať jde pohled poslat odkazem
+* Vývoj jednoho konkrétního člověka přes měsíce (dnes jde jen závod a střediska)

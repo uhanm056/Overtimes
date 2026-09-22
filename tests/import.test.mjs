@@ -106,15 +106,21 @@ check('Nováková roční součet (z navazujícího řádku)', res.merged.novako
 check('Nováková součet', res.merged.novakovaT, 34.5)
 
 console.log('\nSloučení měsíců:')
-check('pořadí měsíců', res.months, '2026-11,2026-10,2026-09,2026-08,2026-07')
+// naimportované měsíce se vsunou na správné místo mezi vestavěné, řazeno od nejnovějšího
+const months = res.months.split(',')
+check('nejnovější čtyři', months.slice(0, 4).join(','), '2026-11,2026-10,2026-09,2026-08')
+check('nejstarší je vestavěný leden', months[months.length - 1], '2026-01')
+check('seřazeno sestupně', String(months.join(',') === [...months].sort().reverse().join(',')), 'true')
 
 // smazání importu vrátí panel do původního stavu
 await page.click('[data-remove="2026-09"]').catch(() => {})
-const months = await page.evaluate(async () => {
+const months2 = await page.evaluate(async () => {
   await window.PP.data.removeMonth('2026-09')
   return window.PP.data.keys().join(',')
 })
-check('po smazání importu', months, '2026-11,2026-10,2026-08,2026-07')
+const after = months2.split(',')
+check('po smazání importu zmizel 2026-09', after.includes('2026-09') ? 'je tam' : 'není', 'není')
+check('ostatní zůstaly', after.length, months.length - 1)
 
 await browser.close()
 server.close()
