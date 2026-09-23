@@ -31,14 +31,28 @@ window.PP = window.PP || {}
     return n
   }
 
-  /** Hezké dělení osy y — krok 1/2/5 × 10^n. */
-  function ticks(max, count) {
-    if (max <= 0) return [0, 1]
-    const raw = max / count
-    const mag = Math.pow(10, Math.floor(Math.log10(raw)))
-    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || 10 * mag
+  /** Hezký krok osy — 1/2/2,5/5 × 10^n. */
+  function niceStep(span, count) {
+    const raw = span / count
+    const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)))
+    return [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || 10 * mag
+  }
+
+  /**
+   * Dělení osy y. Nula je vždycky uvnitř rozsahu — u člověka může měsíc vyjít
+   * záporně (proplacené konto se odečte z evidence) a čára nesmí zmizet pod osu.
+   */
+  function ticks(min, max, count) {
+    const lo = Math.min(0, min)
+    const hi = Math.max(0, max)
+    if (lo === hi) return [0, 1]
+    const step = niceStep(hi - lo, count)
+    const from = Math.floor(lo / step) * step
+    const to = Math.ceil(hi / step) * step
     const out = []
-    for (let v = 0; v <= max + step * 0.001; v += step) out.push(v)
+    for (let v = from; v <= to + step * 0.001; v += step) {
+      out.push(Math.abs(v) < step * 1e-9 ? 0 : v)
+    }
     return out
   }
 
@@ -63,11 +77,29 @@ window.PP = window.PP || {}
 
     const all = spec.series.flatMap((s) => s.values).filter((v) => v != null && isFinite(v))
     const maxVal = all.length ? Math.max.apply(null, all) : 1
-    const ys = ticks(maxVal * 1.02, 4)
-    const yMax = ys[ys.length - 1]
+    const minVal = all.length ? Math.min.apply(null, all) : 0
+
+    let ys, yMin, yMax
+    if (spec.domainMax != null) {
+      // Osa končí přesně na zadané hodnotě — u ročního součtu je tou hodnotou
+      // strop, takže je z grafu vidět, kolik z povolených hodin je vyčerpáno.
+      yMin = Math.min(0, minVal)
+      yMax = Math.max(spec.domainMax, maxVal)
+      const step = niceStep(yMax - yMin, 5)
+      ys = []
+      for (let v = Math.ceil(yMin / step) * step; v <= yMax + step * 0.001; v += step) {
+        if (v <= yMax) ys.push(Math.abs(v) < step * 1e-9 ? 0 : v)
+      }
+      if (!ys.length) ys = [yMin, yMax]
+    } else {
+      ys = ticks(minVal * 1.02, maxVal * 1.02, 4)
+      yMin = ys[0]
+      yMax = ys[ys.length - 1]
+    }
+    const span = yMax - yMin || 1
 
     const x = (i) => pad.l + (spec.labels.length < 2 ? iw / 2 : (i / (spec.labels.length - 1)) * iw)
-    const y = (v) => pad.t + ih - (v / yMax) * ih
+    const y = (v) => pad.t + ih - ((v - yMin) / span) * ih
 
     host.innerHTML = ''
     host.style.position = 'relative'
@@ -105,7 +137,7 @@ window.PP = window.PP || {}
 
       if (spec.area) {
         svg.appendChild(el('path', {
-          d: d + ` L${pts[pts.length - 1][0].toFixed(1)} ${y(0)} L${pts[0][0].toFixed(1)} ${y(0)} Z`,
+          d: d + ` L${pts[pts.length - 1][0].toFixed(1)} ${y(0)} L${pts[0][0].toFixed(1)} ${y(0)} Z`,   // plocha vždy k nule
           fill: s.color, opacity: 0.12, stroke: 'none',
         }))
       }
@@ -138,6 +170,18 @@ window.PP = window.PP || {}
         t.textContent = l.name
         svg.appendChild(t)
       }
+    }
+
+    // prahové čáry (např. 40 a 60 h u jednotlivce)
+    for (const ref of spec.refs || []) {
+      if (ref.value > yMax || ref.value < yMin) continue
+      svg.appendChild(el('line', {
+        x1: pad.l, x2: pad.l + iw, y1: y(ref.value), y2: y(ref.value),
+        class: 'chart-ref ' + (ref.tone || ''),
+      }))
+      const t = el('text', { x: pad.l + iw - 4, y: y(ref.value) - 5, class: 'chart-ref-label ' + (ref.tone || ''), 'text-anchor': 'end' })
+      t.textContent = ref.label
+      svg.appendChild(t)
     }
 
     // vrstva pro najetí myší

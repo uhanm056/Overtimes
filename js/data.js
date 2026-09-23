@@ -138,6 +138,70 @@ window.PP = window.PP || {}
     return out
   }
 
+  /**
+   * Seznam všech lidí napříč měsíci — pro vyhledávání. Jméno a středisko se
+   * berou z nejnovějšího měsíce, ve kterém člověk je (mohl se přeřadit).
+   */
+  PP.roster = function () {
+    const out = new Map()
+    for (const key of PP.data.keys()) {          // od nejnovějšího
+      for (const r of PP.data.month(key).rows) {
+        const id = String(r.o)
+        if (!out.has(id)) out.set(id, { o: r.o, n: r.n, s: r.s, months: 0 })
+        out.get(id).months++
+      }
+    }
+    return Array.from(out.values()).sort((a, b) => String(a.n).localeCompare(String(b.n), 'cs'))
+  }
+
+  /**
+   * Historie jednoho člověka přes všechny měsíce, od nejstaršího.
+   * Měsíc, ve kterém ve výkazu není, má hodnoty null — ne nulu: nulový přesčas
+   * a „ve výkazu vůbec není“ jsou dvě různé věci.
+   */
+  PP.personHistory = function (id) {
+    const wanted = String(id)
+    const keys = PP.data.keys().slice().reverse()
+    const points = []
+    let person = null
+    let lastR = 0
+
+    for (const k of keys) {
+      const rec = PP.data.month(k)
+      const stats = PP.stats(rec)
+      const row = rec.rows.find((r) => String(r.o) === wanted)
+      if (row) {
+        person = { o: row.o, n: row.n, s: row.s }
+        lastR = row.r
+      }
+      points.push({
+        key: k,
+        period: rec.period,
+        row: row || null,
+        t: row ? row.t : null,
+        m: row ? row.m : null,
+        e: row ? row.e : null,
+        // roční součet drží i v měsíci bez přesčasu — nikam neklesá
+        r: row ? row.r : (points.length ? lastR : null),
+        rank: row ? stats.ranking.indexOf(row) + 1 : null,
+        of: stats.withOvertime,
+        center: row ? stats.centers.find((c) => c.name === row.s) : null,
+      })
+    }
+    if (!person) return null
+
+    const withOt = points.filter((p) => p.t != null)
+    return {
+      person,
+      points,
+      months: withOt.length,
+      total: withOt.reduce((a, p) => a + p.t, 0),
+      avg: withOt.length ? withOt.reduce((a, p) => a + p.t, 0) / withOt.length : 0,
+      max: withOt.length ? Math.max.apply(null, withOt.map((p) => p.t)) : 0,
+      year: lastR,
+    }
+  }
+
   /** Porovnání dvou měsíců — delta na osobu i na středisko. */
   PP.compare = function (current, previous) {
     if (!current || !previous) return null

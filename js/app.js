@@ -33,6 +33,9 @@
     sort: { key: 'total', dir: 'desc' },
     cmpSort: { key: 'dTotal', dir: 'desc' },
     metric: 'total',     // ukazatel v grafech vývoje
+    person: null,        // osobní číslo sledovaného člověka
+    personMetric: 'month',
+    personQuery: '',
     cmpA: null,          // starší z porovnávaných měsíců
     cmpB: null,          // novější
     rankingLimit: 25,
@@ -441,6 +444,7 @@
 
     // TOP 5 a plný seznam pod sebou — vedle sebe by se sedmisloupcová tabulka ořízla
     el.innerHTML = chips + kpis + topCard + listCard
+    bindPersonLinks('#panel-centers')
     $$('#panel-centers .chip').forEach((b) => b.addEventListener('click', () => {
       ui.center = b.dataset.center
       renderCenters()
@@ -452,7 +456,8 @@
     const ylvl = r.r >= CFG.year.crit ? 'crit' : r.r > CFG.year.warn ? 'warn' : ''
     return `<tr>
       <td class="rank">${rank}</td>
-      <td class="name">${query ? mark(r.n, query) : esc(r.n)}</td>
+      <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+        title="Zobrazit vývoj přes měsíce">${query ? mark(r.n, query) : esc(r.n)}</button></td>
       <td class="num">${esc(String(r.o))}</td>
       <td class="num">${hm(r.m)}</td>
       <td class="num">${hm(r.e)}</td>
@@ -494,7 +499,8 @@
               const ylvl = r.r >= CFG.year.crit ? 'crit' : r.r > CFG.year.warn ? 'warn' : ''
               return `<tr>
                 <td class="rank">${rank}</td>
-                <td class="name">${mark(r.n, ui.query)}</td>
+                <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+                  title="Zobrazit vývoj přes měsíce">${mark(r.n, ui.query)}</button></td>
                 <td>${mark(r.s, ui.query)}</td>
                 <td class="num">${hm(r.m)}</td>
                 <td class="num">${hm(r.e)}</td>
@@ -521,6 +527,7 @@
       again.focus()
       again.setSelectionRange(again.value.length, again.value.length)
     })
+    bindPersonLinks('#panel-ranking')
     const more = $('#ranking-more')
     if (more) more.addEventListener('click', () => { ui.rankingLimit += 25; renderRanking() })
   }
@@ -652,6 +659,150 @@
     </div>`
   }
 
+  /* ---------- Vývoj jednoho člověka ---------- */
+  const PERSON_METRICS = {
+    month: {
+      label: 'Měsíční přesčas',
+      value: (p) => p.t,
+      refs: [
+        { value: CFG.person.warn, label: CFG.person.warn + ' h', tone: 'warn' },
+        { value: CFG.person.crit, label: CFG.person.crit + ' h', tone: 'crit' },
+      ],
+    },
+    year: {
+      label: 'Roční součet',
+      value: (p) => p.r,
+      refs: [
+        { value: CFG.year.warn, label: CFG.year.warn + ' h', tone: 'warn' },
+        { value: CFG.year.crit, label: CFG.year.crit + ' h', tone: 'crit' },
+        { value: CFG.year.cap, label: 'strop ' + CFG.year.cap + ' h', tone: 'crit' },
+      ],
+    },
+  }
+
+  function drawPerson(hist) {
+    const host = $('#chart-person')
+    if (!host || !hist) return
+    const M = PERSON_METRICS[ui.personMetric] || PERSON_METRICS.month
+    PP.lineChart(host, {
+      labels: hist.points.map((p) => monthShort(p.key)),
+      format: hm,
+      area: ui.personMetric === 'month',
+      height: 250,
+      refs: M.refs,
+      domainMax: ui.personMetric === 'year' ? CFG.year.cap : null,
+      ariaLabel: `${M.label} — ${hist.person.n}`,
+      series: [{
+        name: M.label,
+        color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0f9e91',
+        values: hist.points.map(M.value),
+      }],
+    })
+  }
+
+  function personCard() {
+    const q = fold(ui.personQuery)
+    const hist = ui.person ? PP.personHistory(ui.person) : null
+
+    let body
+    if (hist) {
+      const p = hist.person
+      const gaps = hist.points.filter((x) => x.t == null).length
+      const last = hist.points[hist.points.length - 1]
+      body = `<div class="grid kpis">
+        ${kpi('Přesčas za rok', hm(hist.year),
+          `zbývá ${hm(Math.max(0, CFG.year.cap - hist.year))} do stropu`,
+          level(hist.year, { warn: CFG.year.warn, crit: CFG.year.crit }))}
+        ${kpi('Ø na měsíc', hm(hist.avg), `z ${hist.months} ${hist.months === 1 ? 'měsíce' : hist.months < 5 ? 'měsíců' : 'měsíců'} s přesčasem`, level(hist.avg, CFG.person))}
+        ${kpi('Nejvyšší měsíc', hm(hist.max), '', level(hist.max, CFG.person))}
+        ${kpi('Měsíců bez přesčasu', num(gaps), gaps ? 've výkazu vůbec nebyl' : 'přesčas měl každý měsíc', gaps ? '' : 'warn')}
+      </div>
+
+      <div class="person-metric">
+        ${Object.keys(PERSON_METRICS).map((k) => `<button type="button" class="chip" data-pmetric="${k}"
+          aria-pressed="${k === ui.personMetric}">${esc(PERSON_METRICS[k].label)}</button>`).join('')}
+      </div>
+      <div class="chart-host" id="chart-person"></div>
+
+      <div class="table-wrap" style="margin-top:18px"><table>
+        <thead><tr>
+          <th>Měsíc</th><th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th><th class="num">Ročně</th>
+        </tr></thead>
+        <tbody>${hist.points.map((x) => {
+          if (x.t == null) {
+            return `<tr class="muted-row"><td>${esc(monthName(x.key))}</td>
+              <td colspan="4" class="hint">ve výkazu není — přesčas neměl</td>
+              <td class="num">${x.r == null ? '—' : hm(x.r)}</td></tr>`
+          }
+          const lvl = level(x.t, CFG.person)
+          return `<tr>
+            <td>${esc(monthName(x.key))}</td>
+            <td class="num">${hm(x.m)}</td>
+            <td class="num">${hm(x.e)}</td>
+            <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
+            <td class="num">${x.rank}. z ${x.of}</td>
+            <td class="num">${hm(x.r)}</td>
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+
+      <p class="hint" style="margin:14px 0 0">
+        ${esc(p.n)} · osobní číslo ${esc(String(p.o))} · ${esc(p.s)}${last.t == null
+          ? ' · v posledním měsíci ve výkazu není' : ''}
+      </p>`
+    } else if (q) {
+      const hits = PP.roster().filter((r) =>
+        fold(r.n).includes(q) || String(r.o).includes(q) || fold(r.s).includes(q)).slice(0, 8)
+      body = hits.length
+        ? `<ul class="person-hits">${hits.map((r) => `<li>
+            <button type="button" data-pick="${esc(String(r.o))}">
+              <span class="who">${mark(r.n, ui.personQuery)}<small>${esc(r.s)} · ${esc(String(r.o))}</small></span>
+              <span class="hint">${r.months} ${r.months === 1 ? 'měsíc' : r.months < 5 ? 'měsíce' : 'měsíců'}</span>
+            </button></li>`).join('')}</ul>`
+        : `<p class="hint">Nikdo neodpovídá hledání „${esc(ui.personQuery)}“.</p>`
+    } else {
+      body = `<p class="hint">Napište jméno, osobní číslo nebo středisko. Na jméno se dá
+        kliknout i v Žebříčku závodu a ve Střediscích.</p>`
+    }
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Vývoj jednoho člověka</h2>
+        ${hist ? `<button class="btn ghost sm" type="button" id="person-clear">Vybrat jiného</button>` : ''}
+      </div>
+      ${hist ? '' : `<input type="search" id="person-search" placeholder="Hledat člověka…"
+        value="${esc(ui.personQuery)}" style="width:100%;max-width:420px;margin-bottom:14px">`}
+      ${body}
+    </div>`
+  }
+
+  function bindPersonCard() {
+    const input = $('#person-search')
+    if (input) {
+      input.addEventListener('input', () => {
+        ui.personQuery = input.value
+        renderCompare()
+        const again = $('#person-search')
+        if (again) {
+          again.focus()
+          again.setSelectionRange(again.value.length, again.value.length)
+        }
+      })
+    }
+    $$('#panel-compare [data-pick]').forEach((b) => b.addEventListener('click', () => {
+      ui.person = b.dataset.pick
+      ui.personQuery = ''
+      renderCompare()
+    }))
+    const clear = $('#person-clear')
+    if (clear) clear.addEventListener('click', () => { ui.person = null; renderCompare() })
+    $$('#panel-compare [data-pmetric]').forEach((b) => b.addEventListener('click', () => {
+      ui.personMetric = b.dataset.pmetric
+      renderCompare()
+    }))
+  }
+
   /* ---------- Srovnání měsíců ---------- */
   const CMP_COLS = [
     { key: 'name', label: 'Středisko', num: false },
@@ -764,9 +915,15 @@
       </div>
     </div>`
 
-    el.innerHTML = trendCards() + picker + kpis + table + movers + changesCard(cmp, ui.cmpA, ui.cmpB)
+    el.innerHTML = trendCards() + personCard() + picker + kpis + table + movers +
+      changesCard(cmp, ui.cmpA, ui.cmpB)
     drawTrends()
-    PP.watchCharts(drawTrends)
+    if (ui.person) drawPerson(PP.personHistory(ui.person))
+    bindPersonCard()
+    PP.watchCharts(() => {
+      drawTrends()
+      if (ui.person) drawPerson(PP.personHistory(ui.person))
+    })
 
     $$('#panel-compare [data-metric]').forEach((b) => b.addEventListener('click', () => {
       ui.metric = b.dataset.metric
@@ -1014,6 +1171,16 @@
       btn.disabled = false
       btn.textContent = label
     }
+  }
+
+  /** Proklik ze jména na vývoj toho člověka. */
+  function bindPersonLinks(root) {
+    $$(root + ' [data-person]').forEach((b) => b.addEventListener('click', () => {
+      if (PP.data.keys().length < 2) return
+      ui.person = b.dataset.person
+      ui.personQuery = ''
+      go('compare')
+    }))
   }
 
   /* ---------- překreslení ---------- */

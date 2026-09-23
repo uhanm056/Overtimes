@@ -25,7 +25,7 @@ i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 | **Přehled** | KPI dlaždice, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
 | **Střediska** | Výběr střediska přes chipy, KPI střediska, TOP 5 lidí, seznam všech |
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
-| **Vývoj a srovnání** | Graf vývoje závodu i středisek přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
+| **Vývoj a srovnání** | Graf vývoje závodu, středisek i jednoho člověka přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
 | **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h |
 | **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
 | **Metodika** | Jak se počítá, legislativní kontext |
@@ -144,6 +144,23 @@ Pár věcí, které nejsou samozřejmé:
 * Překresluje se jen při skutečné změně šířky — jinak by překreslení změnilo
   výšku obsahu a `ResizeObserver` by se zacyklil.
 
+### Vývoj jednoho člověka
+
+Karta v téže sekci ukazuje historii jednoho člověka: KPI, graf s přepínačem
+mezi **měsíčním přesčasem** a **ročním součtem**, a tabulku měsíc po měsíci
+včetně pořadí v závodě. Člověka lze najít hledáním, nebo kliknutím na jméno
+v Žebříčku závodu a ve Střediscích.
+
+Dvě věci, na kterých tu záleží:
+
+* **Chybějící měsíc není nula.** Kdo v daném měsíci přesčas neměl, ve výkazu
+  vůbec není — v grafu se nekreslí bod a v tabulce je to napsané slovy.
+  Roční součet přes takový měsíc drží, neklesá.
+* **Osa ročního pohledu končí na stropu 416 h**, ne na nejvyšší hodnotě —
+  smyslem pohledu je vidět, kolik z povolených hodin je vyčerpáno. Měsíční
+  pohled naopak prahové čáry 40 a 60 h kreslí jen když spadají do rozsahu dat;
+  u člověka, který se k nim nepřiblížil, by graf jen zplacatily.
+
 ## Export do Excelu
 
 Tlačítko **Export do Excelu** v horní liště stáhne sešit za vybraný měsíc
@@ -211,6 +228,10 @@ npm install     # playwright
 npm test
 ```
 
+`tests/trend.test.mjs` ověřuje vývojové pohledy — že historie člověka sedí na
+měsíce, že díra v datech není nula a roční součet přes ni drží, a že proklik
+ze jména otevře toho správného člověka.
+
 `tests/export.test.mjs` klikne na tlačítko exportu, zachytí stažený sešit
 a přečte ho zpátky — kontroluje listy, součty i to, že se součet sloupce
 Δ rovná změně měsíce. SheetJS se v testu bere z `node_modules`, aby test
@@ -238,5 +259,5 @@ opravdu přijde `.xlsx`.
 
 ## Co dál
 
-* Uložení vybrané dvojice měsíců a ukazatele do adresy, ať jde pohled poslat odkazem
-* Vývoj jednoho konkrétního člověka přes měsíce (dnes jde jen závod a střediska)
+* Uložení vybraného pohledu do adresy, ať jde poslat odkazem
+* Export vývoje jednoho člověka do sešitu (dnes se exportuje jen vybraný měsíc)
