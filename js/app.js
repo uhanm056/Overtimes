@@ -44,6 +44,8 @@
     sort: { key: 'total', dir: 'desc' },
     cmpSort: { key: 'dTotal', dir: 'desc' },
     metric: 'total',     // ukazatel v grafech vývoje
+    topBy: 'total',      // TOP střediska: podle součtu, nebo Ø na osobu
+    topOpen: {},         // rozbalená střediska v TOP přehledu
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
     personQuery: '',
@@ -264,11 +266,17 @@
     </div>`
 
     el.innerHTML = kpis +
+      topCentersCard(s) +
       `<div class="grid two">${avgChart}${histChart}</div>` +
       `<div class="grid two">${splitChart}${findings}</div>` +
       changesCard(cmp, prevK) +
       centerTable(s, cmp)
     bindCenterTable()
+    bindPersonLinks('#panel-overview')
+    $$('#panel-overview [data-topby]').forEach((b) => b.addEventListener('click', () => {
+      ui.topBy = b.dataset.topby
+      renderOverview()
+    }))
   }
 
   function buildFindings(s, cmp, prevK) {
@@ -352,6 +360,61 @@
       <p class="hint" style="margin:14px 0 0">
         Kdo mezitím změnil středisko, se tu neobjeví — porovnává se osobní číslo, ne středisko.
       </p>
+    </div>`
+  }
+
+  /* ---------- TOP střediska a jejich lidé ----------
+     Přehled, ze kterého je vidět kde se přesčas hromadí a kdo ho tam dělá,
+     bez proklikávání středisko po středisku. */
+  const TOP_CENTERS = 6
+  const TOP_PEOPLE = 5
+
+  function topCentersCard(s) {
+    if (PUBLIC || !s.centers.length) return ''   // jmenná data se nezveřejňují
+
+    const byTotal = ui.topBy === 'total'
+    const list = (byTotal ? s.byTotal : s.byAvg).slice(0, TOP_CENTERS)
+    const max = byTotal ? list[0].total : list[0].avg
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>TOP střediska a jejich lidé</h2>
+        <span class="hint">${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem</span>
+      </div>
+
+      <div class="metric-switch" role="group" aria-label="Řazení středisek">
+        <button type="button" class="chip" data-topby="total" aria-pressed="${byTotal}">Podle součtu hodin</button>
+        <button type="button" class="chip" data-topby="avg" aria-pressed="${!byTotal}">Podle Ø na osobu</button>
+      </div>
+
+      <div class="topc">${list.map((c, i) => {
+        const hodnota = byTotal ? c.total : c.avg
+        const sirka = max > 0 ? Math.max(2, (hodnota / max) * 100) : 0
+        const lide = c.rows.slice(0, TOP_PEOPLE)
+        const zbytek = c.people - lide.length
+        return `<section class="topc-item">
+          <header class="topc-head">
+            <span class="topc-rank">${i + 1}.</span>
+            <span class="topc-name">${esc(c.name)}${c.level
+              ? ` <span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</span>
+            <span class="topc-nums">
+              <strong>${byTotal ? h1(c.total) + ' h' : hm(c.avg)}</strong>
+              <small>${byTotal ? `Ø ${hm(c.avg)} · ${c.people} lidí` : `${h1(c.total)} h · ${c.people} lidí`}</small>
+            </span>
+          </header>
+          <div class="topc-bar"><span style="width:${sirka.toFixed(1)}%"></span></div>
+          <ol class="topc-people">${lide.map((r) => {
+            const lvl = level(r.t, CFG.person)
+            return `<li>
+              <button type="button" class="link-person" data-person="${esc(String(r.o))}"
+                title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button>
+              <span class="amt">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</span>
+            </li>`
+          }).join('')}
+          ${zbytek > 0 ? `<li class="more">a dalších ${num(zbytek)} ve středisku</li>` : ''}
+          </ol>
+        </section>`
+      }).join('')}</div>
     </div>`
   }
 

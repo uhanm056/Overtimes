@@ -24,7 +24,7 @@ Vzorek pro testy a pro `build-public.mjs --demo` se generuje do
 
 | Sekce | Obsah |
 | --- | --- |
-| **Přehled** | KPI dlaždice, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
+| **Přehled** | KPI dlaždice, TOP střediska i s jejich nejvytíženějšími lidmi, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
 | **Střediska** | Výběr střediska přes chipy, KPI střediska, TOP 5 lidí, seznam všech |
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
 | **Vývoj a srovnání** | Graf vývoje závodu, středisek i jednoho člověka přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
@@ -164,6 +164,25 @@ Dvě věci, na kterých tu záleží:
   smyslem pohledu je vidět, kolik z povolených hodin je vyčerpáno. Měsíční
   pohled naopak prahové čáry 40 a 60 h kreslí jen když spadají do rozsahu dat;
   u člověka, který se k nim nepřiblížil, by graf jen zplacatily.
+
+## TOP střediska a jejich lidé
+
+Karta v Přehledu ukáže šest nejvytíženějších středisek a u každého pět lidí
+s nejvyšším přesčasem — bez proklikávání středisko po středisku. Na jméno se
+dá kliknout a otevře se vývoj toho člověka přes měsíce.
+
+Přepínač nad kartou mění, co znamená „TOP":
+
+* **Podle součtu hodin** — kde se přesčas hromadí v objemu. Velká střediska
+  vyjdou nahoře i při nižším průměru.
+* **Podle Ø na osobu** — kde je zátěž nejvyšší na člověka. Nahoře skončí
+  i malá střediska, která v objemu nic neznamenají.
+
+Obojí je legitimní otázka a dávají jiné pořadí — proto přepínač, ne výběr
+za uživatele. U každého střediska se vždy ukazují obě čísla, ať je vidět,
+odkud se pořadí bere.
+
+Ve veřejném vydání karta není, protože obsahuje jména.
 
 ## Sedí roční součet na součet měsíců?
 
