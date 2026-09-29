@@ -18,6 +18,16 @@ Panel se otevře s **ukázkovými daty** — vygenerovaným vzorkem za 1–8/202
 Jsou označená žlutým pruhem a jsou **syntetická**: jména, osobní čísla
 i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 
+Jakmile je načtený aspoň jeden reálný měsíc, dá se vzorek **skrýt** —
+přepínačem v sekci Import výkazu nebo tlačítkem přímo ve žlutém pruhu. Bez
+toho by grafy vývoje míchaly vymyšlené měsíce se skutečnými a křivka by
+vypadala věrohodně, přitom by byla z poloviny nesmysl.
+
+Skrýt se dá jen to, co je čím nahradit: bez reálných dat je přepínač zakázaný
+a i se zapnutou volbou se vzorek ukáže, kdyby jinak nezbylo nic. Volba se
+pamatuje v prohlížeči — když reálné měsíce smažete, vzorek se vrátí, a po
+dalším importu se zase sám skryje.
+
 ## Co panel ukazuje
 
 | Sekce | Obsah |

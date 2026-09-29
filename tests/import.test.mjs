@@ -114,13 +114,40 @@ check('seřazeno sestupně', String(months.join(',') === [...months].sort().reve
 
 // smazání importu vrátí panel do původního stavu
 await page.click('[data-remove="2026-09"]').catch(() => {})
-const months2 = await page.evaluate(async () => {
-  await window.PP.data.removeMonth('2026-09')
-  return window.PP.data.keys().join(',')
+/* ---------- skrývání ukázkových dat ---------- */
+const hide = await page.evaluate(() => {
+  const d = window.PP.data
+  const pred = { vse: d.allKeys().length, realnych: d.realKeys().length, lzeSkryt: d.canHideDemo() }
+  d.setHideDemo(true)
+  const po = { zobrazeno: d.keys().length, samaRealna: d.keys().every((k) => !d.month(k).demo) }
+  // pojistka: skrytí nesmí vyprázdnit panel ani když nic reálného není
+  const bezRealnych = d.realKeys().length === 0
+  d.setHideDemo(false)
+  return { pred, po, bezRealnych }
 })
+
+console.log('\nSkrytí ukázkových dat:')
+check('vzorek i reálné měsíce jsou načtené', hide.pred.lzeSkryt ? 'ano' : 'ne', 'ano')
+check('po skrytí zbydou jen reálné', hide.po.zobrazeno, hide.pred.realnych)
+check('žádný z nich není ukázka', hide.po.samaRealna ? 'ano' : 'ne', 'ano')
+
+// bez reálných dat se skrýt nedá — panel by zůstal prázdný
+const guard = await page.evaluate(async () => {
+  const d = window.PP.data
+  const smazane = d.keys().filter((k) => d.isImported(k))
+  for (const k of smazane) await d.removeMonth(k)
+  d.setHideDemo(true)
+  const out = { lzeSkryt: d.canHideDemo(), zobrazeno: d.keys().length }
+  d.setHideDemo(false)
+  return out
+})
+check('bez reálných dat nelze skrýt', guard.lzeSkryt ? 'lze' : 'nelze', 'nelze')
+check('panel i tak něco ukazuje', guard.zobrazeno > 0 ? 'ano' : 'ne', 'ano')
+
+const months2 = await page.evaluate(() => window.PP.data.keys().join(','))
 const after = months2.split(',')
-check('po smazání importu zmizel 2026-09', after.includes('2026-09') ? 'je tam' : 'není', 'není')
-check('ostatní zůstaly', after.length, months.length - 1)
+check('po smazání importů zmizel 2026-09', after.includes('2026-09') ? 'je tam' : 'není', 'není')
+check('vestavěné měsíce zůstaly', after.length, months.length - 3)
 
 await browser.close()
 server.close()
