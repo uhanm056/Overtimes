@@ -15,6 +15,8 @@ const server = createServer(async (req, res) => {
   try {
     let p = join(ROOT, normalize(decodeURI(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, ''))
     if (p.endsWith('/') || p === ROOT) p = join(p, 'index.html')
+    // Panel se distribuuje bez dat; testům se místo nich podstrčí vzorek.
+    if (p === join(ROOT, 'data', 'months.js')) p = join(ROOT, 'tests', 'fixtures', 'demo-months.js')
     const body = await readFile(p)
     res.writeHead(200, { 'content-type': TYPES[extname(p)] || 'application/octet-stream' })
     res.end(body)
@@ -114,40 +116,15 @@ check('seřazeno sestupně', String(months.join(',') === [...months].sort().reve
 
 // smazání importu vrátí panel do původního stavu
 await page.click('[data-remove="2026-09"]').catch(() => {})
-/* ---------- skrývání ukázkových dat ---------- */
-const hide = await page.evaluate(() => {
+const months2 = await page.evaluate(async () => {
   const d = window.PP.data
-  const pred = { vse: d.allKeys().length, realnych: d.realKeys().length, lzeSkryt: d.canHideDemo() }
-  d.setHideDemo(true)
-  const po = { zobrazeno: d.keys().length, samaRealna: d.keys().every((k) => !d.month(k).demo) }
-  // pojistka: skrytí nesmí vyprázdnit panel ani když nic reálného není
-  const bezRealnych = d.realKeys().length === 0
-  d.setHideDemo(false)
-  return { pred, po, bezRealnych }
+  for (const k of d.keys().filter((x) => d.isImported(x))) await d.removeMonth(k)
+  return d.keys().join(',')
 })
-
-console.log('\nSkrytí ukázkových dat:')
-check('vzorek i reálné měsíce jsou načtené', hide.pred.lzeSkryt ? 'ano' : 'ne', 'ano')
-check('po skrytí zbydou jen reálné', hide.po.zobrazeno, hide.pred.realnych)
-check('žádný z nich není ukázka', hide.po.samaRealna ? 'ano' : 'ne', 'ano')
-
-// bez reálných dat se skrýt nedá — panel by zůstal prázdný
-const guard = await page.evaluate(async () => {
-  const d = window.PP.data
-  const smazane = d.keys().filter((k) => d.isImported(k))
-  for (const k of smazane) await d.removeMonth(k)
-  d.setHideDemo(true)
-  const out = { lzeSkryt: d.canHideDemo(), zobrazeno: d.keys().length }
-  d.setHideDemo(false)
-  return out
-})
-check('bez reálných dat nelze skrýt', guard.lzeSkryt ? 'lze' : 'nelze', 'nelze')
-check('panel i tak něco ukazuje', guard.zobrazeno > 0 ? 'ano' : 'ne', 'ano')
-
-const months2 = await page.evaluate(() => window.PP.data.keys().join(','))
 const after = months2.split(',')
 check('po smazání importů zmizel 2026-09', after.includes('2026-09') ? 'je tam' : 'není', 'není')
 check('vestavěné měsíce zůstaly', after.length, months.length - 3)
+check('zbyly jen vestavěné', after.every((k) => !['2026-09', '2026-10', '2026-11'].includes(k)) ? 'ano' : 'ne', 'ano')
 
 await browser.close()
 server.close()

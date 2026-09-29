@@ -61,4 +61,4 @@ console.log(`→ ${out} (${kb} KiB)`)
 console.log(`   vloženo: styles.css + ${scripts.length} skriptů`)
 console.log(hasLocal
   ? '   data: ' + LOCAL_DATA + ' — REÁLNÁ, s osobními údaji. Soubor nikam nenahrávejte.'
-  : '   data: data/months.js — ukázková')
+  : '   data: žádná — panel startuje prázdný a naplní se importem')

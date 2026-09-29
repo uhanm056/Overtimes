@@ -14,19 +14,11 @@ git clone <repo> && cd Overtimes
 open index.html            # nebo: npm start  (http-server na :8080)
 ```
 
-Panel se otevře s **ukázkovými daty** — vygenerovaným vzorkem za 1–8/2026.
-Jsou označená žlutým pruhem a jsou **syntetická**: jména, osobní čísla
-i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
+**Panel startuje prázdný** se stavem „Naimportujte Součtový výkaz“. Žádná
+vymyšlená čísla se nedistribuují — co v panelu uvidíte, jste tam sami nahráli.
 
-Jakmile je načtený aspoň jeden reálný měsíc, dá se vzorek **skrýt** —
-přepínačem v sekci Import výkazu nebo tlačítkem přímo ve žlutém pruhu. Bez
-toho by grafy vývoje míchaly vymyšlené měsíce se skutečnými a křivka by
-vypadala věrohodně, přitom by byla z poloviny nesmysl.
-
-Skrýt se dá jen to, co je čím nahradit: bez reálných dat je přepínač zakázaný
-a i se zapnutou volbou se vzorek ukáže, kdyby jinak nezbylo nic. Volba se
-pamatuje v prohlížeči — když reálné měsíce smažete, vzorek se vrátí, a po
-dalším importu se zase sám skryje.
+Vzorek pro testy a pro `build-public.mjs --demo` se generuje do
+`tests/fixtures/demo-months.js` a do panelu se nedostane.
 
 ## Co panel ukazuje
 
@@ -59,8 +51,8 @@ js/export.js                sestavení sešitu .xlsx ke stažení
 js/chart.js                 spojnicové grafy vývoje (vlastní SVG, bez knihovny)
 js/data.js                  sloučení vestavěných a importovaných měsíců + statistiky
 js/app.js                   vykreslení sekcí
-data/months.js              vestavěná data (window.PP_BUILTIN_MONTHS)
-tools/generate-demo-data.mjs  generátor ukázkových dat
+data/months.js              vestavěná data — prázdné, panel se plní importem
+tools/generate-demo-data.mjs  vzorek pro testy → tests/fixtures/demo-months.js
 tools/report-to-data.mjs      převod reálných výkazů na data/months.js
 tools/build-single-file.mjs   slepení panelu do jednoho .html k rozeslání
 tools/build-public.mjs        veřejné vydání bez osobních údajů do docs/
@@ -284,7 +276,7 @@ Dvě věci k tomu:
 ## Data
 
 ```bash
-npm run data                                              # přegeneruje ukázková data
+npm run data                                              # přegeneruje vzorek pro testy
 node tools/report-to-data.mjs vykaz-07.xls vykaz-08.xls   # reálná data
 node tools/report-to-data.mjs --keep vykaz-09.xls         # přidat další měsíc
 ```
@@ -297,7 +289,7 @@ Co projde skriptem, projde i importem v UI.
 
 | Soubor | Obsah | Git |
 | --- | --- | --- |
-| `data/months.js` | ukázková data, generuje `generate-demo-data.mjs` | **commituje se** |
+| `data/months.js` | prázdné — panel startuje bez dat | commituje se |
 | `data/months.local.js` | reálná data, generuje `report-to-data.mjs` | **v `.gitignore`** |
 
 Reálná data se do `data/months.js` nezapisují **nikdy**. Ten soubor je

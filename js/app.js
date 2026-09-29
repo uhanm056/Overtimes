@@ -139,26 +139,13 @@
       return
     }
 
-    // Jakmile jsou k dispozici reálná data, nabídne se rovnou schování vzorku —
-    // míchat vymyšlené měsíce se skutečnými je v grafech vývoje zrádné.
-    const canHide = PP.data.canHideDemo()
     box.innerHTML = `<span aria-hidden="true">⚠</span><div>
       <strong>Ukázková data.</strong> ${esc(monthName(ui.month))} je vygenerovaný vzorek —
-      jména, osobní čísla i hodiny jsou vymyšlené. ${canHide
-        ? 'Reálné měsíce už máte načtené.'
-        : 'Reálný měsíc přidáte v sekci'}
-      ${canHide
-        ? '<button class="btn ghost sm" type="button" data-hide-demo>Skrýt ukázková data</button>'
-        : '<button class="btn ghost sm" type="button" data-goto="import">Import výkazu</button>.'}
+      jména, osobní čísla i hodiny jsou vymyšlené. Reálný měsíc přidáte v sekci
+      <button class="btn ghost sm" type="button" data-goto="import">Import výkazu</button>.
     </div>`
     const btn = box.querySelector('[data-goto]')
     if (btn) btn.addEventListener('click', () => go('import'))
-    const hide = box.querySelector('[data-hide-demo]')
-    if (hide) hide.addEventListener('click', () => {
-      PP.data.setHideDemo(true)
-      ui.month = null
-      refreshAll()
-    })
   }
 
   /* ---------- stavební kameny ---------- */
@@ -1024,11 +1011,7 @@
   /* ---------- Import ---------- */
   function renderImport() {
     const el = $('#panel-import')
-    // tady se vypisuje všechno, i skrytý vzorek — jinak by nebylo poznat, co panel drží
-    const keys = PP.data.allKeys()
-    const shown = PP.data.keys()
-    const canHide = PP.data.canHideDemo()
-    const hiding = PP.data.hideDemo && canHide
+    const keys = PP.data.keys()
 
     el.innerHTML = `<div class="card">
       <div class="card-head">
@@ -1048,21 +1031,8 @@
     <div class="card">
       <div class="card-head">
         <h2>Načtené měsíce</h2>
-        <span class="hint">${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}${
-          hiding ? ` · zobrazeno ${shown.length}` : ''}</span>
+        <span class="hint">${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</span>
       </div>
-
-      <label class="switch${canHide ? '' : ' off'}">
-        <input type="checkbox" id="hide-demo" ${hiding ? 'checked' : ''} ${canHide ? '' : 'disabled'}>
-        <span>
-          <strong>Skrýt ukázková data</strong>
-          <small>${canHide
-            ? 'Panel bude počítat jen s reálnými měsíci — včetně grafů vývoje.'
-            : PP.data.realKeys().length
-              ? 'Žádná ukázková data tu nejsou, není co skrývat.'
-              : 'Zatím tu nejsou žádná reálná data. Nejdřív naimportujte výkaz.'}</small>
-        </span>
-      </label>
 
       <div class="table-wrap"><table>
         <thead><tr>
@@ -1073,9 +1043,8 @@
           const rec = PP.data.month(k)
           const st = PP.stats(rec)
           const imported = PP.data.isImported(k)
-          const skryty = hiding && !shown.includes(k)
-          return `<tr${skryty ? ' class="muted-row"' : ''}>
-            <td>${esc(monthName(k))}${skryty ? ' <span class="tag">skryto</span>' : ''}</td>
+          return `<tr>
+            <td>${esc(monthName(k))}</td>
             <td>${esc(rec.period || '—')}</td>
             <td class="num">${num(st.withOvertime)}</td>
             <td class="num">${h1(st.total)} h</td>
@@ -1087,16 +1056,6 @@
         </tbody>
       </table></div>
     </div>`
-
-    const hideBox = $('#hide-demo')
-    if (hideBox) hideBox.addEventListener('change', () => {
-      PP.data.setHideDemo(hideBox.checked)
-      ui.month = null      // vybraný měsíc mohl být právě skrytý
-      ui.person = null
-      ui.cmpA = null
-      ui.cmpB = null
-      refreshAll()
-    })
 
     const fileInput = $('#file')
     const drop = $('#drop')

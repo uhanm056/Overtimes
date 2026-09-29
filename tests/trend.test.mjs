@@ -14,6 +14,8 @@ const server = createServer(async (req, res) => {
   try {
     let p = join(ROOT, normalize(decodeURI(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, ''))
     if (p.endsWith('/') || p === ROOT) p = join(p, 'index.html')
+    // Panel se distribuuje bez dat; testům se místo nich podstrčí vzorek.
+    if (p === join(ROOT, 'data', 'months.js')) p = join(ROOT, 'tests', 'fixtures', 'demo-months.js')
     const body = await readFile(p)
     res.writeHead(200, { 'content-type': TYPES[extname(p)] || 'application/octet-stream' })
     res.end(body)

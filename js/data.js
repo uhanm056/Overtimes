@@ -4,16 +4,9 @@ window.PP = window.PP || {}
 ;(function (PP) {
   'use strict'
 
-  const HIDE_KEY = 'prescasy.hideDemo'
-
   const state = {
     months: {},        // 'YYYY-MM' → record
     imported: {},      // podmnožina, kterou lze smazat
-    hideDemo: false,   // schovat vygenerovaný vzorek, jakmile jsou reálná data
-  }
-
-  function readHideDemo() {
-    try { return window.localStorage.getItem(HIDE_KEY) === '1' } catch (err) { return false }
   }
 
   PP.data = {
@@ -22,7 +15,6 @@ window.PP = window.PP || {}
     /** Načte vestavěná data a přes ně položí importované měsíce (import přepisuje). */
     async init() {
       const builtin = window.PP_BUILTIN_MONTHS || {}
-      state.hideDemo = readHideDemo()
       state.imported = await PP.store.loadImported()
       state.months = {}
       for (const key in builtin) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
@@ -32,37 +24,9 @@ window.PP = window.PP || {}
       return state.months
     },
 
-    /** Všechny načtené měsíce od nejnovějšího, včetně skrytého vzorku. */
-    allKeys() {
-      return Object.keys(state.months).sort().reverse()
-    },
-
-    /** Měsíce s reálnými daty — co není označené jako ukázka. */
-    realKeys() {
-      return this.allKeys().filter((k) => !state.months[k].demo)
-    },
-
-    /**
-     * Klíče měsíců od nejnovějšího — to, co panel skutečně zobrazuje.
-     * Se zapnutým skrýváním jen reálné měsíce; kdyby ale nezbylo nic,
-     * vzorek se ukáže i tak. Prázdný panel nikomu nepomůže.
-     */
+    /** Klíče měsíců od nejnovějšího. */
     keys() {
-      if (!state.hideDemo) return this.allKeys()
-      const real = this.realKeys()
-      return real.length ? real : this.allKeys()
-    },
-
-    /** Dá se vzorek skrýt? Jen když je čím ho nahradit. */
-    canHideDemo() {
-      return this.realKeys().length > 0 && this.allKeys().length > this.realKeys().length
-    },
-
-    get hideDemo() { return state.hideDemo },
-
-    setHideDemo(value) {
-      state.hideDemo = !!value
-      try { window.localStorage.setItem(HIDE_KEY, value ? '1' : '0') } catch (err) { /* jen preference */ }
+      return Object.keys(state.months).sort().reverse()
     },
 
     month(key) {
