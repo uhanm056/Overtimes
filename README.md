@@ -18,6 +18,16 @@ Panel se otevře s **ukázkovými daty** — vygenerovaným vzorkem za 1–8/202
 Jsou označená žlutým pruhem a jsou **syntetická**: jména, osobní čísla
 i hodiny jsou vymyšlené. Reálná data se přidávají importem (viz níže).
 
+Jakmile je načtený aspoň jeden reálný měsíc, dá se vzorek **skrýt** —
+přepínačem v sekci Import výkazu nebo tlačítkem přímo ve žlutém pruhu. Bez
+toho by grafy vývoje míchaly vymyšlené měsíce se skutečnými a křivka by
+vypadala věrohodně, přitom by byla z poloviny nesmysl.
+
+Skrýt se dá jen to, co je čím nahradit: bez reálných dat je přepínač zakázaný
+a i se zapnutou volbou se vzorek ukáže, kdyby jinak nezbylo nic. Volba se
+pamatuje v prohlížeči — když reálné měsíce smažete, vzorek se vrátí, a po
+dalším importu se zase sám skryje.
+
 ## Co panel ukazuje
 
 | Sekce | Obsah |
@@ -52,6 +62,7 @@ js/app.js                   vykreslení sekcí
 data/months.js              vestavěná data (window.PP_BUILTIN_MONTHS)
 tools/generate-demo-data.mjs  generátor ukázkových dat
 tools/report-to-data.mjs      převod reálných výkazů na data/months.js
+tools/build-single-file.mjs   slepení panelu do jednoho .html k rozeslání
 tests/                      vzorové výkazy a integrační test importu
 ```
 
@@ -203,6 +214,27 @@ Takhle je panel napojený na úložiště publikovaného artefaktu, kde je jeden
 měsíc jedním dokumentem v kolekci `months` (cca 22 KiB na měsíc, limit
 dokumentu 256 KiB). Když je úložiště nedostupné (privátní režim, zablokované
 cookies), spadne se na paměť a panel to napíše v sekci Import.
+
+## Jeden soubor k rozeslání
+
+Rozdělení na `index.html` + `styles.css` + `js/*` je dobré pro práci v kódu,
+ale komu chcete panel poslat, ten ocení jeden soubor:
+
+```bash
+node tools/build-single-file.mjs            # → dist/prescasovy-panel-plana.html
+node tools/build-single-file.mjs panel.html # nebo vlastní cesta
+```
+
+Vloží styly i skripty přímo do HTML, v pořadí, které bere z `index.html` —
+nemůže se tedy rozejít s tím, co běží při vývoji. Výsledek se otevře dvojklikem,
+bez serveru.
+
+Dvě věci k tomu:
+
+* `dist/` je v `.gitignore`. Je to výstup, ne zdroj — a se skutečnými daty by
+  obsahoval osobní údaje, zatímco repozitář je veřejný.
+* Prohlížeč váže `localStorage` u `file://` na umístění souboru. Novou verzi
+  proto **přepište na stejné místo**, jinak přijdete o naimportované měsíce.
 
 ## Data
 

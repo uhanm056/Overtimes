@@ -2,6 +2,10 @@ node_modules/
 .DS_Store
 *.log
 
+# Slepený jednosouborový panel — výstup, ne zdroj. S reálnými daty by navíc
+# obsahoval osobní údaje, a repo je veřejné.
+/dist/
+
 # Reálné výkazy do repa nepatří — obsahují osobní údaje
 /vykazy/
 *.xls
