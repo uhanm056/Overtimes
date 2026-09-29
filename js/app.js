@@ -273,6 +273,7 @@
       centerTable(s, cmp)
     bindCenterTable()
     bindPersonLinks('#panel-overview')
+    bindCenterLinks('#panel-overview')
     $$('#panel-overview [data-topby]').forEach((b) => b.addEventListener('click', () => {
       ui.topBy = b.dataset.topby
       renderOverview()
@@ -395,7 +396,8 @@
         return `<section class="topc-item">
           <header class="topc-head">
             <span class="topc-rank">${i + 1}.</span>
-            <span class="topc-name">${esc(c.name)}${c.level
+            <span class="topc-name"><button type="button" class="link-center" data-center="${esc(c.name)}"
+                title="Otevřít detail střediska">${esc(c.name)}</button>${c.level
               ? ` <span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</span>
             <span class="topc-nums">
               <strong>${byTotal ? h1(c.total) + ' h' : hm(c.avg)}</strong>
@@ -451,7 +453,8 @@
         <tbody>${rows.map((c) => {
           const d = dmap.get(c.name)
           return `<tr>
-            <td>${esc(c.name)} ${c.level ? `<span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
+            <td><button type="button" class="link-center" data-center="${esc(c.name)}"
+              title="Otevřít detail střediska">${esc(c.name)}</button> ${c.level ? `<span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
             <td class="num">${num(c.people)}</td>
             <td class="num">${h1(c.total)}</td>
             <td class="num">${hm(c.avg)}</td>
@@ -1307,6 +1310,14 @@
       btn.disabled = false
       btn.textContent = label
     }
+  }
+
+  /** Proklik z názvu střediska na jeho detail. */
+  function bindCenterLinks(root) {
+    $$(root + ' .link-center').forEach((b) => b.addEventListener('click', () => {
+      ui.center = b.dataset.center
+      go('centers')
+    }))
   }
 
   /** Proklik ze jména na vývoj toho člověka. */

@@ -144,6 +144,62 @@ console.log('\nProklik ze jména:')
 check('otevře se vývoj a srovnání', po.sekce, 'Vývoj a srovnání')
 check('vybraný člověk sedí', po.kdo.startsWith(jmeno) ? 'ano' : 'ne: ' + po.kdo, 'ano')
 
+/* ---------- proklik na středisko a shoda čísel ----------
+   Karta TOP středisek a detail střediska musí ukazovat totéž. Kdyby se
+   rozešly, panel by si sám odporoval a nikdo by nevěděl, čemu věřit. */
+await page.click('#nav button[data-section="overview"]')
+await page.waitForSelector('.topc-item')
+
+const zKarty = await page.evaluate(() => {
+  const it = document.querySelector('.topc-item')
+  const nums = it.querySelector('.topc-nums')
+  return {
+    nazev: it.querySelector('.link-center').textContent.trim(),
+    hlavni: nums.querySelector('strong').textContent.trim(),
+    vedlejsi: nums.querySelector('small').textContent.trim(),
+    lide: [...it.querySelectorAll('.topc-people li:not(.more)')].map((l) => ({
+      jmeno: l.querySelector('.link-person').textContent.trim(),
+      hodiny: l.querySelector('.amt').textContent.trim(),
+    })),
+  }
+})
+
+await page.click('.topc-item .link-center')
+await page.waitForSelector('#panel-centers .chip[aria-pressed="true"]')
+
+const zDetailu = await page.evaluate(() => {
+  const kpi = (label) => {
+    const k = [...document.querySelectorAll('#panel-centers .kpi')]
+      .find((x) => x.querySelector('.label').textContent.trim() === label)
+    return k ? k.querySelector('.value').textContent.trim() : null
+  }
+  return {
+    vybrane: document.querySelector('#panel-centers .chip[aria-pressed="true"]').textContent.trim(),
+    celkem: kpi('Přesčas celkem'),
+    lidi: kpi('Lidí s přesčasem'),
+    prumer: kpi('Ø na osobu'),
+    top5: [...document.querySelectorAll('#panel-centers .bars .bar-row')].map((r) => ({
+      jmeno: r.querySelector('.name').textContent.trim(),
+      hodiny: r.querySelector('.val').textContent.trim(),
+    })),
+  }
+})
+
+console.log('\nProklik z TOP středisek na detail:')
+check('otevře se sekce Střediska', await page.$eval('#section-title', (e) => e.textContent), 'Střediska')
+check('vybralo se to samé středisko',
+  zDetailu.vybrane.startsWith(zKarty.nazev) ? 'ano' : `ne: ${zDetailu.vybrane}`, 'ano')
+// „681,0 h" v kartě vs „681,0 h" v detailu
+check('součet hodin sedí', zDetailu.celkem, zKarty.hlavni)
+// vedlejší řádek karty je „Ø 24:20 · 28 lidí"
+const [ovKarty, lidiKarty] = zKarty.vedlejsi.split('·').map((x) => x.trim())
+check('Ø na osobu sedí', zDetailu.prumer, ovKarty.replace('Ø', '').trim())
+check('počet lidí sedí', zDetailu.lidi + ' lidí', lidiKarty)
+check('TOP 5 lidí je stejných',
+  zDetailu.top5.map((x) => x.jmeno).join(' | '), zKarty.lide.map((x) => x.jmeno).join(' | '))
+check('a se stejnými hodinami',
+  zDetailu.top5.map((x) => x.hodiny).join(' | '), zKarty.lide.map((x) => x.hodiny).join(' | '))
+
 /* ---------- kontrola ročního součtu ----------
    Musí umět obojí: potvrdit, že součty sedí, a odhalit, když nesedí.
    Test, který jen projde na správných datech, nedokazuje nic. */

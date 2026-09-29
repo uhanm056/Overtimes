@@ -168,8 +168,16 @@ Dvě věci, na kterých tu záleží:
 ## TOP střediska a jejich lidé
 
 Karta v Přehledu ukáže šest nejvytíženějších středisek a u každého pět lidí
-s nejvyšším přesčasem — bez proklikávání středisko po středisku. Na jméno se
-dá kliknout a otevře se vývoj toho člověka přes měsíce.
+s nejvyšším přesčasem — bez proklikávání středisko po středisku.
+
+Prokliknout se dá obojí: **jméno** otevře vývoj toho člověka přes měsíce,
+**název střediska** jeho detail v sekci Střediska. Totéž funguje z tabulky
+„Všechna střediska“.
+
+Oba pohledy počítají ze stejného souhrnu, takže se nemůžou rozejít —
+a test to hlídá: po prokliku porovnává součet hodin, Ø na osobu, počet lidí
+i pořadí a hodiny TOP 5. Kdyby se čísla rozešla, panel by si odporoval
+a nikdo by nevěděl, čemu věřit.
 
 Přepínač nad kartou mění, co znamená „TOP":
 
