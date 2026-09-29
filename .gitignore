@@ -6,6 +6,9 @@ node_modules/
 # obsahoval osobní údaje, a repo je veřejné.
 /dist/
 
+# Reálná data panelu — jména, osobní čísla, přesčasy. Do repa nikdy.
+/data/months.local.js
+
 # Reálné výkazy do repa nepatří — obsahují osobní údaje
 /vykazy/
 *.xls

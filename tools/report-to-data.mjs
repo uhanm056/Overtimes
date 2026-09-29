@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Převede reálné Součtové výkazy na vestavěná data panelu (data/months.js).
+ * Převede reálné Součtové výkazy na lokální data panelu (data/months.local.js).
  *
  * Nepřepisuje parser znovu v Node — pustí headless Chromium, načte do něj
  * samotný panel a nechá soubory rozparsovat úplně stejným kódem, jaký běží
@@ -11,8 +11,8 @@
  *   node tools/report-to-data.mjs vykaz-07.xls vykaz-08.xls
  *   node tools/report-to-data.mjs --keep vykaz-09.xls    # přidá k existujícím
  *
- * Bez --keep se data/months.js přepíše jen zadanými měsíci (tedy i zahodí
- * ukázková data, což je při přechodu na ostrý provoz obvykle to, co chcete).
+ * Výstup se do repozitáře necommituje — je v .gitignore. Panel s těmi daty
+ * si postavíte příkazem:  node tools/build-single-file.mjs
  */
 import { chromium } from 'playwright'
 import { createServer } from 'node:http'
@@ -22,7 +22,14 @@ import { dirname, extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const OUT = join(ROOT, 'data', 'months.js')
+
+/* Zapisuje se do data/months.local.js, ne do data/months.js.
+   Ten druhý je sledovaný gitem a repozitář může být veřejný — reálná data
+   by tam byla na github.com k přečtení komukoli, řádek po řádku.
+   Soubor .local.js je v .gitignore a build-single-file.mjs si ho vezme
+   přednostně, takže panel s reálnými daty vznikne, aniž by cokoli opustilo
+   tvůj počítač. */
+const OUT = join(ROOT, 'data', 'months.local.js')
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 
 const args = process.argv.slice(2)
@@ -66,6 +73,7 @@ await page.evaluate(() => {
 
 const months = {}
 if (keep) {
+  // --keep navazuje na dřív načtená reálná data, ukázková se zahazují
   const existing = await page.evaluate(() => window.PP_BUILTIN_MONTHS || {})
   for (const k in existing) if (!existing[k].demo) months[k] = existing[k]
 }
@@ -105,13 +113,16 @@ const ordered = {}
 for (const k of Object.keys(months).sort()) ordered[k] = months[k]
 
 const banner = `/*
- * Vestavěná data panelu — vygenerováno skriptem tools/report-to-data.mjs
- * ze Součtových výkazů. Needitujte ručně.
+ * LOKÁLNÍ DATA — OBSAHUJÍ OSOBNÍ ÚDAJE. NECOMMITOVAT.
  *
- * Pozor: soubor obsahuje osobní údaje zaměstnanců (jméno, osobní číslo,
- * středisko, odpracované přesčasy). Než repozitář nebo publikovaný panel
- * zpřístupníte dál, ověřte, komu tato data smí být vidět.
+ * Vygenerováno skriptem tools/report-to-data.mjs ze Součtových výkazů.
+ * Jména, osobní čísla, střediska a odpracované přesčasy zaměstnanců.
+ *
+ * Soubor je v .gitignore a má tam zůstat. Panel s těmito daty si postavíte
+ * příkazem  node tools/build-single-file.mjs  — výsledek je taky lokální.
  */
 `
 await writeFile(OUT, banner + 'window.PP_BUILTIN_MONTHS = ' + JSON.stringify(ordered) + ';\n', 'utf8')
-console.log(`→ data/months.js (${Object.keys(ordered).length} měsíců)`)
+console.log(`→ data/months.local.js (${Object.keys(ordered).length} měsíců)`)
+console.log('   Obsahuje osobní údaje. Je v .gitignore, necommitovat.')
+console.log('   Panel s těmito daty:  node tools/build-single-file.mjs')
