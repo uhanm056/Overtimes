@@ -63,6 +63,7 @@ data/months.js              vestavěná data (window.PP_BUILTIN_MONTHS)
 tools/generate-demo-data.mjs  generátor ukázkových dat
 tools/report-to-data.mjs      převod reálných výkazů na data/months.js
 tools/build-single-file.mjs   slepení panelu do jednoho .html k rozeslání
+tools/build-public.mjs        veřejné vydání bez osobních údajů do docs/
 tests/                      vzorové výkazy a integrační test importu
 ```
 
@@ -214,6 +215,49 @@ Takhle je panel napojený na úložiště publikovaného artefaktu, kde je jeden
 měsíc jedním dokumentem v kolekci `months` (cca 22 KiB na měsíc, limit
 dokumentu 256 KiB). Když je úložiště nedostupné (privátní režim, zablokované
 cookies), spadne se na paměť a panel to napíše v sekci Import.
+
+## Veřejné vydání pro GitHub Pages
+
+Panel má dvě vydání z jednoho kódu:
+
+| | Interní | Veřejné (`docs/`) |
+| --- | --- | --- |
+| Jména a osobní čísla | ano | **ne, vůbec** |
+| Žebříček závodu, Roční limit, vývoj člověka | ano | ne |
+| Střediska: TOP 5 a seznam lidí | ano | ne |
+| Sloupec Maximum (hodnota jednotlivce) | ano | ne |
+| Export do Excelu | ano | ne |
+| Přehled, souhrny za střediska, grafy vývoje | ano | ano |
+
+```bash
+node tools/build-public.mjs vykaz-07.xls vykaz-08.xls   # → docs/index.html
+node tools/build-public.mjs --demo                      # z ukázkových dat
+```
+
+Do `docs/index.html` se zapisují **jen souhrny za střediska**. Řádky s lidmi
+v tom souboru nejsou — nejde je z něj získat ani zobrazením zdroje.
+
+### Malá střediska se slučují
+
+Střediska pod **5 lidí** jdou do „Ostatní (malá střediska)“. U tříčlenného
+střediska by průměr na osobu prakticky prozradil přesčasy těch tří konkrétních
+lidí, protože kdo tam pracuje ví každý. Kdyby i sloučený zbytek vyšel pod
+pět lidí, nezveřejní se vůbec a nástroj to napíše.
+
+### Pojistka
+
+Než se cokoli zapíše, nástroj prohledá výstup na **každé jméno a každé osobní
+číslo** ze vstupu. Když najde jediný výskyt, nezapíše nic a skončí chybou.
+Totéž hlídá `tests/public.test.mjs` při každém běhu testů.
+
+### Zapnutí Pages
+
+V repozitáři *Settings → Pages → Source: Deploy from a branch → `main` → `/docs`*.
+Pak stačí po každé aktualizaci dat spustit build a pushnout.
+
+> Co je v `docs/`, je **veřejné na internetu**. Souhrny za střediska osobní údaj
+> nejsou, ale zvaž, jestli chceš mít vytíženost závodu venku. Kdyby ne, patří
+> panel na interní sdílení, ne na Pages.
 
 ## Jeden soubor k rozeslání
 

@@ -1,0 +1,3244 @@
+<!doctype html>
+<html lang="cs" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Přesčasový panel Planá</title>
+<meta name="description" content="Přehled přesčasových hodin podle středisek — závod Planá.">
+<meta name="color-scheme" content="light dark">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Přesčasový panel Planá — vzhled.
+   Tmavý boční rail + světlý/tmavý obsah. Barvy jsou tokeny v :root,
+   tmavý režim se přebírá z prefers-color-scheme a přebíjí přepínačem [data-theme]. */
+
+/* ---------- tokeny: světlý režim ---------- */
+:root {
+  color-scheme: light;
+
+  --bg: #f4f6f6;
+  --surface: #ffffff;
+  --surface-2: #eef1f1;
+  --surface-3: #e3e8e8;
+  --line: #d9e0df;
+  --line-soft: #e8eded;
+
+  --text: #14201f;
+  --text-2: #4d5f5d;
+  --text-3: #7a8b89;
+
+  --accent: #0f9e91;
+  --accent-2: #25c9b6;
+  --accent-soft: #e0f4f1;
+  --on-accent: #ffffff;
+
+  --warn: #c07f00;
+  --warn-soft: #fbf0d8;
+  --crit: #d24842;
+  --crit-soft: #fbe4e3;
+  --good: #1a9963;
+  --good-soft: #ddf3e8;
+
+  --rail-bg: #0e1a1c;
+  --rail-bg-2: #16292b;
+  --rail-text: #d7e4e3;
+  --rail-text-2: #7f9997;
+  --rail-line: #23393b;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(16, 33, 32, .06), 0 8px 24px -14px rgba(16, 33, 32, .28);
+
+  --font-display: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
+  --font-text: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+/* ---------- tokeny: tmavý režim ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg: #0f1718;
+    --surface: #162224;
+    --surface-2: #1c2b2d;
+    --surface-3: #24373a;
+    --line: #2a3f42;
+    --line-soft: #223336;
+
+    --text: #e7f0ef;
+    --text-2: #a3b7b5;
+    --text-3: #7a908e;
+
+    --accent: #25c9b6;
+    --accent-2: #4fe0cf;
+    --accent-soft: #16383a;
+    --on-accent: #04211f;
+
+    --warn: #e0a52a;
+    --warn-soft: #3a2f11;
+    --crit: #f0716a;
+    --crit-soft: #3d1f1e;
+    --good: #3fc98a;
+    --good-soft: #12352a;
+
+    --rail-bg: #0a1314;
+    --rail-bg-2: #12211f;
+    --rail-line: #1e3134;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .7);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0f1718;
+  --surface: #162224;
+  --surface-2: #1c2b2d;
+  --surface-3: #24373a;
+  --line: #2a3f42;
+  --line-soft: #223336;
+
+  --text: #e7f0ef;
+  --text-2: #a3b7b5;
+  --text-3: #7a908e;
+
+  --accent: #25c9b6;
+  --accent-2: #4fe0cf;
+  --accent-soft: #16383a;
+  --on-accent: #04211f;
+
+  --warn: #e0a52a;
+  --warn-soft: #3a2f11;
+  --crit: #f0716a;
+  --crit-soft: #3d1f1e;
+  --good: #3fc98a;
+  --good-soft: #12352a;
+
+  --rail-bg: #0a1314;
+  --rail-bg-2: #12211f;
+  --rail-line: #1e3134;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .7);
+}
+
+/* ---------- základ ---------- */
+* { box-sizing: border-box; }
+
+/* vlastní display: flex na .demo-banner by přebil výchozí pravidlo prohlížeče */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin: 0;
+}
+
+a { color: var(--accent); }
+
+.num, td.num, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---------- rozvržení ---------- */
+.shell { display: flex; min-height: 100vh; }
+
+.rail {
+  flex: 0 0 236px;
+  background: linear-gradient(180deg, var(--rail-bg-2), var(--rail-bg));
+  color: var(--rail-text);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand { display: flex; gap: 11px; align-items: center; padding: 0 6px; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 10px; flex: none;
+  background: linear-gradient(140deg, var(--accent-2), var(--accent));
+  color: #04211f;
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+}
+.brand-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; line-height: 1.15; }
+.brand-sub { color: var(--rail-text-2); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; }
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  color: var(--rail-text); font: inherit; text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border-radius: var(--radius-sm);
+  transition: background .13s ease, color .13s ease;
+}
+.nav button:hover { background: rgba(255, 255, 255, .06); }
+.nav button[aria-current='true'] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.nav button[aria-current='true'] .nav-icon { opacity: 1; }
+.nav-icon { width: 17px; height: 17px; flex: none; opacity: .72; }
+
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.rail-note { color: var(--rail-text-2); font-size: 11.5px; line-height: 1.45; padding: 0 6px; }
+
+.theme-toggle {
+  appearance: none; cursor: pointer; font: inherit;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 11px; border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--rail-line);
+  color: var(--rail-text);
+}
+.theme-toggle:hover { background: rgba(255, 255, 255, .1); }
+
+.main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end;
+  justify-content: space-between;
+  padding: 26px 32px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  position: sticky; top: 0; z-index: 5;
+}
+.topbar h1 { font-size: 25px; }
+.topbar .sub { color: var(--text-2); font-size: 13.5px; margin-top: 3px; }
+
+.month-picker { display: flex; align-items: center; gap: 9px; }
+.month-picker label { color: var(--text-2); font-size: 13px; }
+select, input[type='search'], input[type='text'] {
+  font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 8px 11px;
+}
+select:focus-visible, input:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+.content { padding: 24px 32px 56px; }
+.panel[hidden] { display: none !important; }
+
+/* ---------- upozornění na ukázková data ---------- */
+.demo-banner {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 0 32px 0; padding: 11px 14px;
+  border: 1px dashed var(--warn); border-radius: var(--radius);
+  background: var(--warn-soft); color: var(--text);
+  font-size: 13.5px;
+}
+.demo-banner strong { font-weight: 700; }
+
+/* ---------- karty ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+/* jen mezi bloky na úrovni sekce — uvnitř .grid rozestupy dělá gap */
+.panel > .card + .card,
+.panel > .grid + .card,
+.panel > .card + .grid,
+.panel > .grid + .grid { margin-top: 18px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.card-head h2 { font-size: 16.5px; }
+.card-head h3 { font-size: 15px; }
+.card-head .hint, .hint { color: var(--text-3); font-size: 12.5px; }
+
+.grid { display: grid; gap: 18px; }
+.grid.kpis { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-items: start; }
+
+/* ---------- KPI ---------- */
+.kpi { display: flex; flex-direction: column; gap: 5px; }
+.kpi .label { color: var(--text-2); font-size: 12.5px; letter-spacing: .01em; }
+.kpi .value {
+  font-family: var(--font-mono); font-size: 23px; font-weight: 600;
+  letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums;
+}
+.kpi .foot { color: var(--text-3); font-size: 11.5px; line-height: 1.4; }
+.kpi.warn .value { color: var(--warn); }
+.kpi.crit .value { color: var(--crit); }
+.kpi.good .value { color: var(--good); }
+
+/* ---------- pruhové grafy ---------- */
+.bars { display: flex; flex-direction: column; gap: 9px; }
+.bar-row { display: grid; grid-template-columns: minmax(96px, 168px) 1fr auto; gap: 12px; align-items: center; }
+.bar-row .name { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { background: var(--surface-2); border-radius: 999px; height: 11px; overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width .35s ease; }
+.bar-fill.warn { background: var(--warn); }
+.bar-fill.crit { background: var(--crit); }
+.bar-row .val { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 74px; text-align: right; }
+.bar-row .val small { color: var(--text-3); }
+
+/* histogram */
+.hist { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end; height: 168px; }
+.hist-col { display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; height: 100%; text-align: center; }
+.hist-bar { background: var(--accent); border-radius: 6px 6px 2px 2px; min-height: 3px; transition: height .35s ease; }
+.hist-bar.warn { background: var(--warn); }
+.hist-bar.crit { background: var(--crit); }
+.hist-col .n { font-family: var(--font-mono); font-size: 12.5px; }
+.hist-col .lbl { color: var(--text-3); font-size: 11.5px; }
+
+/* rozpad MEZD / evidence */
+.split { display: flex; height: 26px; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.split span { display: block; }
+.split .paid { background: var(--accent); }
+.split .konto { background: var(--accent-2); opacity: .5; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 13px; color: var(--text-2); }
+.legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 7px; vertical-align: -1px; }
+
+/* ---------- tabulky ---------- */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+th {
+  color: var(--text-2); font-weight: 600; font-size: 12.5px;
+  position: sticky; top: 0; background: var(--surface);
+}
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th[aria-sort='ascending']::after { content: ' ▲'; font-size: 9px; }
+th[aria-sort='descending']::after { content: ' ▼'; font-size: 9px; }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--surface-2); }
+td.name { white-space: normal; min-width: 190px; }
+.rank { color: var(--text-3); font-family: var(--font-mono); width: 34px; }
+mark { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 2px; }
+
+/* ---------- odznaky ---------- */
+.tag {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+  background: var(--surface-3); color: var(--text-2);
+}
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.crit { background: var(--crit-soft); color: var(--crit); }
+.tag.good { background: var(--good-soft); color: var(--good); }
+.tag.accent { background: var(--accent-soft); color: var(--accent); }
+
+/* ---------- chipy středisek ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  appearance: none; cursor: pointer; font: inherit; font-size: 13px;
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--text); border-radius: 999px; padding: 6px 13px;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: border-color .13s ease, background .13s ease;
+}
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chip .c-avg { font-family: var(--font-mono); font-size: 12px; opacity: .8; }
+.chip.warn:not([aria-pressed='true']) { border-color: var(--warn); }
+.chip.crit:not([aria-pressed='true']) { border-color: var(--crit); }
+
+/* ---------- lišta nástrojů a export ---------- */
+.topbar-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.export-status { font-size: 12.5px; color: var(--text-3); max-width: 240px; }
+.export-status.ok { color: var(--good); }
+.export-status.err { color: var(--crit); }
+#export-btn[disabled] { opacity: .6; cursor: progress; }
+
+/* ---------- grafy vývoje ---------- */
+.metric-switch { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chart-host { position: relative; width: 100%; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+
+.chart-grid { stroke: var(--line-soft); stroke-width: 1; }
+.chart-axis { stroke: var(--line); stroke-width: 1; }
+.chart-tick { fill: var(--text-3); font-size: 11.5px; font-family: var(--font-mono); }
+.chart-line { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* prstenec v barvě povrchu odděluje body tam, kde se čáry kříží */
+.chart-dot { stroke: var(--surface); stroke-width: 2; }
+.chart-end { font-size: 11.5px; font-weight: 600; font-family: var(--font-text); }
+.chart-ref { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 5 4; opacity: .6; }
+.chart-ref.warn { stroke: var(--warn); opacity: .8; }
+.chart-ref.crit { stroke: var(--crit); opacity: .8; }
+.chart-ref-label { font-size: 10.5px; fill: var(--text-3); font-family: var(--font-text); }
+.chart-ref-label.warn { fill: var(--warn); }
+.chart-ref-label.crit { fill: var(--crit); }
+
+.chart-cross { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+
+.chart-tip {
+  position: absolute; top: 6px; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  padding: 8px 11px; font-size: 12.5px; pointer-events: none; z-index: 2;
+  min-width: 128px;
+}
+.chart-tip strong { display: block; margin-bottom: 5px; font-family: var(--font-display); }
+.chart-tip .row { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
+.chart-tip .row i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.chart-tip .nm { color: var(--text-2); }
+.chart-legend { margin-top: 14px; }
+
+.chart-tip .vl { margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- vývoj jednoho člověka ---------- */
+.person-metric { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 16px; }
+.person-hits { list-style: none; margin: 0; padding: 0; }
+.person-hits li + li { border-top: 1px solid var(--line-soft); }
+.person-hits button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font: inherit; color: var(--text); text-align: left; width: 100%;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 8px; border-radius: var(--radius-sm);
+}
+.person-hits button:hover { background: var(--surface-2); }
+.person-hits .who { display: flex; flex-direction: column; }
+.person-hits .who small { color: var(--text-3); font-size: 11.5px; }
+
+.link-person {
+  appearance: none; border: 0; background: transparent; padding: 0;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+  border-bottom: 1px dotted var(--text-3);
+}
+.link-person:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+tr.muted-row td { color: var(--text-3); }
+
+/* ---------- srovnání měsíců ---------- */
+.cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.cmp-picker label { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
+.cmp-arrow { color: var(--accent); font-size: 17px; }
+
+/* ---------- kdo přibyl / vypadl ---------- */
+.change-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+.change-title { font-size: 14.5px; display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.change-cols .hint { margin: 0 0 11px; }
+.change-list { list-style: none; margin: 0; padding: 0; }
+.change-list li {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
+}
+.change-list li.more { color: var(--text-3); font-size: 12.5px; border-bottom: 0; }
+.change-list .who { display: flex; flex-direction: column; min-width: 0; }
+.change-list .who small { color: var(--text-3); font-size: 11.5px; }
+.change-list .amt {
+  display: flex; flex-direction: column; align-items: flex-end; flex: none;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.change-list .amt small { color: var(--text-3); font-size: 11px; font-family: var(--font-text); }
+
+/* ---------- roční limit ---------- */
+.limit-row { display: grid; grid-template-columns: 1fr; gap: 5px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.limit-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.limit-head .who { font-size: 13.5px; }
+.limit-head .who small { color: var(--text-3); }
+.limit-head .amt { font-family: var(--font-mono); font-size: 13.5px; }
+.limit-track { position: relative; height: 9px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.limit-fill { display: block; height: 100%; border-radius: 999px; background: var(--good); }
+.limit-fill.warn { background: var(--warn); }
+.limit-fill.crit { background: var(--crit); }
+
+/* ---------- import: přepínač ---------- */
+.switch {
+  display: flex; align-items: flex-start; gap: 11px; cursor: pointer;
+  padding: 12px 14px; margin-bottom: 16px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.switch:hover { border-color: var(--accent); }
+.switch.off { cursor: not-allowed; opacity: .65; }
+.switch.off:hover { border-color: var(--line); }
+.switch input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+.switch span { display: flex; flex-direction: column; gap: 2px; }
+.switch strong { font-size: 13.5px; font-weight: 600; }
+.switch small { color: var(--text-2); font-size: 12.5px; }
+
+/* ---------- import ---------- */
+.drop {
+  border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 34px 22px; text-align: center; background: var(--surface-2);
+  transition: border-color .13s ease, background .13s ease;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h3 { font-size: 16px; margin-bottom: 6px; }
+.drop p { color: var(--text-2); margin: 0 0 14px; font-size: 13.5px; }
+
+.btn {
+  appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 13.5px;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+  border-radius: var(--radius-sm); padding: 9px 16px;
+}
+.btn:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+.btn.ghost:hover { border-color: var(--accent); background: var(--surface-2); }
+.btn.danger { background: transparent; color: var(--crit); border-color: var(--crit); }
+.btn.danger:hover { background: var(--crit-soft); }
+.btn.sm { padding: 5px 11px; font-size: 12.5px; }
+
+.log { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.log-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 13px; border-radius: var(--radius-sm);
+  background: var(--surface-2); font-size: 13.5px;
+  border-left: 3px solid var(--text-3);
+}
+.log-item.ok { border-left-color: var(--good); background: var(--good-soft); }
+.log-item.err { border-left-color: var(--crit); background: var(--crit-soft); }
+.log-item.busy { border-left-color: var(--accent); background: var(--accent-soft); }
+
+/* ---------- metodika ---------- */
+.prose { max-width: 74ch; }
+.prose h3 { margin: 22px 0 7px; font-size: 15px; }
+.prose h3:first-child { margin-top: 0; }
+.prose p, .prose li { color: var(--text-2); font-size: 14px; }
+.prose p { margin: 0 0 10px; }
+.prose ul { margin: 0 0 12px; padding-left: 20px; }
+.prose li { margin-bottom: 5px; }
+.prose code {
+  font-family: var(--font-mono); font-size: 12.5px;
+  background: var(--surface-2); border-radius: 5px; padding: 1px 5px;
+}
+.prose strong { color: var(--text); }
+
+.empty { color: var(--text-2); text-align: center; padding: 40px 20px; }
+.empty h3 { color: var(--text); margin-bottom: 8px; }
+
+/* ---------- responzivita ---------- */
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .rail {
+    flex: none; height: auto; position: static;
+    flex-direction: row; align-items: center; gap: 14px;
+    padding: 12px 16px; overflow-x: auto;
+  }
+  .brand-sub, .rail-note { display: none; }
+  .nav { flex-direction: row; }
+  .nav button { padding: 8px 11px; white-space: nowrap; }
+  .rail-foot { margin-top: 0; margin-left: auto; }
+  .topbar { padding: 18px 18px 14px; position: static; }
+  .content { padding: 18px; }
+  .demo-banner { margin: 0 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@media print {
+  .rail, .drop, .btn { display: none !important; }
+  .card { box-shadow: none; break-inside: avoid; }
+}
+</style>
+<meta name="robots" content="noindex">
+<meta name="generator" content="build-public.mjs · 2026-09-29">
+</head>
+<body>
+
+<div class="shell">
+  <!-- boční rail -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">PP</div>
+      <div>
+        <div class="brand-name">Přesčasy</div>
+        <div class="brand-sub">Závod Planá</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav" aria-label="Sekce panelu"></nav>
+
+    <div class="rail-foot">
+      <p class="rail-note" id="rail-note"></p>
+      <button class="theme-toggle" id="theme-toggle" type="button">
+        <span id="theme-label">Motiv: systém</span>
+        <span aria-hidden="true">◐</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- obsah -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="section-title">Přehled</h1>
+        <p class="sub" id="section-sub"></p>
+      </div>
+      <div class="topbar-tools">
+        <div class="month-picker">
+          <label for="month-select">Období</label>
+          <select id="month-select"></select>
+        </div>
+        <button class="btn ghost" type="button" id="export-btn">Export do Excelu</button>
+        <span class="export-status" id="export-status" role="status"></span>
+      </div>
+    </header>
+
+    <div id="demo-banner" hidden></div>
+
+    <div class="content">
+      <section class="panel" id="panel-overview" aria-labelledby="section-title"></section>
+      <section class="panel" id="panel-centers" hidden></section>
+      <section class="panel" id="panel-ranking" hidden></section>
+      <section class="panel" id="panel-compare" hidden></section>
+      <section class="panel" id="panel-year" hidden></section>
+      <section class="panel" id="panel-import" hidden></section>
+      <section class="panel" id="panel-method" hidden></section>
+    </div>
+  </main>
+</div>
+
+<!-- Klasické skripty (ne moduly), aby šel panel otevřít i přímo z disku. -->
+
+<!-- veřejné agregáty -->
+<script>
+window.PP_PUBLIC = true;
+window.PP_BUILTIN_MONTHS = {"2026-01":{"period":"1. 1. – 31. 1. 2026","rawPeriod":"1.1.2026 - 31.1.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":118,"total":1100.02,"mezdy":792.05,"evidence":307.99,"overWarn":1,"overCrit":0,"year150":0,"year250":0,"yearCap":0,"hist":[{"label":"≤ 0","count":1},{"label":"0–10","count":73},{"label":"10–20","count":38},{"label":"20–30","count":5},{"label":"30–40","count":0},{"label":"40–50","count":1},{"label":"50–60","count":0},{"label":"60+","count":0}],"centers":[{"name":"G410 Quality","people":11,"total":175,"m":140.31,"e":34.7},{"name":"G220 Výroba B","people":14,"total":155.78,"m":97.88,"e":57.9},{"name":"G720 Expedice","people":9,"total":84.06,"m":61.28,"e":22.77},{"name":"G310 Údržba","people":7,"total":91.39,"m":65.36,"e":26.06},{"name":"G230 Výroba C","people":11,"total":104.78,"m":59.65,"e":45.13},{"name":"G430 Logistika","people":5,"total":49.67,"m":36.7,"e":12.96},{"name":"G210 Výroba A","people":18,"total":149.99,"m":117.18,"e":32.8},{"name":"G320 Nástrojárna","people":5,"total":39.7,"m":32.11,"e":7.6},{"name":"G420 Warehouse","people":15,"total":96.01,"m":59.04,"e":36.96},{"name":"Ostatní (malá střediska)","people":23,"total":153.64,"m":122.54,"e":31.11}]}},"2026-02":{"period":"1. 2. – 28. 2. 2026","rawPeriod":"1.2.2026 - 28.2.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":128,"total":1450.03,"mezdy":1029.53,"evidence":420.49,"overWarn":1,"overCrit":0,"year150":0,"year250":0,"yearCap":0,"hist":[{"label":"≤ 0","count":1},{"label":"0–10","count":67},{"label":"10–20","count":45},{"label":"20–30","count":11},{"label":"30–40","count":3},{"label":"40–50","count":1},{"label":"50–60","count":0},{"label":"60+","count":0}],"centers":[{"name":"G310 Údržba","people":8,"total":155.29,"m":108.81,"e":46.48},{"name":"G410 Quality","people":12,"total":225,"m":143.94,"e":81.07},{"name":"G420 Warehouse","people":17,"total":132,"m":97.8,"e":34.2},{"name":"G210 Výroba A","people":18,"total":194.97,"m":173.32,"e":21.68},{"name":"G320 Nástrojárna","people":5,"total":51.48,"m":46.45,"e":5.01},{"name":"G220 Výroba B","people":15,"total":185.15,"m":139.96,"e":45.2},{"name":"G230 Výroba C","people":12,"total":112.02,"m":66.56,"e":45.47},{"name":"G430 Logistika","people":6,"total":69.88,"m":39.77,"e":30.09},{"name":"G720 Expedice","people":10,"total":109.81,"m":64.42,"e":45.41},{"name":"Ostatní (malá střediska)","people":25,"total":214.43,"m":148.5,"e":65.88}]}},"2026-03":{"period":"1. 3. – 31. 3. 2026","rawPeriod":"1.3.2026 - 31.3.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":140,"total":1900.03,"mezdy":1330.02,"evidence":570.01,"overWarn":2,"overCrit":0,"year150":0,"year250":0,"yearCap":0,"hist":[{"label":"≤ 0","count":2},{"label":"0–10","count":60},{"label":"10–20","count":47},{"label":"20–30","count":24},{"label":"30–40","count":5},{"label":"40–50","count":1},{"label":"50–60","count":1},{"label":"60+","count":0}],"centers":[{"name":"G310 Údržba","people":8,"total":201.18,"m":168.22,"e":32.96},{"name":"G410 Quality","people":13,"total":300.01,"m":200.5,"e":99.5},{"name":"G220 Výroba B","people":17,"total":243.37,"m":163.45,"e":79.93},{"name":"G230 Výroba C","people":13,"total":143.4,"m":108.12,"e":35.28},{"name":"G210 Výroba A","people":20,"total":260.01,"m":162.58,"e":97.4},{"name":"G320 Nástrojárna","people":6,"total":85.7,"m":69.75,"e":15.95},{"name":"G420 Warehouse","people":17,"total":180,"m":122.34,"e":57.66},{"name":"G720 Expedice","people":11,"total":144.89,"m":99.71,"e":45.18},{"name":"G430 Logistika","people":6,"total":78.92,"m":68.85,"e":10.08},{"name":"Ostatní (malá střediska)","people":29,"total":262.55,"m":166.5,"e":96.07}]}},"2026-04":{"period":"1. 4. – 30. 4. 2026","rawPeriod":"1.4.2026 - 30.4.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":152,"total":2450.04,"mezdy":1666.06,"evidence":783.96,"overWarn":2,"overCrit":0,"year150":0,"year250":0,"yearCap":0,"hist":[{"label":"≤ 0","count":2},{"label":"0–10","count":42},{"label":"10–20","count":63},{"label":"20–30","count":34},{"label":"30–40","count":9},{"label":"40–50","count":1},{"label":"50–60","count":1},{"label":"60+","count":0}],"centers":[{"name":"G220 Výroba B","people":18,"total":334.6,"m":202.17,"e":132.42},{"name":"G410 Quality","people":14,"total":380,"m":261.66,"e":118.34},{"name":"G310 Údržba","people":9,"total":187.7,"m":116.14,"e":71.55},{"name":"G320 Nástrojárna","people":6,"total":93.65,"m":81.12,"e":12.54},{"name":"G720 Expedice","people":12,"total":207.07,"m":154.82,"e":52.24},{"name":"G230 Výroba C","people":14,"total":244.76,"m":177.16,"e":67.62},{"name":"G210 Výroba A","people":22,"total":330.02,"m":208.48,"e":121.53},{"name":"G420 Warehouse","people":20,"total":260,"m":175.91,"e":84.09},{"name":"G510 Technologie","people":5,"total":71.17,"m":44.98,"e":26.18},{"name":"G430 Logistika","people":7,"total":79.55,"m":54.98,"e":24.56},{"name":"Ostatní (malá střediska)","people":25,"total":261.52,"m":188.64,"e":72.89}]}},"2026-05":{"period":"1. 5. – 31. 5. 2026","rawPeriod":"1.5.2026 - 31.5.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":163,"total":3050.06,"mezdy":2043.51,"evidence":1006.45,"overWarn":9,"overCrit":1,"year150":2,"year250":0,"yearCap":0,"hist":[{"label":"≤ 0","count":3},{"label":"0–10","count":31},{"label":"10–20","count":73},{"label":"20–30","count":36},{"label":"30–40","count":11},{"label":"40–50","count":4},{"label":"50–60","count":4},{"label":"60+","count":1}],"centers":[{"name":"G410 Quality","people":15,"total":450.01,"m":332.7,"e":117.29},{"name":"G720 Expedice","people":12,"total":288.91,"m":206.28,"e":82.63},{"name":"G210 Výroba A","people":26,"total":420.03,"m":323.76,"e":96.23},{"name":"G420 Warehouse","people":21,"total":350,"m":205.37,"e":144.61},{"name":"G310 Údržba","people":10,"total":246.86,"m":150.81,"e":96.03},{"name":"G430 Logistika","people":7,"total":143.64,"m":89.12,"e":54.53},{"name":"G220 Výroba B","people":20,"total":389.75,"m":272.37,"e":117.39},{"name":"G320 Nástrojárna","people":7,"total":104.53,"m":70.18,"e":34.35},{"name":"G510 Technologie","people":5,"total":80.65,"m":55.42,"e":25.23},{"name":"G230 Výroba C","people":15,"total":233.33,"m":141.32,"e":91.98},{"name":"Ostatní (malá střediska)","people":25,"total":342.35,"m":196.18,"e":146.18}]}},"2026-06":{"period":"1. 6. – 30. 6. 2026","rawPeriod":"1.6.2026 - 30.6.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":176,"total":3800.02,"mezdy":2470.03,"evidence":1329.96,"overWarn":13,"overCrit":4,"year150":13,"year250":0,"yearCap":0,"hist":[{"label":"≤ 0","count":3},{"label":"0–10","count":26},{"label":"10–20","count":63},{"label":"20–30","count":41},{"label":"30–40","count":30},{"label":"40–50","count":8},{"label":"50–60","count":1},{"label":"60+","count":4}],"centers":[{"name":"G410 Quality","people":16,"total":560.01,"m":364.74,"e":195.27},{"name":"G720 Expedice","people":13,"total":334.86,"m":244.35,"e":90.52},{"name":"G310 Údržba","people":11,"total":365.21,"m":226.42,"e":138.8},{"name":"G320 Nástrojárna","people":7,"total":158.92,"m":118.2,"e":40.72},{"name":"G420 Warehouse","people":24,"total":480.01,"m":251.5,"e":228.49},{"name":"G430 Logistika","people":8,"total":171.48,"m":120.22,"e":51.27},{"name":"G220 Výroba B","people":21,"total":479.77,"m":301.86,"e":177.91},{"name":"G230 Výroba C","people":16,"total":255.13,"m":180.26,"e":74.87},{"name":"G210 Výroba A","people":28,"total":520.02,"m":339.47,"e":180.48},{"name":"G510 Technologie","people":5,"total":81.06,"m":57.24,"e":23.82},{"name":"Ostatní (malá střediska)","people":27,"total":393.55,"m":265.77,"e":127.81}]}},"2026-07":{"period":"1. 7. – 31. 7. 2026","rawPeriod":"1.7.2026 - 31.7.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":182,"total":4625.01,"mezdy":2913.79,"evidence":1711.21,"overWarn":30,"overCrit":6,"year150":22,"year250":2,"yearCap":0,"hist":[{"label":"≤ 0","count":3},{"label":"0–10","count":22},{"label":"10–20","count":55},{"label":"20–30","count":41},{"label":"30–40","count":31},{"label":"40–50","count":19},{"label":"50–60","count":5},{"label":"60+","count":6}],"centers":[{"name":"G410 Quality","people":17,"total":640,"m":440.06,"e":199.93},{"name":"G310 Údržba","people":11,"total":461.71,"m":269.11,"e":192.58},{"name":"G210 Výroba A","people":28,"total":600.03,"m":382.48,"e":217.56},{"name":"G230 Výroba C","people":16,"total":434.16,"m":256.75,"e":177.4},{"name":"G420 Warehouse","people":24,"total":590.04,"m":371.49,"e":218.52},{"name":"G720 Expedice","people":15,"total":428.2,"m":289.78,"e":138.47},{"name":"G220 Výroba B","people":22,"total":466.51,"m":322.52,"e":144.02},{"name":"G510 Technologie","people":5,"total":141.56,"m":44.65,"e":96.92},{"name":"G320 Nástrojárna","people":7,"total":156.21,"m":102.13,"e":54.07},{"name":"G430 Logistika","people":8,"total":189.45,"m":106.13,"e":83.31},{"name":"G630 IT","people":5,"total":112.47,"m":59.25,"e":53.21},{"name":"G710 Nákup","people":5,"total":42.76,"m":25.26,"e":17.5},{"name":"Ostatní (malá střediska)","people":19,"total":361.91,"m":244.18,"e":117.72}]}},"2026-08":{"period":"1. 8. – 31. 8. 2026","rawPeriod":"1.8.2026 - 31.8.2026","people":197,"aggregate":true,"demo":true,"summary":{"withOvertime":189,"total":4276.01,"mezdy":2522.87,"evidence":1753.1,"overWarn":19,"overCrit":6,"year150":44,"year250":7,"yearCap":0,"hist":[{"label":"≤ 0","count":4},{"label":"0–10","count":20},{"label":"10–20","count":74},{"label":"20–30","count":49},{"label":"30–40","count":23},{"label":"40–50","count":11},{"label":"50–60","count":2},{"label":"60+","count":6}],"centers":[{"name":"G310 Údržba","people":12,"total":346.07,"m":292.08,"e":54},{"name":"G720 Expedice","people":15,"total":401.28,"m":277.82,"e":123.49},{"name":"G410 Quality","people":18,"total":609.98,"m":338.98,"e":271.02},{"name":"G420 Warehouse","people":25,"total":681.03,"m":401.82,"e":279.16},{"name":"G210 Výroba A","people":29,"total":620,"m":377.71,"e":242.26},{"name":"G220 Výroba B","people":23,"total":386.04,"m":265.62,"e":120.41},{"name":"G230 Výroba C","people":17,"total":330.12,"m":141.86,"e":188.26},{"name":"G520 Projekty","people":5,"total":78.92,"m":49.64,"e":29.27},{"name":"G630 IT","people":5,"total":103.43,"m":54.84,"e":48.61},{"name":"G510 Technologie","people":6,"total":115.68,"m":71.24,"e":44.44},{"name":"G320 Nástrojárna","people":8,"total":152.74,"m":68.98,"e":83.76},{"name":"G430 Logistika","people":9,"total":142.93,"m":64.98,"e":77.94},{"name":"Ostatní (malá střediska)","people":17,"total":307.79,"m":117.3,"e":190.48}]}}};
+</script>
+
+<!-- js/util.js -->
+<script>
+/* Přesčasový panel Planá — společné utility a konfigurace.
+   Klasický skript (ne ES modul), aby šel index.html otevřít i z disku (file://). */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  /* ---------- prahové hodnoty ---------- */
+  PP.CFG = {
+    // měsíční přesčas jednotlivce
+    person: { warn: 40, crit: 60 },
+    // průměr na osobu za středisko
+    center: { warn: 35, crit: 45 },
+    // roční součet přesčasu
+    year: { warn: 150, crit: 250, cap: 416 },
+  }
+
+  /** Stupeň závažnosti podle prahů: '' | 'warn' | 'crit'. */
+  PP.level = function (value, th) {
+    if (value >= th.crit) return 'crit'
+    if (value >= th.warn) return 'warn'
+    return ''
+  }
+
+  /* ---------- formátování ---------- */
+  const NF = new Intl.NumberFormat('cs-CZ')
+  const NF1 = new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+  /** Hodiny jako h:mm, se znaménkem: 54.4833 → "54:29", -2.5 → "−2:30". */
+  PP.hm = function (hours) {
+    if (hours == null || !isFinite(hours)) return '—'
+    const sign = hours < 0 ? '−' : ''
+    let total = Math.round(Math.abs(hours) * 60)
+    const h = Math.floor(total / 60)
+    const m = total % 60
+    return sign + h + ':' + String(m).padStart(2, '0')
+  }
+
+  /** Hodiny jako desetinné číslo v českém formátu: 4625.05 → "4 625,1". */
+  PP.h1 = function (hours) {
+    if (hours == null || !isFinite(hours)) return '—'
+    return NF1.format(hours)
+  }
+
+  /** Celé číslo v českém formátu. */
+  PP.num = function (n) {
+    if (n == null || !isFinite(n)) return '—'
+    return NF.format(Math.round(n))
+  }
+
+  /** Procenta na celé číslo. */
+  PP.pct = function (ratio) {
+    if (ratio == null || !isFinite(ratio)) return '—'
+    return Math.round(ratio * 100) + ' %'
+  }
+
+  /** Klíč měsíce YYYY-MM → "srpen 2026". */
+  const MONTH_NAMES = [
+    'leden', 'únor', 'březen', 'duben', 'květen', 'červen',
+    'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec',
+  ]
+  PP.monthName = function (key) {
+    const m = /^(\d{4})-(\d{2})$/.exec(key || '')
+    if (!m) return key || '—'
+    return MONTH_NAMES[Number(m[2]) - 1] + ' ' + m[1]
+  }
+  /** Klíč měsíce YYYY-MM → "8/2026". */
+  PP.monthShort = function (key) {
+    const m = /^(\d{4})-(\d{2})$/.exec(key || '')
+    if (!m) return key || '—'
+    return Number(m[2]) + '/' + m[1]
+  }
+
+  /* ---------- text ---------- */
+  /** Malá písmena bez diakritiky a s normalizovanými mezerami — pro hledání a párování hlaviček. */
+  PP.fold = function (s) {
+    return String(s == null ? '' : s)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  /** Escapování do HTML. */
+  PP.esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]))
+  }
+
+  /** Zvýraznění hledaného výrazu v textu (vstup se escapuje). */
+  PP.mark = function (text, query) {
+    const safe = PP.esc(text)
+    const q = PP.fold(query)
+    if (!q) return safe
+    const hay = PP.fold(text)
+    const at = hay.indexOf(q)
+    if (at < 0) return safe
+    // fold nemění délku pro běžnou českou diakritiku, offsety tedy sedí
+    return PP.esc(text.slice(0, at)) + '<mark>' + PP.esc(text.slice(at, at + q.length)) +
+      '</mark>' + PP.esc(text.slice(at + q.length))
+  }
+
+  /** Střední jméno střediska bez kódu: "G463 Prefix" → "Prefix". */
+  PP.centerName = function (s) {
+    return String(s || '').replace(/^[A-Z]?\d{2,5}\s+/, '')
+  }
+
+  /* ---------- DOM ---------- */
+  PP.el = function (tag, attrs, children) {
+    const node = document.createElement(tag)
+    if (attrs) {
+      for (const k in attrs) {
+        if (k === 'class') node.className = attrs[k]
+        else if (k === 'html') node.innerHTML = attrs[k]
+        else if (k === 'text') node.textContent = attrs[k]
+        else if (k.startsWith('on')) node.addEventListener(k.slice(2), attrs[k])
+        else if (attrs[k] != null) node.setAttribute(k, attrs[k])
+      }
+    }
+    for (const c of [].concat(children || [])) {
+      if (c == null) continue
+      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c)
+    }
+    return node
+  }
+
+  PP.$ = (sel, root) => (root || document).querySelector(sel)
+  PP.$$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel))
+})(window.PP)
+</script>
+
+<!-- js/store.js -->
+<script>
+/* Perzistence importovaných měsíců.
+ *
+ * Vrstva je odstíněná — panel volá jen loadImported / saveImported / removeImported
+ * a nezajímá ho, kam se ukládá:
+ *
+ *   • localStorage pod klíčem `prescasy.months.v1` (výchozí, funguje i z file://)
+ *   • libovolný jiný backend přes window.PP_DB_ADAPTER (viz README) — např.
+ *     kolekce `months` v úložišti publikovaného artefaktu, kde je dokumentem
+ *     klíč měsíce. Jeden měsíc má cca 22 KiB, limit dokumentu je 256 KiB.
+ *
+ * Všechny funkce vracejí Promise, aby šel doplnit asynchronní backend.
+ */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  const LS_KEY = 'prescasy.months.v1'
+
+  const localBackend = {
+    name: 'localStorage',
+    async load() {
+      try {
+        const raw = window.localStorage.getItem(LS_KEY)
+        if (!raw) return {}
+        const data = JSON.parse(raw)
+        return data && typeof data === 'object' ? data : {}
+      } catch (err) {
+        console.warn('[store] localStorage není dostupný:', err)
+        return {}
+      }
+    },
+    async save(key, record) {
+      const all = await this.load()
+      all[key] = record
+      window.localStorage.setItem(LS_KEY, JSON.stringify(all))
+    },
+    async remove(key) {
+      const all = await this.load()
+      delete all[key]
+      window.localStorage.setItem(LS_KEY, JSON.stringify(all))
+    },
+  }
+
+  const memoryBackend = {
+    name: 'paměť (neukládá se)',
+    data: {},
+    async load() { return Object.assign({}, this.data) },
+    async save(key, record) { this.data[key] = record },
+    async remove(key) { delete this.data[key] },
+  }
+
+  function backend() {
+    // Adaptér smí být dosazen před načtením app.js — např. wrapperem artefaktu.
+    if (window.PP_DB_ADAPTER) return window.PP_DB_ADAPTER
+    try {
+      const probe = '__pp_probe__'
+      window.localStorage.setItem(probe, '1')
+      window.localStorage.removeItem(probe)
+      return localBackend
+    } catch (err) {
+      // privátní režim, zablokované úložiště, file:// v některých prohlížečích
+      return memoryBackend
+    }
+  }
+
+  PP.store = {
+    /** Název aktivního backendu — zobrazuje se v sekci Import. */
+    get backendName() { return backend().name },
+
+    /** Všechny importované měsíce jako mapa { 'YYYY-MM': record }. */
+    loadImported() { return backend().load() },
+
+    /** Uloží/přepíše jeden měsíc. */
+    saveImported(key, record) { return backend().save(key, record) },
+
+    /** Smaže jeden importovaný měsíc. */
+    removeImported(key) { return backend().remove(key) },
+  }
+})(window.PP)
+</script>
+
+<!-- js/parser.js -->
+<script>
+/* Parser Součtového výkazu z mzdového systému.
+ *
+ * Podporované vstupy:
+ *   • .xlsx  (ZIP, začíná "PK")            → SheetJS, lazy-load z cdnjs
+ *   • .xls   (legacy BIFF, začíná D0 CF)   → SheetJS
+ *   • .xls   (ve skutečnosti HTML tabulka) → DOMParser  ← tohle chodí z mezd
+ *   • .csv / .txt                          → oddělovač ; , nebo tab
+ *
+ * Výstupem je záznam měsíce v datovém modelu panelu:
+ *   { period, rawPeriod, people, rows: [{ n, o, s, m, e, t, r }], importedAt, file }
+ */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  const SHEETJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+  const HEADER_SCAN_ROWS = 40
+
+  /* ---------- načtení SheetJS na požádání ---------- */
+  let sheetJsPromise = null
+  function loadSheetJS() {
+    if (window.XLSX) return Promise.resolve(window.XLSX)
+    if (sheetJsPromise) return sheetJsPromise
+    sheetJsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = SHEETJS_URL
+      s.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('SheetJS se načetl, ale není dostupný.')))
+      s.onerror = () => reject(new Error('Nepodařilo se načíst SheetJS z cdnjs — zkontrolujte připojení k síti.'))
+      document.head.appendChild(s)
+    })
+    return sheetJsPromise
+  }
+
+  /* ---------- čtení souboru ---------- */
+  function readArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result)
+      fr.onerror = () => reject(new Error('Soubor se nepodařilo přečíst.'))
+      fr.readAsArrayBuffer(file)
+    })
+  }
+
+  /** Text z bufferu — respektuje deklarovaný charset, jinak UTF-8 s fallbackem na windows-1250. */
+  function decodeText(buffer) {
+    const bytes = new Uint8Array(buffer)
+    const ascii = new TextDecoder('latin1').decode(bytes.subarray(0, 4096))
+    const declared = /charset\s*=\s*["']?\s*([\w-]+)/i.exec(ascii)
+    const tryDecode = (enc) => {
+      try { return new TextDecoder(enc, { fatal: false }).decode(bytes) } catch (err) { return null }
+    }
+    if (declared) {
+      const text = tryDecode(declared[1].toLowerCase())
+      if (text) return text
+    }
+    const utf8 = tryDecode('utf-8')
+    // U+FFFD = špatně dekódované bajty → výkaz je nejspíš v středoevropském kódování
+    if (utf8 && !/�/.test(utf8)) return utf8
+    return tryDecode('windows-1250') || utf8 || ''
+  }
+
+  /* ---------- převod vstupu na matici buněk ---------- */
+  async function toMatrix(file) {
+    const buffer = await readArrayBuffer(file)
+    const head = new Uint8Array(buffer.slice(0, 8))
+    const isZip = head[0] === 0x50 && head[1] === 0x4b            // "PK" → xlsx
+    const isBiff = head[0] === 0xd0 && head[1] === 0xcf            // OLE2 → legacy .xls
+
+    if (isZip || isBiff) {
+      const XLSX = await loadSheetJS()
+      const wb = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: false, raw: true })
+      // list s nejvíc řádky — výkaz bývá první, ale ne vždy
+      let best = null
+      for (const name of wb.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, blankrows: false, raw: true, defval: '' })
+        if (!best || rows.length > best.length) best = rows
+      }
+      return { matrix: (best || []).map((r) => r.map(cellText)), kind: isZip ? 'xlsx' : 'xls (BIFF)' }
+    }
+
+    const text = decodeText(buffer)
+    if (/<\s*table/i.test(text)) return { matrix: htmlToMatrix(text), kind: 'HTML tabulka (.xls z mezd)' }
+    return { matrix: csvToMatrix(text), kind: 'CSV' }
+  }
+
+  function cellText(v) {
+    if (v == null) return ''
+    if (typeof v === 'number') return String(v)
+    return String(v)
+  }
+
+  /** Vybere <table> s nejvíc řádky a převede ji na matici textů. */
+  function htmlToMatrix(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const tables = Array.prototype.slice.call(doc.querySelectorAll('table'))
+    if (!tables.length) throw new Error('V souboru není žádná tabulka.')
+    let best = tables[0]
+    for (const t of tables) if (t.rows.length > best.rows.length) best = t
+    return Array.prototype.map.call(best.rows, (tr) =>
+      Array.prototype.map.call(tr.cells, (td) =>
+        td.textContent.replace(/\u00a0/g, ' ').trim()
+      )
+    )
+  }
+
+  /** CSV s automatickou detekcí oddělovače, respektuje uvozovky. */
+  function csvToMatrix(text) {
+    const sample = text.slice(0, 8192)
+    const counts = { ';': 0, ',': 0, '\t': 0 }
+    for (const ch of sample) if (ch in counts) counts[ch]++
+    const delim = Object.keys(counts).reduce((a, b) => (counts[b] > counts[a] ? b : a), ';')
+
+    const rows = []
+    let row = []
+    let cell = ''
+    let quoted = false
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i]
+      if (quoted) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++ } else quoted = false
+        } else cell += ch
+        continue
+      }
+      if (ch === '"') { quoted = true; continue }
+      if (ch === delim) { row.push(cell.trim()); cell = ''; continue }
+      if (ch === '\n') { row.push(cell.trim()); rows.push(row); row = []; cell = ''; continue }
+      if (ch === '\r') continue
+      cell += ch
+    }
+    if (cell || row.length) { row.push(cell.trim()); rows.push(row) }
+    return rows.filter((r) => r.some((c) => c !== ''))
+  }
+
+  /* ---------- hlavička ---------- */
+  const COLUMN_TESTS = {
+    name: (c) => c.includes('prijmeni') && c.includes('jmeno'),
+    id: (c) => c.includes('osobni'),
+    center: (c) => c.includes('stredisko'),
+    component: (c) => c.includes('mzdova') && c.includes('slozka'),
+    hours: (c) => c.includes('hodiny'),
+  }
+
+  function findHeader(matrix) {
+    const limit = Math.min(matrix.length, HEADER_SCAN_ROWS)
+    for (let r = 0; r < limit; r++) {
+      const cells = matrix[r].map(PP.fold)
+      const cols = {}
+      for (const key in COLUMN_TESTS) {
+        const idx = cells.findIndex(COLUMN_TESTS[key])
+        if (idx >= 0) cols[key] = idx
+      }
+      if (cols.name != null && cols.id != null && cols.center != null &&
+          cols.component != null && cols.hours != null) {
+        return { row: r, cols }
+      }
+    }
+    throw new Error(
+      'Nenašel jsem hlavičku výkazu. Očekávám sloupce Příjmení a jméno, Osobní číslo, ' +
+      'Středisko, Mzdová složka a Hodiny v prvních ' + HEADER_SCAN_ROWS + ' řádcích.'
+    )
+  }
+
+  /* ---------- období ---------- */
+  const DATE_RANGE = /(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{4})\s*[-–—]\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{4})/
+
+  function findPeriod(matrix, headerRow) {
+    // 1) řádek nad hlavičkou začínající "Období:"
+    for (let r = headerRow; r >= 0; r--) {
+      for (const cell of matrix[r]) {
+        if (/^obdobi\s*:/.test(PP.fold(cell))) {
+          const m = DATE_RANGE.exec(cell)
+          if (m) return m
+        }
+      }
+    }
+    // 2) první výskyt d.m.yyyy - d.m.yyyy kdekoli nad hlavičkou
+    for (let r = 0; r <= headerRow; r++) {
+      for (const cell of matrix[r]) {
+        const m = DATE_RANGE.exec(cell)
+        if (m) return m
+      }
+    }
+    return null
+  }
+
+  /** "1.8.2026 - 31.8.2026" → { key: '2026-08', period: '1. 8. – 31. 8. 2026', rawPeriod } */
+  function describePeriod(m) {
+    const [, d1, m1, y1, d2, m2, y2] = m.map(String)
+    const key = y1 + '-' + String(Number(m1)).padStart(2, '0')
+    const left = Number(y1) === Number(y2) && Number(m1) === Number(m2)
+      ? `${Number(d1)}. ${Number(m1)}.`
+      : `${Number(d1)}. ${Number(m1)}. ${y1}`
+    const period = `${left} – ${Number(d2)}. ${Number(m2)}. ${y2}`
+    return { key, period, rawPeriod: m[0].trim() }
+  }
+
+  /* ---------- hodnoty ---------- */
+  /** "54:29", "-2:30", "1 234,50", "48.98" → číslo hodin. Prázdno → 0. */
+  function parseHours(raw) {
+    let s = String(raw == null ? '' : raw).replace(/\u00a0/g, ' ').trim()
+    if (!s) return 0
+    let sign = 1
+    if (/^[-−]/.test(s)) { sign = -1; s = s.slice(1).trim() }
+    else if (/[-−]$/.test(s)) { sign = -1; s = s.slice(0, -1).trim() }   // 12:30-
+    if (/^\(.*\)$/.test(s)) { sign = -1; s = s.slice(1, -1).trim() }     // (12:30)
+
+    const hm = /^(\d+)\s*:\s*(\d{1,2})$/.exec(s)
+    if (hm) return sign * (Number(hm[1]) + Number(hm[2]) / 60)
+
+    const num = Number(s.replace(/\s/g, '').replace(',', '.'))
+    return isFinite(num) ? sign * num : 0
+  }
+
+  /** Zařazení mzdové složky: 'm' = do MEZD, 'e' = evidence, 'r' = roční součet, null = nezajímá nás. */
+  function classify(component) {
+    const c = PP.fold(component)
+    if (!c.includes('prescas')) return null
+    if (c.includes('rocni') || c.includes('soucet')) return 'r'
+    if (c.includes('eviden') || c.includes('konto')) return 'e'
+    if (c.includes('mezd') || c.includes('proplac')) return 'm'
+    return null
+  }
+
+  /* ---------- hlavní vstupní bod ---------- */
+  /**
+   * Rozparsuje soubor na záznam měsíce.
+   * @returns {Promise<{key: string, record: object, kind: string, skipped: number}>}
+   */
+  PP.parseReport = async function (file) {
+    const { matrix, kind } = await toMatrix(file)
+    if (!matrix.length) throw new Error('Soubor je prázdný.')
+
+    const header = findHeader(matrix)
+    const cols = header.cols
+
+    const periodMatch = findPeriod(matrix, header.row)
+    if (!periodMatch) {
+      throw new Error('Nenašel jsem období výkazu (řádek „Období: d.m.rrrr - d.m.rrrr“).')
+    }
+    const period = describePeriod(periodMatch)
+
+    const byPerson = new Map()      // osobní číslo|středisko → agregovaný řádek
+    const everyone = new Set()      // všichni lidé ve výkazu, i bez přesčasu
+    let skipped = 0
+
+    // Sestavy z mezd tisknou jméno, osobní číslo a středisko často jen na prvním
+    // řádku skupiny a další mzdové složky nechávají tyhle sloupce prázdné.
+    // Takový řádek proto přebírá identitu z předchozího, jinak by se ztratil.
+    let last = null
+
+    for (let r = header.row + 1; r < matrix.length; r++) {
+      const row = matrix[r]
+      if (!row || !row.length) continue
+
+      const id = String(row[cols.id] || '').trim()
+      const name = String(row[cols.name] || '').trim()
+      const center = String(row[cols.center] || '').trim()
+
+      // souhrnné řádky "Celkem …" ukončují skupinu, identita se dál nedědí
+      if (/^(celkem|soucet|mezisoucet)/.test(PP.fold(name))) { last = null; continue }
+
+      let who
+      if (!name && !id) {
+        // pokračovací řádek — bez předchozí identity ho zahodit musíme
+        if (!last) continue
+        who = last
+      } else if (!id && last && PP.fold(last.n) === PP.fold(name)) {
+        // jméno se opakuje, ale číslo je vyplněné jen jednou
+        who = { n: last.n, o: last.o, s: center || last.s }
+        last = who
+      } else {
+        who = { n: name, o: id, s: center }
+        last = who
+        // Do stavu osob počítáme jen řádky s osobním číslem. Sestavy mívají
+        // mezisoučty nadepsané jménem bez čísla a ty nejsou další člověk.
+        if (id) everyone.add(id + '|' + center)
+      }
+      if (!who.o && !who.n) continue
+
+      const bucket = classify(row[cols.component])
+      if (!bucket) { skipped++; continue }
+
+      const key = (who.o || who.n) + '|' + who.s
+      const hours = parseHours(row[cols.hours])
+      let rec = byPerson.get(key)
+      if (!rec) {
+        rec = {
+          n: who.n,
+          o: /^\d+$/.test(String(who.o)) ? Number(who.o) : who.o,
+          s: who.s, m: 0, e: 0, t: 0, r: 0,
+        }
+        byPerson.set(key, rec)
+      }
+      rec[bucket] += hours
+    }
+
+    const round2 = (v) => Math.round(v * 100) / 100
+    const rows = Array.from(byPerson.values())
+      .map((rec) => {
+        rec.m = round2(rec.m)
+        rec.e = round2(rec.e)
+        rec.r = round2(rec.r)
+        rec.t = round2(rec.m + rec.e)
+        return rec
+      })
+      .sort((a, b) => b.t - a.t || String(a.n).localeCompare(String(b.n), 'cs'))
+
+    if (!rows.length) {
+      throw new Error('Ve výkazu nejsou žádné přesčasové mzdové složky.')
+    }
+
+    return {
+      key: period.key,
+      kind,
+      skipped,
+      record: {
+        period: period.period,
+        rawPeriod: period.rawPeriod,
+        // pojistka pro výkazy bez osobních čísel — stav nesmí být menší
+        // než počet lidí, kteří v něm mají přesčas
+        people: Math.max(everyone.size, rows.length),
+        rows,
+        importedAt: new Date().toISOString(),
+        file: file.name,
+      },
+    }
+  }
+
+  // sdíleno s exportem — SheetJS se stahuje jen jednou, na požádání
+  PP.loadSheetJS = loadSheetJS
+
+  // vystaveno kvůli testům a případnému CLI použití
+  PP.parserInternals = { parseHours, classify, csvToMatrix, htmlToMatrix, findHeader, describePeriod, DATE_RANGE }
+})(window.PP)
+</script>
+
+<!-- js/export.js -->
+<script>
+/* Export do Excelu.
+ *
+ * Používá stejný SheetJS, jaký se stahuje kvůli importu .xlsx — načte se
+ * až při prvním exportu, ne při startu panelu.
+ *
+ * Hodiny jsou v sešitu jako desetinná čísla, aby se daly sčítat a filtrovat.
+ * Klíčové sloupce mají vedle sebe i tvar h:mm, protože v tom je výkaz čitelný.
+ * Časový formát Excelu se schválně nepoužívá — evidence bývá záporná a záporný
+ * čas Excel neumí zobrazit (ukáže ####).
+ */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  const CFG = PP.CFG
+
+  /** Pásmo pro sloupec v sešitu — ať jde v Excelu filtrovat. */
+  function band(value, th) {
+    const lvl = PP.level(value, th)
+    return lvl === 'crit' ? 'kritické' : lvl === 'warn' ? 'sledovat' : 'ok'
+  }
+
+  const round2 = (v) => Math.round(v * 100) / 100
+
+  function sheetFrom(XLSX, rows, widths) {
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    if (widths) ws['!cols'] = widths.map((w) => ({ wch: w }))
+    if (rows.length > 1) {
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: rows.length - 1, c: rows[0].length - 1 },
+      }) }
+    }
+    return ws
+  }
+
+  /* ---------- jednotlivé listy ---------- */
+
+  function souhrn(rec, key, s, cmp, prevKey) {
+    const rows = [
+      ['Ukazatel', 'Hodnota'],
+      ['Měsíc', PP.monthName(key)],
+      ['Období', rec.period || ''],
+      ['Osob ve výkazu', s.people],
+      ['Lidí s přesčasem', s.withOvertime],
+      ['Přesčas celkem (h)', round2(s.total)],
+      ['Do MEZD (h)', round2(s.mezdy)],
+      ['Evidence (h)', round2(s.evidence)],
+      ['Podíl proplacených', round2(s.paidShare)],
+      ['Ø na osobu (h)', round2(s.avg)],
+      ['Ø na osobu (h:mm)', PP.hm(s.avg)],
+      ['Maximum (h)', round2(s.max)],
+      ['Nad ' + CFG.person.warn + ' h za měsíc', s.overWarn],
+      ['Nad ' + CFG.person.crit + ' h za měsíc', s.overCrit],
+      ['Nad ' + CFG.year.warn + ' h ročně', s.year150],
+      ['Nad ' + CFG.year.crit + ' h ročně', s.year250],
+      ['Na stropu ' + CFG.year.cap + ' h', s.yearCap],
+    ]
+    if (cmp) {
+      rows.push([], ['Proti měsíci', PP.monthName(prevKey)])
+      rows.push(['Δ přesčas celkem (h)', round2(cmp.dTotal)])
+      rows.push(['Δ lidí s přesčasem', cmp.dPeople])
+      rows.push(['Δ Ø na osobu (h)', round2(cmp.dAvg)])
+      rows.push(['Δ podíl proplacených', round2(cmp.dPaidShare)])
+      rows.push(['Vypadli', cmp.dropped.length])
+      rows.push(['Přibyli', cmp.added.length])
+    }
+    rows.push([], ['Zdroj', rec.file || ''])
+    if (rec.demo) rows.push(['Pozor', 'UKÁZKOVÁ DATA — jména i hodiny jsou vymyšlené'])
+    return rows
+  }
+
+  function strediska(s, cmp) {
+    const dmap = new Map((cmp ? cmp.centers : []).map((c) => [c.name, c]))
+    const head = ['Středisko', 'Lidí', 'Celkem (h)', 'Ø na osobu (h)', 'Ø (h:mm)',
+      'Do MEZD (h)', 'Evidence (h)', 'Maximum (h)', 'Pásmo']
+    if (cmp) head.push('Δ Ø (h)', 'Δ celkem (h)')
+    const rows = [head]
+    for (const c of s.byTotal) {
+      const r = [c.name, c.people, round2(c.total), round2(c.avg), PP.hm(c.avg),
+        round2(c.m), round2(c.e), round2(c.max), band(c.avg, CFG.center)]
+      if (cmp) {
+        const d = dmap.get(c.name)
+        r.push(d && d.dAvg != null ? round2(d.dAvg) : '', d && d.dTotal != null ? round2(d.dTotal) : '')
+      }
+      rows.push(r)
+    }
+    return rows
+  }
+
+  function lide(s) {
+    const rows = [['Jméno', 'Osobní číslo', 'Středisko', 'Do MEZD (h)', 'Evidence (h)',
+      'Přesčas (h)', 'Přesčas (h:mm)', 'Pásmo', 'Roční součet (h)', 'Roční (h:mm)',
+      'Zbývá do ' + CFG.year.cap + ' h', 'Pásmo ročně']]
+    for (const r of s.ranking) {
+      rows.push([r.n, r.o, r.s, round2(r.m), round2(r.e), round2(r.t), PP.hm(r.t),
+        band(r.t, CFG.person), round2(r.r), PP.hm(r.r),
+        round2(Math.max(0, CFG.year.cap - r.r)),
+        band(r.r, { warn: CFG.year.warn, crit: CFG.year.crit })])
+    }
+    return rows
+  }
+
+  function zmeny(cmp, keyA, keyB) {
+    const rows = [['Typ', 'Jméno', 'Osobní číslo', 'Středisko',
+      PP.monthShort(keyA) + ' (h)', PP.monthShort(keyB) + ' (h)', 'Δ (h)']]
+    for (const r of cmp.dropped) {
+      rows.push(['vypadl', r.n, r.o, r.s, round2(r.t), 0, round2(-r.t)])
+    }
+    for (const r of cmp.added) {
+      rows.push(['přibyl', r.n, r.o, r.s, 0, round2(r.t), round2(r.t)])
+    }
+    for (const m of cmp.movers) {
+      rows.push(['zůstal', m.r.n, m.r.o, m.r.s, round2(m.prev.t), round2(m.r.t), round2(m.d)])
+    }
+    return rows
+  }
+
+  /* ---------- vstupní bod ---------- */
+
+  /**
+   * Sestaví a stáhne sešit za jeden měsíc. Když existuje předchozí měsíc,
+   * přidá i listy se srovnáním.
+   * @param {string} key klíč měsíce YYYY-MM
+   * @param {string|null} prevKey klíč měsíce k porovnání, nebo null
+   */
+  PP.exportExcel = async function (key, prevKey) {
+    const rec = PP.data.month(key)
+    if (!rec) throw new Error('Měsíc ' + key + ' není načtený.')
+    const XLSX = await PP.loadSheetJS()
+
+    const s = PP.stats(rec)
+    const prev = prevKey ? PP.data.month(prevKey) : null
+    const cmp = prev ? PP.compare(rec, prev) : null
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, sheetFrom(XLSX, souhrn(rec, key, s, cmp, prevKey), [30, 46]), 'Souhrn')
+    XLSX.utils.book_append_sheet(wb, sheetFrom(XLSX, strediska(s, cmp), [24, 7, 12, 14, 11, 12, 12, 12, 11, 10, 12]), 'Střediska')
+    XLSX.utils.book_append_sheet(wb, sheetFrom(XLSX, lide(s), [30, 13, 22, 12, 12, 12, 14, 10, 15, 12, 16, 12]), 'Lidé')
+    if (cmp) {
+      XLSX.utils.book_append_sheet(wb, sheetFrom(XLSX, zmeny(cmp, prevKey, key), [10, 30, 13, 22, 12, 12, 10]), 'Změny lidí')
+    }
+
+    const name = 'Prescasy_' + key + (cmp ? '_vs_' + prevKey : '') + '.xlsx'
+    XLSX.writeFile(wb, name)
+    return { name, sheets: wb.SheetNames }
+  }
+})(window.PP)
+</script>
+
+<!-- js/chart.js -->
+<script>
+/* Spojnicové grafy vývoje. Vlastní SVG, bez knihovny — panel se nemá
+ * čím rozbít offline a nepotřebuje build.
+ *
+ * Kreslí se do změřené šířky kontejneru, ne do škálovaného viewBoxu, aby
+ * popisky měly na každé šířce stejnou velikost.
+ */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  /* Kategoriální paleta pro víc sérií. Firemní teal je sémantická barva
+     (accent), na rozlišení entit se nehodí. Tyhle odstíny jsou ověřené na
+     rozlišitelnost při barvosleposti proti světlému i tmavému povrchu panelu. */
+  const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4']
+  const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181']
+
+  function isDark() {
+    const attr = document.documentElement.getAttribute('data-theme')
+    if (attr === 'dark') return true
+    if (attr === 'light') return false
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+
+  PP.seriesColors = function () { return isDark() ? SERIES_DARK : SERIES_LIGHT }
+
+  const NS = 'http://www.w3.org/2000/svg'
+  const el = (name, attrs) => {
+    const n = document.createElementNS(NS, name)
+    for (const k in attrs) if (attrs[k] != null) n.setAttribute(k, attrs[k])
+    return n
+  }
+
+  /** Hezký krok osy — 1/2/2,5/5 × 10^n. */
+  function niceStep(span, count) {
+    const raw = span / count
+    const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)))
+    return [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || 10 * mag
+  }
+
+  /**
+   * Dělení osy y. Nula je vždycky uvnitř rozsahu — u člověka může měsíc vyjít
+   * záporně (proplacené konto se odečte z evidence) a čára nesmí zmizet pod osu.
+   */
+  function ticks(min, max, count) {
+    const lo = Math.min(0, min)
+    const hi = Math.max(0, max)
+    if (lo === hi) return [0, 1]
+    const step = niceStep(hi - lo, count)
+    const from = Math.floor(lo / step) * step
+    const to = Math.ceil(hi / step) * step
+    const out = []
+    for (let v = from; v <= to + step * 0.001; v += step) {
+      out.push(Math.abs(v) < step * 1e-9 ? 0 : v)
+    }
+    return out
+  }
+
+  /**
+   * Vykreslí spojnicový graf.
+   *
+   * @param {HTMLElement} host   kontejner; obsah se přepíše
+   * @param {object} spec
+   *   labels   popisky osy x
+   *   series   [{ name, color, values }] — values může obsahovat null (chybí)
+   *   format   funkce pro hodnotu v popisku a tooltipu
+   *   area     vyplnit plochu pod čarou (jen u jedné série)
+   *   endLabel přidat popisek na konec čáry (u víc sérií)
+   */
+  PP.lineChart = function (host, spec) {
+    const width = Math.max(320, host.clientWidth || 640)
+    const height = spec.height || 260
+    const endRoom = spec.endLabel ? 94 : 16
+    const pad = { t: 14, r: endRoom, b: 30, l: 56 }
+    const iw = width - pad.l - pad.r
+    const ih = height - pad.t - pad.b
+
+    const all = spec.series.flatMap((s) => s.values).filter((v) => v != null && isFinite(v))
+    const maxVal = all.length ? Math.max.apply(null, all) : 1
+    const minVal = all.length ? Math.min.apply(null, all) : 0
+
+    let ys, yMin, yMax
+    if (spec.domainMax != null) {
+      // Osa končí přesně na zadané hodnotě — u ročního součtu je tou hodnotou
+      // strop, takže je z grafu vidět, kolik z povolených hodin je vyčerpáno.
+      yMin = Math.min(0, minVal)
+      yMax = Math.max(spec.domainMax, maxVal)
+      const step = niceStep(yMax - yMin, 5)
+      ys = []
+      for (let v = Math.ceil(yMin / step) * step; v <= yMax + step * 0.001; v += step) {
+        if (v <= yMax) ys.push(Math.abs(v) < step * 1e-9 ? 0 : v)
+      }
+      if (!ys.length) ys = [yMin, yMax]
+    } else {
+      ys = ticks(minVal * 1.02, maxVal * 1.02, 4)
+      yMin = ys[0]
+      yMax = ys[ys.length - 1]
+    }
+    const span = yMax - yMin || 1
+
+    const x = (i) => pad.l + (spec.labels.length < 2 ? iw / 2 : (i / (spec.labels.length - 1)) * iw)
+    const y = (v) => pad.t + ih - ((v - yMin) / span) * ih
+
+    host.innerHTML = ''
+    host.style.position = 'relative'
+    const svg = el('svg', {
+      width, height, viewBox: `0 0 ${width} ${height}`,
+      role: 'img', 'aria-label': spec.ariaLabel || 'Graf vývoje', class: 'chart',
+    })
+
+    // mřížka a osa y
+    for (const v of ys) {
+      svg.appendChild(el('line', {
+        x1: pad.l, x2: pad.l + iw, y1: y(v), y2: y(v),
+        class: v === 0 ? 'chart-axis' : 'chart-grid',
+      }))
+      const t = el('text', { x: pad.l - 9, y: y(v) + 4, class: 'chart-tick', 'text-anchor': 'end' })
+      t.textContent = (spec.tickFormat || spec.format)(v)
+      svg.appendChild(t)
+    }
+
+    // osa x
+    spec.labels.forEach((lab, i) => {
+      const t = el('text', { x: x(i), y: pad.t + ih + 19, class: 'chart-tick', 'text-anchor': 'middle' })
+      t.textContent = lab
+      svg.appendChild(t)
+    })
+
+    // série
+    const endLabels = []
+    spec.series.forEach((s) => {
+      const pts = s.values
+        .map((v, i) => (v == null ? null : [x(i), y(v)]))
+        .filter(Boolean)
+      if (!pts.length) return
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ')
+
+      if (spec.area) {
+        svg.appendChild(el('path', {
+          d: d + ` L${pts[pts.length - 1][0].toFixed(1)} ${y(0)} L${pts[0][0].toFixed(1)} ${y(0)} Z`,   // plocha vždy k nule
+          fill: s.color, opacity: 0.12, stroke: 'none',
+        }))
+      }
+      svg.appendChild(el('path', { d, fill: 'none', stroke: s.color, class: 'chart-line' }))
+      pts.forEach((p) => svg.appendChild(el('circle', {
+        cx: p[0], cy: p[1], r: 4, fill: s.color, class: 'chart-dot',
+      })))
+
+      if (spec.endLabel) {
+        const last = pts[pts.length - 1]
+        endLabels.push({ x: last[0] + 10, y: last[1], name: s.name, color: s.color })
+      }
+    })
+
+    // Koncové popisky se u blízkých čar překrývají — rozhrnout je od sebe,
+    // pořadí shora dolů zůstává, takže popisek pořád patří ke své čáře.
+    if (endLabels.length) {
+      const GAP = 15
+      endLabels.sort((a, b) => a.y - b.y)
+      for (let i = 1; i < endLabels.length; i++) {
+        if (endLabels[i].y - endLabels[i - 1].y < GAP) endLabels[i].y = endLabels[i - 1].y + GAP
+      }
+      const overflow = endLabels[endLabels.length - 1].y - (pad.t + ih)
+      if (overflow > 0) {
+        const shift = Math.min(overflow, endLabels[0].y - pad.t)
+        for (const l of endLabels) l.y -= shift
+      }
+      for (const l of endLabels) {
+        const t = el('text', { x: l.x, y: l.y + 4, class: 'chart-end', fill: l.color })
+        t.textContent = l.name
+        svg.appendChild(t)
+      }
+    }
+
+    // prahové čáry (např. 40 a 60 h u jednotlivce)
+    for (const ref of spec.refs || []) {
+      if (ref.value > yMax || ref.value < yMin) continue
+      svg.appendChild(el('line', {
+        x1: pad.l, x2: pad.l + iw, y1: y(ref.value), y2: y(ref.value),
+        class: 'chart-ref ' + (ref.tone || ''),
+      }))
+      const t = el('text', { x: pad.l + iw - 4, y: y(ref.value) - 5, class: 'chart-ref-label ' + (ref.tone || ''), 'text-anchor': 'end' })
+      t.textContent = ref.label
+      svg.appendChild(t)
+    }
+
+    // vrstva pro najetí myší
+    const cross = el('line', { y1: pad.t, y2: pad.t + ih, class: 'chart-cross', opacity: 0 })
+    svg.appendChild(cross)
+    const hot = el('rect', { x: pad.l, y: pad.t, width: iw, height: ih, fill: 'transparent' })
+    svg.appendChild(hot)
+    host.appendChild(svg)
+
+    const tip = document.createElement('div')
+    tip.className = 'chart-tip'
+    tip.hidden = true
+    host.appendChild(tip)
+
+    const nearest = (px) => {
+      let best = 0
+      for (let i = 1; i < spec.labels.length; i++) {
+        if (Math.abs(px - x(i)) < Math.abs(px - x(best))) best = i
+      }
+      return best
+    }
+
+    function show(ev) {
+      const box = svg.getBoundingClientRect()
+      const i = nearest(((ev.clientX - box.left) / box.width) * width)
+      cross.setAttribute('x1', x(i))
+      cross.setAttribute('x2', x(i))
+      cross.setAttribute('opacity', 1)
+      tip.innerHTML = `<strong>${PP.esc(spec.labels[i])}</strong>` +
+        spec.series.map((s) => s.values[i] == null ? '' : `
+          <span class="row"><i style="background:${s.color}"></i>
+          <span class="nm">${PP.esc(s.name)}</span>
+          <span class="vl">${PP.esc(spec.format(s.values[i]))}</span></span>`).join('')
+      tip.hidden = false
+      const left = (x(i) / width) * box.width
+      tip.style.left = Math.min(Math.max(left, 8), box.width - tip.offsetWidth - 8) + 'px'
+    }
+    function hide() {
+      cross.setAttribute('opacity', 0)
+      tip.hidden = true
+    }
+    hot.addEventListener('mousemove', show)
+    hot.addEventListener('mouseleave', hide)
+    svg.addEventListener('touchstart', (e) => { if (e.touches[0]) show(e.touches[0]) }, { passive: true })
+    svg.addEventListener('touchmove', (e) => { if (e.touches[0]) show(e.touches[0]) }, { passive: true })
+  }
+
+  /* Překreslení po změně šířky. Pozorovatel je jeden, přepíná se na aktuální
+     sadu grafů, aby se nehromadily po každém překreslení sekce. */
+  let observer = null
+  PP.watchCharts = function (redraw) {
+    if (observer) observer.disconnect()
+    if (!window.ResizeObserver) return
+    const host = document.querySelector('.content')
+    if (!host) return
+
+    // Překresluje se jen při skutečné změně šířky. Bez toho by překreslení
+    // grafu změnilo výšku obsahu, pozorovatel by se spustil znovu a točilo
+    // by se to dokola — a každé překreslení by navíc zahodilo rozkreslený
+    // tooltip pod kurzorem.
+    let lastWidth = host.clientWidth
+    let timer = null
+    observer = new ResizeObserver(() => {
+      if (host.clientWidth === lastWidth) return
+      lastWidth = host.clientWidth
+      clearTimeout(timer)
+      timer = setTimeout(redraw, 120)
+    })
+    observer.observe(host)
+  }
+})(window.PP)
+</script>
+
+<!-- js/data.js -->
+<script>
+/* Datová vrstva: sloučení vestavěných a importovaných měsíců + odvozené statistiky. */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  const HIDE_KEY = 'prescasy.hideDemo'
+
+  const state = {
+    months: {},        // 'YYYY-MM' → record
+    imported: {},      // podmnožina, kterou lze smazat
+    hideDemo: false,   // schovat vygenerovaný vzorek, jakmile jsou reálná data
+  }
+
+  function readHideDemo() {
+    try { return window.localStorage.getItem(HIDE_KEY) === '1' } catch (err) { return false }
+  }
+
+  PP.data = {
+    state,
+
+    /** Načte vestavěná data a přes ně položí importované měsíce (import přepisuje). */
+    async init() {
+      const builtin = window.PP_BUILTIN_MONTHS || {}
+      state.hideDemo = readHideDemo()
+      state.imported = await PP.store.loadImported()
+      state.months = {}
+      for (const key in builtin) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
+      for (const key in state.imported) {
+        state.months[key] = Object.assign({ source: 'imported' }, state.imported[key])
+      }
+      return state.months
+    },
+
+    /** Všechny načtené měsíce od nejnovějšího, včetně skrytého vzorku. */
+    allKeys() {
+      return Object.keys(state.months).sort().reverse()
+    },
+
+    /** Měsíce s reálnými daty — co není označené jako ukázka. */
+    realKeys() {
+      return this.allKeys().filter((k) => !state.months[k].demo)
+    },
+
+    /**
+     * Klíče měsíců od nejnovějšího — to, co panel skutečně zobrazuje.
+     * Se zapnutým skrýváním jen reálné měsíce; kdyby ale nezbylo nic,
+     * vzorek se ukáže i tak. Prázdný panel nikomu nepomůže.
+     */
+    keys() {
+      if (!state.hideDemo) return this.allKeys()
+      const real = this.realKeys()
+      return real.length ? real : this.allKeys()
+    },
+
+    /** Dá se vzorek skrýt? Jen když je čím ho nahradit. */
+    canHideDemo() {
+      return this.realKeys().length > 0 && this.allKeys().length > this.realKeys().length
+    },
+
+    get hideDemo() { return state.hideDemo },
+
+    setHideDemo(value) {
+      state.hideDemo = !!value
+      try { window.localStorage.setItem(HIDE_KEY, value ? '1' : '0') } catch (err) { /* jen preference */ }
+    },
+
+    month(key) {
+      return state.months[key] || null
+    },
+
+    isImported(key) {
+      return Object.prototype.hasOwnProperty.call(state.imported, key)
+    },
+
+    /** Obsahuje panel jen ukázková data? */
+    isDemoOnly() {
+      const keys = this.keys()
+      return keys.length > 0 && keys.every((k) => state.months[k].demo)
+    },
+
+    async addMonth(key, record) {
+      await PP.store.saveImported(key, record)
+      state.imported[key] = record
+      state.months[key] = Object.assign({ source: 'imported' }, record)
+    },
+
+    /** Smaže importovaný měsíc; pokud pro něj existují vestavěná data, vrátí se. */
+    async removeMonth(key) {
+      await PP.store.removeImported(key)
+      delete state.imported[key]
+      const builtin = window.PP_BUILTIN_MONTHS || {}
+      if (builtin[key]) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
+      else delete state.months[key]
+    },
+  }
+
+  /* ---------- odvozené statistiky ---------- */
+
+  const HIST_BUCKETS = [
+    { from: -Infinity, to: 0, label: '≤ 0' },
+    { from: 0, to: 10, label: '0–10' },
+    { from: 10, to: 20, label: '10–20' },
+    { from: 20, to: 30, label: '20–30' },
+    { from: 30, to: 40, label: '30–40' },
+    { from: 40, to: 50, label: '40–50' },
+    { from: 50, to: 60, label: '50–60' },
+    { from: 60, to: Infinity, label: '60+' },
+  ]
+
+  const cache = new WeakMap()
+
+  /**
+   * Souhrn nad agregovaným měsícem — takový záznam žádné lidi neobsahuje,
+   * jen předpočítaná čísla za střediska. Používá ho veřejné vydání panelu.
+   */
+  function aggregateStats(record) {
+    const s = record.summary
+    const centers = s.centers.map((c) => {
+      const avg = c.people ? c.total / c.people : 0
+      return Object.assign({}, c, { avg, level: PP.level(avg, PP.CFG.center), rows: [] })
+    })
+    return {
+      key: null,
+      aggregate: true,
+      people: record.people,
+      withOvertime: s.withOvertime,
+      total: s.total,
+      mezdy: s.mezdy,
+      evidence: s.evidence,
+      paidShare: s.total !== 0 ? s.mezdy / s.total : 0,
+      avg: s.withOvertime ? s.total / s.withOvertime : 0,
+      max: 0,                       // nejvyšší hodnota jednotlivce se nezveřejňuje
+      overWarn: s.overWarn,
+      overCrit: s.overCrit,
+      centers,
+      byAvg: centers.slice().sort((a, b) => b.avg - a.avg),
+      byTotal: centers.slice().sort((a, b) => b.total - a.total),
+      hist: s.hist,
+      yearly: [],                   // jmenné pohledy v agregátu neexistují
+      ranking: [],
+      year150: s.year150,
+      year250: s.year250,
+      yearCap: s.yearCap,
+    }
+  }
+
+  /** Spočítá (a zapamatuje si) souhrn nad jedním měsícem. */
+  PP.stats = function (record) {
+    if (!record) return null
+    if (cache.has(record)) return cache.get(record)
+    if (record.aggregate) {
+      const agg = aggregateStats(record)
+      cache.set(record, agg)
+      return agg
+    }
+
+    const rows = record.rows || []
+    const sum = (f) => rows.reduce((a, r) => a + (Number(r[f]) || 0), 0)
+    const total = sum('t')
+    const mezdy = sum('m')
+    const evidence = sum('e')
+
+    const centers = new Map()
+    for (const r of rows) {
+      let c = centers.get(r.s)
+      if (!c) {
+        c = { name: r.s, people: 0, total: 0, m: 0, e: 0, max: -Infinity, rows: [] }
+        centers.set(r.s, c)
+      }
+      c.people++
+      c.total += r.t
+      c.m += r.m
+      c.e += r.e
+      if (r.t > c.max) c.max = r.t
+      c.rows.push(r)
+    }
+    for (const c of centers.values()) {
+      c.avg = c.people ? c.total / c.people : 0
+      c.level = PP.level(c.avg, PP.CFG.center)
+      c.rows.sort((a, b) => b.t - a.t)
+    }
+
+    const hist = HIST_BUCKETS.map((b) => ({
+      label: b.label,
+      count: rows.filter((r) => (b.to === 0 ? r.t <= 0 : r.t > b.from && r.t <= b.to)).length,
+    }))
+
+    const yearly = rows.slice().sort((a, b) => b.r - a.r)
+
+    const out = {
+      key: null,
+      people: record.people || rows.length,
+      withOvertime: rows.length,
+      total,
+      mezdy,
+      evidence,
+      paidShare: total !== 0 ? mezdy / total : 0,
+      avg: rows.length ? total / rows.length : 0,
+      max: rows.length ? Math.max.apply(null, rows.map((r) => r.t)) : 0,
+      overWarn: rows.filter((r) => r.t >= PP.CFG.person.warn).length,
+      overCrit: rows.filter((r) => r.t >= PP.CFG.person.crit).length,
+      centers: Array.from(centers.values()),
+      byAvg: Array.from(centers.values()).sort((a, b) => b.avg - a.avg),
+      byTotal: Array.from(centers.values()).sort((a, b) => b.total - a.total),
+      hist,
+      yearly,
+      year150: rows.filter((r) => r.r > PP.CFG.year.warn).length,
+      year250: rows.filter((r) => r.r > PP.CFG.year.crit).length,
+      yearCap: rows.filter((r) => r.r >= PP.CFG.year.cap).length,
+      ranking: rows.slice().sort((a, b) => b.t - a.t),
+    }
+    cache.set(record, out)
+    return out
+  }
+
+  /**
+   * Seznam všech lidí napříč měsíci — pro vyhledávání. Jméno a středisko se
+   * berou z nejnovějšího měsíce, ve kterém člověk je (mohl se přeřadit).
+   */
+  PP.roster = function () {
+    const out = new Map()
+    for (const key of PP.data.keys()) {          // od nejnovějšího
+      for (const r of PP.data.month(key).rows || []) {
+        const id = String(r.o)
+        if (!out.has(id)) out.set(id, { o: r.o, n: r.n, s: r.s, months: 0 })
+        out.get(id).months++
+      }
+    }
+    return Array.from(out.values()).sort((a, b) => String(a.n).localeCompare(String(b.n), 'cs'))
+  }
+
+  /**
+   * Historie jednoho člověka přes všechny měsíce, od nejstaršího.
+   * Měsíc, ve kterém ve výkazu není, má hodnoty null — ne nulu: nulový přesčas
+   * a „ve výkazu vůbec není“ jsou dvě různé věci.
+   */
+  PP.personHistory = function (id) {
+    const wanted = String(id)
+    const keys = PP.data.keys().slice().reverse()
+    const points = []
+    let person = null
+    let lastR = 0
+
+    for (const k of keys) {
+      const rec = PP.data.month(k)
+      const stats = PP.stats(rec)
+      const row = (rec.rows || []).find((r) => String(r.o) === wanted)
+      if (row) {
+        person = { o: row.o, n: row.n, s: row.s }
+        lastR = row.r
+      }
+      points.push({
+        key: k,
+        period: rec.period,
+        row: row || null,
+        t: row ? row.t : null,
+        m: row ? row.m : null,
+        e: row ? row.e : null,
+        // roční součet drží i v měsíci bez přesčasu — nikam neklesá
+        r: row ? row.r : (points.length ? lastR : null),
+        rank: row ? stats.ranking.indexOf(row) + 1 : null,
+        of: stats.withOvertime,
+        center: row ? stats.centers.find((c) => c.name === row.s) : null,
+      })
+    }
+    if (!person) return null
+
+    const withOt = points.filter((p) => p.t != null)
+    return {
+      person,
+      points,
+      months: withOt.length,
+      total: withOt.reduce((a, p) => a + p.t, 0),
+      avg: withOt.length ? withOt.reduce((a, p) => a + p.t, 0) / withOt.length : 0,
+      max: withOt.length ? Math.max.apply(null, withOt.map((p) => p.t)) : 0,
+      year: lastR,
+    }
+  }
+
+  /** Porovnání dvou měsíců — delta na osobu i na středisko. */
+  PP.compare = function (current, previous) {
+    if (!current || !previous) return null
+    const a = PP.stats(current)
+    const b = PP.stats(previous)
+    const prevCenters = new Map(b.centers.map((c) => [c.name, c]))
+    const centers = a.centers.map((c) => {
+      const p = prevCenters.get(c.name)
+      return {
+        name: c.name,
+        avg: c.avg,
+        prevAvg: p ? p.avg : null,
+        dAvg: p ? c.avg - p.avg : null,
+        total: c.total,
+        prevTotal: p ? p.total : null,
+        dTotal: p ? c.total - p.total : null,
+      }
+    })
+    // Osobní srovnání jde jen nad záznamy s řádky. Agregovaný měsíc (veřejné
+    // vydání) lidi vůbec neobsahuje, takže zůstane u čísel za střediska.
+    const rowsA = current.rows || []
+    const rowsB = previous.rows || []
+    const hasPeople = rowsA.length > 0 && rowsB.length > 0
+
+    // Kdo mezi měsíci vypadl a kdo přibyl. Porovnává se podle osobního čísla,
+    // ne podle klíče s pobočkou — kdo změnil středisko, není nový člověk.
+    const prevIds = new Set(rowsB.map((r) => String(r.o)))
+    const curIds = new Set(rowsA.map((r) => String(r.o)))
+    const dropped = hasPeople
+      ? rowsB.filter((r) => !curIds.has(String(r.o))).sort((x, y) => y.t - x.t)
+      : []
+    const added = hasPeople
+      ? rowsA.filter((r) => !prevIds.has(String(r.o))).sort((x, y) => y.t - x.t)
+      : []
+
+    // kdo zůstal v obou měsících, seřazený podle změny přesčasu
+    const prevById = new Map(rowsB.map((r) => [String(r.o), r]))
+    const movers = hasPeople
+      ? rowsA
+          .filter((r) => prevById.has(String(r.o)))
+          .map((r) => {
+            const p = prevById.get(String(r.o))
+            return { r, prev: p, d: r.t - p.t }
+          })
+          .sort((x, y) => y.d - x.d)
+      : []
+
+    return {
+      dTotal: a.total - b.total,
+      dPeople: a.withOvertime - b.withOvertime,
+      dAvg: a.avg - b.avg,
+      dPaidShare: a.paidShare - b.paidShare,
+      centers,
+      dropped,
+      added,
+      movers,
+    }
+  }
+})(window.PP)
+</script>
+
+<!-- js/app.js -->
+<script>
+/* Přesčasový panel Planá — UI. */
+;(function (PP) {
+  'use strict'
+
+  const { esc, hm, h1, num, pct, fold, mark, level, monthName, monthShort, centerName, $, $$ } = PP
+  const CFG = PP.CFG
+
+  const ICONS = {
+    overview: '<path d="M3 13h5v7H3zM9.5 4h5v16h-5zM16 9h5v11h-5z"/>',
+    centers: '<path d="M4 20V8l6-4 6 4v12M4 20h16M14 20v-5h-4v5M20 20V11l-4-2.6"/>',
+    ranking: '<path d="M6 20v-6M12 20V4M18 20v-9"/>',
+    compare: '<path d="M4 7h10M4 7l3-3M4 7l3 3M20 17H10M20 17l-3-3M20 17l-3 3"/>',
+    year: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 7v5l3.2 2"/>',
+    import: '<path d="M12 3v11M8 10.5l4 4 4-4M4 20h16"/>',
+    method: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.6"/>',
+  }
+
+  const SECTIONS = [
+    { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
+    { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska.' },
+    { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
+    { id: 'compare', label: 'Vývoj a srovnání', title: 'Vývoj a srovnání', sub: 'Jak se přesčas vyvíjí a co se změnilo mezi dvěma obdobími.' },
+    { id: 'year', label: 'Roční limit', title: 'Roční limit', sub: 'Kdo se blíží zákonnému stropu 416 h/rok.' },
+    { id: 'import', label: 'Import výkazu', title: 'Import výkazu', sub: 'Přidání dalšího měsíce ze Součtového výkazu.' },
+    { id: 'method', label: 'Metodika', title: 'Metodika', sub: 'Jak se čísla počítají a co znamenají.' },
+  ]
+
+  /* Veřejné vydání: agregáty za střediska, nic jmenného. Nastavuje ho
+     tools/build-public.mjs; interní panel běží bez něj. */
+  const PUBLIC = !!window.PP_PUBLIC
+
+  const PUBLIC_SECTIONS = ['overview', 'centers', 'compare', 'method']
+  if (PUBLIC) {
+    for (let i = SECTIONS.length - 1; i >= 0; i--) {
+      if (!PUBLIC_SECTIONS.includes(SECTIONS[i].id)) SECTIONS.splice(i, 1)
+    }
+  }
+
+  const ui = {
+    section: 'overview',
+    month: null,
+    center: null,
+    query: '',
+    sort: { key: 'total', dir: 'desc' },
+    cmpSort: { key: 'dTotal', dir: 'desc' },
+    metric: 'total',     // ukazatel v grafech vývoje
+    person: null,        // osobní číslo sledovaného člověka
+    personMetric: 'month',
+    personQuery: '',
+    cmpA: null,          // starší z porovnávaných měsíců
+    cmpB: null,          // novější
+    rankingLimit: 25,
+    log: [],          // výsledky importů; přežijí překreslení panelu
+  }
+
+  /* ---------- motiv ---------- */
+  const THEME_KEY = 'prescasy.theme'
+  const THEMES = [
+    { value: '', label: 'Motiv: systém' },
+    { value: 'light', label: 'Motiv: světlý' },
+    { value: 'dark', label: 'Motiv: tmavý' },
+  ]
+  function applyTheme(value) {
+    document.documentElement.setAttribute('data-theme', value)
+    const t = THEMES.find((x) => x.value === value) || THEMES[0]
+    $('#theme-label').textContent = t.label
+    try { window.localStorage.setItem(THEME_KEY, value) } catch (err) { /* jen preference */ }
+  }
+  function initTheme() {
+    let saved = ''
+    try { saved = window.localStorage.getItem(THEME_KEY) || '' } catch (err) { saved = '' }
+    applyTheme(THEMES.some((t) => t.value === saved) ? saved : '')
+    $('#theme-toggle').addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') || ''
+      const idx = THEMES.findIndex((t) => t.value === cur)
+      applyTheme(THEMES[(idx + 1) % THEMES.length].value)
+    })
+  }
+
+  /* ---------- navigace ---------- */
+  function renderNav() {
+    $('#nav').innerHTML = SECTIONS.map((s) => `
+      <button type="button" data-section="${s.id}" aria-current="${s.id === ui.section}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[s.id]}</svg>
+        <span>${esc(s.label)}</span>
+      </button>`).join('')
+    $$('#nav button').forEach((b) => b.addEventListener('click', () => go(b.dataset.section)))
+  }
+
+  function go(id) {
+    if (!SECTIONS.some((s) => s.id === id)) return
+    ui.section = id
+    if (location.hash.slice(1) !== id) location.hash = id
+    $$('#nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.section === id)))
+    const s = SECTIONS.find((x) => x.id === id)
+    $('#section-title').textContent = s.title
+    $('#section-sub').textContent = s.sub
+    SECTIONS.forEach((x) => { $('#panel-' + x.id).hidden = x.id !== id })
+    render()
+  }
+
+  /* ---------- výběr měsíce ---------- */
+  function renderMonthPicker() {
+    const keys = PP.data.keys()
+    const sel = $('#month-select')
+    sel.innerHTML = keys.map((k) => {
+      const rec = PP.data.month(k)
+      const flag = rec.demo ? ' · ukázka' : PP.data.isImported(k) ? ' · import' : ''
+      return `<option value="${esc(k)}">${esc(monthName(k))}${esc(flag)}</option>`
+    }).join('')
+    if (!keys.length) sel.innerHTML = '<option value="">— žádná data —</option>'
+    if (!ui.month || !keys.includes(ui.month)) ui.month = keys[0] || null
+    sel.value = ui.month || ''
+    sel.disabled = keys.length < 2
+  }
+
+  function currentMonth() { return ui.month ? PP.data.month(ui.month) : null }
+  function currentStats() { return PP.stats(currentMonth()) }
+  function previousKey() {
+    const keys = PP.data.keys()
+    const i = keys.indexOf(ui.month)
+    return i >= 0 && i + 1 < keys.length ? keys[i + 1] : null
+  }
+
+  /* ---------- ukázková data ---------- */
+  function renderDemoBanner() {
+    const rec = currentMonth()
+    const box = $('#demo-banner')
+    if (!rec || !rec.demo) { box.hidden = true; box.innerHTML = ''; return }
+    box.hidden = false
+    box.className = 'demo-banner'
+    // Ve veřejném vydání není kam odkazovat — sekce Import tam neexistuje.
+    if (PUBLIC) {
+      box.innerHTML = `<span aria-hidden="true">⚠</span><div>
+        <strong>Ukázková data.</strong> Tenhle přehled je postavený z vygenerovaného
+        vzorku, ne ze skutečných výkazů. Čísla nic neznamenají.
+      </div>`
+      return
+    }
+
+    // Jakmile jsou k dispozici reálná data, nabídne se rovnou schování vzorku —
+    // míchat vymyšlené měsíce se skutečnými je v grafech vývoje zrádné.
+    const canHide = PP.data.canHideDemo()
+    box.innerHTML = `<span aria-hidden="true">⚠</span><div>
+      <strong>Ukázková data.</strong> ${esc(monthName(ui.month))} je vygenerovaný vzorek —
+      jména, osobní čísla i hodiny jsou vymyšlené. ${canHide
+        ? 'Reálné měsíce už máte načtené.'
+        : 'Reálný měsíc přidáte v sekci'}
+      ${canHide
+        ? '<button class="btn ghost sm" type="button" data-hide-demo>Skrýt ukázková data</button>'
+        : '<button class="btn ghost sm" type="button" data-goto="import">Import výkazu</button>.'}
+    </div>`
+    const btn = box.querySelector('[data-goto]')
+    if (btn) btn.addEventListener('click', () => go('import'))
+    const hide = box.querySelector('[data-hide-demo]')
+    if (hide) hide.addEventListener('click', () => {
+      PP.data.setHideDemo(true)
+      ui.month = null
+      refreshAll()
+    })
+  }
+
+  /* ---------- stavební kameny ---------- */
+  function kpi(label, value, foot, tone) {
+    return `<div class="card kpi${tone ? ' ' + tone : ''}">
+      <span class="label">${esc(label)}</span>
+      <span class="value">${value}</span>
+      ${foot ? `<span class="foot">${foot}</span>` : ''}
+    </div>`
+  }
+
+  function barRow(name, value, maxValue, valueHtml, tone) {
+    const w = maxValue > 0 ? Math.max(1, (value / maxValue) * 100) : 0
+    return `<div class="bar-row">
+      <span class="name" title="${esc(name)}">${esc(name)}</span>
+      <span class="bar-track"><span class="bar-fill${tone ? ' ' + tone : ''}" style="width:${w.toFixed(1)}%"></span></span>
+      <span class="val">${valueHtml}</span>
+    </div>`
+  }
+
+  /** Delta jako odznak: +3:20 / −1:05. */
+  function delta(value, formatter) {
+    if (value == null || !isFinite(value)) return ''
+    const f = formatter || hm
+    if (Math.abs(value) < 0.005) return '<span class="tag">beze změny</span>'
+    const up = value > 0
+    return `<span class="tag ${up ? 'crit' : 'good'}">${up ? '+' : '−'}${f(Math.abs(value))}</span>`
+  }
+
+  function emptyState(text) {
+    return `<div class="card"><div class="empty">
+      <h3>Zatím tu nic není</h3><p>${esc(text)}</p>
+    </div></div>`
+  }
+
+  /* ---------- Přehled ---------- */
+  function renderOverview() {
+    const el = $('#panel-overview')
+    const rec = currentMonth()
+    if (!rec) { el.innerHTML = emptyState('Naimportujte Součtový výkaz a panel se naplní.'); return }
+    const s = currentStats()
+    const prevK = previousKey()
+    const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
+
+    const kpis = `<div class="grid kpis">
+      ${kpi('Přesčas celkem', h1(s.total) + ' h',
+        cmp ? `proti ${esc(monthShort(prevK))} ${delta(cmp.dTotal, h1)}` : esc(rec.period))}
+      ${kpi('Lidí s přesčasem', num(s.withOvertime),
+        `z ${num(s.people)} osob · ${pct(s.withOvertime / s.people)}`)}
+      ${kpi('Ø na osobu', hm(s.avg),
+        cmp ? `proti ${esc(monthShort(prevK))} ${delta(cmp.dAvg)}` : 'z lidí s přesčasem',
+        level(s.avg, CFG.person))}
+      ${kpi('Proplaceno (MEZD)', pct(s.paidShare),
+        cmp ? `zbytek do konta ${delta(-cmp.dPaidShare, (v) => Math.round(v * 100) + ' p. b.')}` : 'zbytek roste v evidenci')}
+      ${kpi('Nad ' + CFG.person.crit + ' h za měsíc', num(s.overCrit),
+        `nad ${CFG.person.warn} h: ${num(s.overWarn)}`, s.overCrit ? 'crit' : 'good')}
+      ${kpi('Nad ' + CFG.year.warn + ' h ročně', num(s.year150),
+        `nad ${CFG.year.crit} h: ${num(s.year250)}`, s.year150 ? 'warn' : 'good')}
+    </div>`
+
+    const topAvg = s.byAvg.slice(0, 10)
+    const maxAvg = topAvg.length ? topAvg[0].avg : 0
+    const avgChart = `<div class="card">
+      <div class="card-head">
+        <h2>Ø hodin na osobu podle středisek</h2>
+        <span class="hint">práh ${CFG.center.warn} h / ${CFG.center.crit} h · TOP 10</span>
+      </div>
+      <div class="bars">
+        ${topAvg.map((c) => barRow(c.name, c.avg, maxAvg,
+          `${hm(c.avg)} <small>· ${c.people} os.</small>`, c.level)).join('')}
+      </div>
+    </div>`
+
+    const maxHist = Math.max.apply(null, s.hist.map((b) => b.count).concat([1]))
+    const histChart = `<div class="card">
+      <div class="card-head">
+        <h2>Rozložení přesčasu</h2>
+        <span class="hint">počet lidí v pásmu hodin</span>
+      </div>
+      <div class="hist">
+        ${s.hist.map((b) => {
+          const tone = b.label === '60+' ? 'crit' : b.label === '50–60' || b.label === '40–50' ? 'warn' : ''
+          return `<div class="hist-col">
+            <span class="n">${b.count || ''}</span>
+            <span class="hist-bar${tone ? ' ' + tone : ''}" style="height:${(b.count / maxHist * 100).toFixed(1)}%"></span>
+            <span class="lbl">${esc(b.label)}</span>
+          </div>`
+        }).join('')}
+      </div>
+    </div>`
+
+    const absM = Math.abs(s.mezdy)
+    const absE = Math.abs(s.evidence)
+    const splitChart = `<div class="card">
+      <div class="card-head">
+        <h2>Proplaceno vs. evidence</h2>
+        <span class="hint">${esc(rec.period)}</span>
+      </div>
+      <div class="split">
+        <span class="paid" style="width:${(absM / (absM + absE) * 100).toFixed(1)}%"></span>
+        <span class="konto" style="width:${(absE / (absM + absE) * 100).toFixed(1)}%"></span>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--accent)"></i>Do MEZD ${h1(s.mezdy)} h · ${pct(s.paidShare)}</span>
+        <span><i class="dot" style="background:var(--accent-2);opacity:.5"></i>Evidence ${h1(s.evidence)} h · ${pct(1 - s.paidShare)}</span>
+      </div>
+      <p class="hint" style="margin:12px 0 0">
+        Záporná evidence znamená odečet konta po proplacení — proto může někomu vyjít součet 0
+        i při desítkách vykázaných hodin.
+      </p>
+    </div>`
+
+    const findings = `<div class="card">
+      <div class="card-head"><h2>Zjištění</h2><span class="hint">počítáno z dat, ne psáno ručně</span></div>
+      <ul class="prose" style="margin:0;padding-left:20px">${buildFindings(s, cmp, prevK).map((f) => `<li>${f}</li>`).join('')}</ul>
+    </div>`
+
+    el.innerHTML = kpis +
+      `<div class="grid two">${avgChart}${histChart}</div>` +
+      `<div class="grid two">${splitChart}${findings}</div>` +
+      changesCard(cmp, prevK) +
+      centerTable(s, cmp)
+    bindCenterTable()
+  }
+
+  function buildFindings(s, cmp, prevK) {
+    const out = []
+    const top = s.byAvg[0]
+    if (top) {
+      const d = cmp && cmp.centers.find((c) => c.name === top.name)
+      out.push(`<strong>${esc(top.name)}</strong> má nejvyšší průměr na osobu: <strong>${hm(top.avg)}</strong>
+        na ${top.people} ${top.people === 1 ? 'člověka' : top.people < 5 ? 'lidi' : 'lidí'}` +
+        (d && d.dAvg != null ? ` — proti ${esc(monthShort(prevK))} ${d.dAvg > 0 ? 'roste' : 'klesá'} o ${hm(Math.abs(d.dAvg))}.` : '.'))
+    }
+    const abs = s.byTotal[0]
+    if (abs) {
+      const d = cmp && cmp.centers.find((c) => c.name === abs.name)
+      const jumped = d && d.prevTotal != null && cmp.centers.some((c) => c.name !== abs.name && c.prevTotal > d.prevTotal && c.total < abs.total)
+      out.push(`Objemově je největší <strong>${esc(abs.name)}</strong> s <strong>${h1(abs.total)} h</strong>
+        na ${abs.people} lidí` + (jumped ? ' — v tomto měsíci přeskočil dosud nejvytíženější středisko.' : '.') +
+        ' Průměr ' + hm(abs.avg) + ' na osobu.')
+    }
+    if (s.year150) {
+      out.push(`<strong>${num(s.year150)} ${s.year150 === 1 ? 'člověk je' : 'lidí je'}</strong> nad ${CFG.year.warn} h ročního přesčasu` +
+        (s.year250 ? `, z toho ${num(s.year250)} nad ${CFG.year.crit} h` : '') +
+        ` — u nich je potřeba dohoda o práci přesčas nad nařízený rámec.`)
+    }
+    if (cmp) {
+      const dp = Math.round(cmp.dPaidShare * 100)
+      if (dp !== 0) {
+        out.push(`Podíl proplácených hodin ${dp < 0 ? 'klesl' : 'vzrostl'} z ${pct(s.paidShare - cmp.dPaidShare)}
+          na ${pct(s.paidShare)} — ${dp < 0 ? 'roste konto v evidenci' : 'konto se rozpouští do výplat'}.`)
+      }
+    }
+    if (s.overCrit) {
+      out.push(`${num(s.overCrit)} ${s.overCrit === 1 ? 'člověk překročil' : 'lidí překročilo'}
+        ${CFG.person.crit} h v jednom měsíci` + (PUBLIC ? '.' : `; maximum je ${hm(s.max)}.`))
+    }
+    return out.length ? out : ['Za tento měsíc nejsou vykázané žádné přesčasové hodiny.']
+  }
+
+  const CHANGE_LIMIT = 10
+
+  /** Seznam lidí, kteří proti minulému měsíci ve výkazu přibyli nebo z něj zmizeli. */
+  function changeList(rows, hoursLabel) {
+    if (!rows.length) return '<p class="hint" style="margin:0">Nikdo.</p>'
+    const shown = rows.slice(0, CHANGE_LIMIT)
+    return `<ul class="change-list">${shown.map((r) => `
+      <li>
+        <span class="who">${esc(r.n)}<small>${esc(r.s)}</small></span>
+        <span class="amt">${hm(r.t)}<small>${esc(hoursLabel)}</small></span>
+      </li>`).join('')}
+      ${rows.length > shown.length
+        ? `<li class="more">a další ${num(rows.length - shown.length)}</li>`
+        : ''}
+    </ul>`
+  }
+
+  function changesCard(cmp, keyA, keyB) {
+    if (!cmp) return ''
+    const { dropped, added } = cmp
+    if (!dropped.length && !added.length) return ''
+    const prev = monthShort(keyA)
+    const cur = monthShort(keyB || ui.month)
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Kdo přibyl a kdo vypadl</h2>
+        <span class="hint">proti ${esc(prev)} · porovnáno podle osobního čísla</span>
+      </div>
+      <div class="change-cols">
+        <div>
+          <h3 class="change-title">Vypadli <span class="tag good">${num(dropped.length)}</span></h3>
+          <p class="hint">V ${esc(prev)} přesčas měli, v ${esc(cur)} ho ve výkazu nemají —
+             typicky dovolená, nemoc nebo odchod.</p>
+          ${changeList(dropped, 'v ' + prev)}
+        </div>
+        <div>
+          <h3 class="change-title">Přibyli <span class="tag warn">${num(added.length)}</span></h3>
+          <p class="hint">V ${esc(prev)} ve výkazu nebyli, v ${esc(cur)} přesčas mají.</p>
+          ${changeList(added, 'v ' + cur)}
+        </div>
+      </div>
+      <p class="hint" style="margin:14px 0 0">
+        Kdo mezitím změnil středisko, se tu neobjeví — porovnává se osobní číslo, ne středisko.
+      </p>
+    </div>`
+  }
+
+  const CENTER_COLS = [
+    { key: 'name', label: 'Středisko', num: false },
+    { key: 'people', label: 'Lidí', num: true },
+    { key: 'total', label: 'Celkem', num: true },
+    { key: 'avg', label: 'Ø / osoba', num: true },
+    { key: 'm', label: 'Do MEZD', num: true },
+    { key: 'e', label: 'Evidence', num: true },
+    // Maximum je přesčas jednoho konkrétního člověka — ve veřejném vydání odpadá
+    { key: 'max', label: 'Maximum', num: true, internal: true },
+  ].filter((c) => !(c.internal && PUBLIC))
+
+  function centerTable(s, cmp) {
+    const dir = ui.sort.dir === 'asc' ? 1 : -1
+    const key = ui.sort.key
+    const rows = s.centers.slice().sort((a, b) =>
+      key === 'name' ? dir * String(a.name).localeCompare(String(b.name), 'cs') : dir * (a[key] - b[key]))
+    const dmap = new Map((cmp ? cmp.centers : []).map((c) => [c.name, c]))
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Všechna střediska</h2>
+        <span class="hint">${rows.length} středisek · klikem na hlavičku se řadí</span>
+      </div>
+      <div class="table-wrap"><table id="center-table">
+        <thead><tr>
+          ${CENTER_COLS.map((c) => `<th class="sortable${c.num ? ' num' : ''}" data-key="${c.key}"
+            aria-sort="${key === c.key ? (ui.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+            >${esc(c.label)}</th>`).join('')}
+          ${cmp ? '<th class="num">Δ Ø</th>' : ''}
+        </tr></thead>
+        <tbody>${rows.map((c) => {
+          const d = dmap.get(c.name)
+          return `<tr>
+            <td>${esc(c.name)} ${c.level ? `<span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
+            <td class="num">${num(c.people)}</td>
+            <td class="num">${h1(c.total)}</td>
+            <td class="num">${hm(c.avg)}</td>
+            <td class="num">${h1(c.m)}</td>
+            <td class="num">${h1(c.e)}</td>
+            ${PUBLIC ? '' : `<td class="num">${hm(c.max)}</td>`}
+            ${cmp ? `<td class="num">${d && d.dAvg != null ? delta(d.dAvg) : '<span class="tag">nové</span>'}</td>` : ''}
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+    </div>`
+  }
+
+  function bindCenterTable() {
+    $$('#center-table th.sortable').forEach((th) => th.addEventListener('click', () => {
+      const key = th.dataset.key
+      if (ui.sort.key === key) ui.sort.dir = ui.sort.dir === 'asc' ? 'desc' : 'asc'
+      else ui.sort = { key, dir: key === 'name' ? 'asc' : 'desc' }
+      renderOverview()
+    }))
+  }
+
+  /* ---------- Střediska ---------- */
+  function renderCenters() {
+    const el = $('#panel-centers')
+    const rec = currentMonth()
+    if (!rec) { el.innerHTML = emptyState('Naimportujte Součtový výkaz a panel se naplní.'); return }
+    const s = currentStats()
+    if (!s.byAvg.length) { el.innerHTML = emptyState('V tomto měsíci není vykázaný žádný přesčas.'); return }
+
+    if (!ui.center || !s.centers.some((c) => c.name === ui.center)) ui.center = s.byAvg[0].name
+    const c = s.centers.find((x) => x.name === ui.center)
+    const prevK = previousKey()
+    const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
+    const d = cmp && cmp.centers.find((x) => x.name === c.name)
+
+    const chips = `<div class="card">
+      <div class="card-head"><h2>Výběr střediska</h2><span class="hint">řazeno podle Ø na osobu</span></div>
+      <div class="chips">${s.byAvg.map((x) => `
+        <button class="chip ${x.level}" type="button" data-center="${esc(x.name)}" aria-pressed="${x.name === ui.center}">
+          <span>${esc(x.name)}</span><span class="c-avg">${hm(x.avg)}</span>
+        </button>`).join('')}</div>
+    </div>`
+
+    const share = s.total ? c.total / s.total : 0
+    const kpis = `<div class="grid kpis">
+      ${kpi('Přesčas celkem', h1(c.total) + ' h', `${pct(share)} přesčasu závodu`)}
+      ${kpi('Lidí s přesčasem', num(c.people), PUBLIC ? 'v tomto měsíci' : `maximum ${hm(c.max)}`)}
+      ${kpi('Ø na osobu', hm(c.avg),
+        d && d.dAvg != null ? `proti ${esc(monthShort(prevK))} ${delta(d.dAvg)}` : 'práh ' + CFG.center.warn + ' / ' + CFG.center.crit + ' h',
+        c.level)}
+      ${kpi('Proplaceno (MEZD)', pct(c.total ? c.m / c.total : 0), `${h1(c.m)} h z ${h1(c.total)} h`)}
+    </div>`
+
+    const top5 = c.rows.slice(0, 5)
+    const maxTop = top5.length ? top5[0].t : 0
+    const topCard = `<div class="card">
+      <div class="card-head"><h3>TOP 5 lidí</h3><span class="hint">${esc(c.name)}</span></div>
+      <div class="bars">${top5.map((r) =>
+        barRow(r.n, r.t, maxTop, hm(r.t), level(r.t, CFG.person))).join('')}</div>
+    </div>`
+
+    const listCard = `<div class="card">
+      <div class="card-head"><h3>Všichni s přesčasem</h3><span class="hint">${c.people} lidí</span></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="rank">#</th><th>Jméno</th><th class="num">Os. č.</th>
+          <th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th class="num">Přesčas</th><th class="num">Ročně</th>
+        </tr></thead>
+        <tbody>${c.rows.map((r, i) => personRow(r, i + 1)).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    // Ve veřejném vydání odpadá všechno jmenné — zůstanou jen čísla za středisko.
+    el.innerHTML = PUBLIC ? chips + kpis : chips + kpis + topCard + listCard
+    if (!PUBLIC) bindPersonLinks('#panel-centers')
+    $$('#panel-centers .chip').forEach((b) => b.addEventListener('click', () => {
+      ui.center = b.dataset.center
+      renderCenters()
+    }))
+  }
+
+  function personRow(r, rank, query) {
+    const lvl = level(r.t, CFG.person)
+    const ylvl = r.r >= CFG.year.crit ? 'crit' : r.r > CFG.year.warn ? 'warn' : ''
+    return `<tr>
+      <td class="rank">${rank}</td>
+      <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+        title="Zobrazit vývoj přes měsíce">${query ? mark(r.n, query) : esc(r.n)}</button></td>
+      <td class="num">${esc(String(r.o))}</td>
+      <td class="num">${hm(r.m)}</td>
+      <td class="num">${hm(r.e)}</td>
+      <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
+      <td class="num">${ylvl ? `<span class="tag ${ylvl}">${hm(r.r)}</span>` : hm(r.r)}</td>
+    </tr>`
+  }
+
+  /* ---------- Žebříček závodu ---------- */
+  function renderRanking() {
+    const el = $('#panel-ranking')
+    const rec = currentMonth()
+    if (!rec) { el.innerHTML = emptyState('Naimportujte Součtový výkaz a panel se naplní.'); return }
+    const s = currentStats()
+
+    const q = fold(ui.query)
+    const hits = q
+      ? s.ranking.filter((r) => fold(r.n).includes(q) || fold(r.s).includes(q))
+      : s.ranking
+    const shown = hits.slice(0, ui.rankingLimit)
+
+    el.innerHTML = `<div class="card">
+      <div class="card-head">
+        <h2>Žebříček závodu</h2>
+        <span class="hint">${esc(monthName(ui.month))} · ${num(hits.length)} z ${num(s.ranking.length)} lidí</span>
+      </div>
+      <input type="search" id="ranking-search" placeholder="Hledat jméno nebo středisko…"
+             value="${esc(ui.query)}" style="width:100%;max-width:420px;margin-bottom:14px">
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="rank">#</th><th>Jméno</th><th>Středisko</th>
+          <th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th class="num">Přesčas</th><th class="num">Ročně</th>
+        </tr></thead>
+        <tbody>${shown.length
+          ? shown.map((r) => {
+              const rank = s.ranking.indexOf(r) + 1
+              const lvl = level(r.t, CFG.person)
+              const ylvl = r.r >= CFG.year.crit ? 'crit' : r.r > CFG.year.warn ? 'warn' : ''
+              return `<tr>
+                <td class="rank">${rank}</td>
+                <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+                  title="Zobrazit vývoj přes měsíce">${mark(r.n, ui.query)}</button></td>
+                <td>${mark(r.s, ui.query)}</td>
+                <td class="num">${hm(r.m)}</td>
+                <td class="num">${hm(r.e)}</td>
+                <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
+                <td class="num">${ylvl ? `<span class="tag ${ylvl}">${hm(r.r)}</span>` : hm(r.r)}</td>
+              </tr>`
+            }).join('')
+          : `<tr><td colspan="7" class="empty">Nikdo neodpovídá hledání „${esc(ui.query)}“.</td></tr>`}
+        </tbody>
+      </table></div>
+      ${hits.length > shown.length
+        ? `<p style="margin:14px 0 0"><button class="btn ghost sm" type="button" id="ranking-more">
+             Zobrazit dalších ${Math.min(25, hits.length - shown.length)} (celkem ${num(hits.length)})
+           </button></p>`
+        : ''}
+    </div>`
+
+    const input = $('#ranking-search')
+    input.addEventListener('input', () => {
+      ui.query = input.value
+      ui.rankingLimit = 25
+      renderRanking()
+      const again = $('#ranking-search')
+      again.focus()
+      again.setSelectionRange(again.value.length, again.value.length)
+    })
+    bindPersonLinks('#panel-ranking')
+    const more = $('#ranking-more')
+    if (more) more.addEventListener('click', () => { ui.rankingLimit += 25; renderRanking() })
+  }
+
+  /* ---------- Vývoj přes víc měsíců ---------- */
+  const METRICS = {
+    total: {
+      label: 'Přesčas celkem',
+      plant: (s) => s.total,
+      center: (c) => c.total,
+      format: (v) => h1(v) + ' h',
+      tick: (v) => num(v) + ' h',
+    },
+    avg: {
+      label: 'Ø na osobu',
+      plant: (s) => s.avg,
+      center: (c) => c.avg,
+      format: hm,
+    },
+    people: {
+      label: 'Lidí s přesčasem',
+      plant: (s) => s.withOvertime,
+      center: (c) => c.people,
+      format: num,
+    },
+    paid: {
+      label: 'Podíl proplacených',
+      plant: (s) => s.paidShare,
+      center: (c) => (c.total ? c.m / c.total : 0),
+      format: pct,
+      tick: pct,
+    },
+  }
+
+  /** Měsíce od nejstaršího k nejnovějšímu — graf vývoje čte čas zleva doprava. */
+  function timeline() {
+    return PP.data.keys().slice().reverse()
+  }
+
+  /** Pět největších středisek podle posledního měsíce. Barva patří středisku,
+      ne jeho pořadí, takže přepnutí ukazatele nepřebarví přeživší. */
+  function topCenters() {
+    const keys = timeline()
+    if (!keys.length) return []
+    const last = PP.stats(PP.data.month(keys[keys.length - 1]))
+    const colors = PP.seriesColors()
+    return last.byTotal.slice(0, 5).map((c, i) => ({ name: c.name, color: colors[i] }))
+  }
+
+  function metricSwitcher() {
+    return `<div class="metric-switch" role="group" aria-label="Ukazatel grafu">
+      ${Object.keys(METRICS).map((k) => `<button type="button" class="chip" data-metric="${k}"
+        aria-pressed="${k === ui.metric}">${esc(METRICS[k].label)}</button>`).join('')}
+    </div>`
+  }
+
+  /** Nakreslí oba grafy vývoje do už vykreslených karet. */
+  function drawTrends() {
+    const keys = timeline()
+    if (keys.length < 2) return
+    const M = METRICS[ui.metric] || METRICS.total
+    const labels = keys.map(monthShort)
+
+    const plantHost = $('#chart-plant')
+    if (plantHost) {
+      PP.lineChart(plantHost, {
+        labels,
+        format: M.format,
+        tickFormat: M.tick,
+        area: true,
+        height: 250,
+        ariaLabel: `Vývoj ukazatele ${M.label} za závod`,
+        series: [{
+          name: M.label,
+          color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0f9e91',
+          values: keys.map((k) => M.plant(PP.stats(PP.data.month(k)))),
+        }],
+      })
+    }
+
+    const centerHost = $('#chart-centers')
+    if (centerHost) {
+      PP.lineChart(centerHost, {
+        labels,
+        format: M.format,
+        tickFormat: M.tick,
+        endLabel: true,
+        height: 260,
+        ariaLabel: `Vývoj ukazatele ${M.label} po střediscích`,
+        series: topCenters().map((t) => ({
+          name: centerName(t.name),
+          color: t.color,
+          values: keys.map((k) => {
+            const c = PP.stats(PP.data.month(k)).centers.find((x) => x.name === t.name)
+            return c ? M.center(c) : null
+          }),
+        })),
+      })
+    }
+  }
+
+  function trendCards() {
+    const keys = timeline()
+    if (keys.length < 2) return ''
+    const M = METRICS[ui.metric] || METRICS.total
+    const first = PP.stats(PP.data.month(keys[0]))
+    const last = PP.stats(PP.data.month(keys[keys.length - 1]))
+    const from = M.plant(first)
+    const to = M.plant(last)
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Vývoj závodu</h2>
+        <span class="hint">${esc(monthShort(keys[0]))} – ${esc(monthShort(keys[keys.length - 1]))} ·
+          ${esc(M.label)}: ${esc(M.format(from))} → ${esc(M.format(to))}</span>
+      </div>
+      ${metricSwitcher()}
+      <div class="chart-host" id="chart-plant"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Vývoj středisek</h2>
+        <span class="hint">pět největších podle posledního měsíce · ${esc(M.label)}</span>
+      </div>
+      <div class="chart-host" id="chart-centers"></div>
+      <div class="legend chart-legend">${topCenters().map((t) =>
+        `<span><i class="dot" style="background:${t.color}"></i>${esc(t.name)}</span>`).join('')}</div>
+    </div>`
+  }
+
+  /* ---------- Vývoj jednoho člověka ---------- */
+  const PERSON_METRICS = {
+    month: {
+      label: 'Měsíční přesčas',
+      value: (p) => p.t,
+      refs: [
+        { value: CFG.person.warn, label: CFG.person.warn + ' h', tone: 'warn' },
+        { value: CFG.person.crit, label: CFG.person.crit + ' h', tone: 'crit' },
+      ],
+    },
+    year: {
+      label: 'Roční součet',
+      value: (p) => p.r,
+      refs: [
+        { value: CFG.year.warn, label: CFG.year.warn + ' h', tone: 'warn' },
+        { value: CFG.year.crit, label: CFG.year.crit + ' h', tone: 'crit' },
+        { value: CFG.year.cap, label: 'strop ' + CFG.year.cap + ' h', tone: 'crit' },
+      ],
+    },
+  }
+
+  function drawPerson(hist) {
+    const host = $('#chart-person')
+    if (!host || !hist) return
+    const M = PERSON_METRICS[ui.personMetric] || PERSON_METRICS.month
+    PP.lineChart(host, {
+      labels: hist.points.map((p) => monthShort(p.key)),
+      format: hm,
+      area: ui.personMetric === 'month',
+      height: 250,
+      refs: M.refs,
+      domainMax: ui.personMetric === 'year' ? CFG.year.cap : null,
+      ariaLabel: `${M.label} — ${hist.person.n}`,
+      series: [{
+        name: M.label,
+        color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0f9e91',
+        values: hist.points.map(M.value),
+      }],
+    })
+  }
+
+  function personCard() {
+    const q = fold(ui.personQuery)
+    const hist = ui.person ? PP.personHistory(ui.person) : null
+
+    let body
+    if (hist) {
+      const p = hist.person
+      const gaps = hist.points.filter((x) => x.t == null).length
+      const last = hist.points[hist.points.length - 1]
+      body = `<div class="grid kpis">
+        ${kpi('Přesčas za rok', hm(hist.year),
+          `zbývá ${hm(Math.max(0, CFG.year.cap - hist.year))} do stropu`,
+          level(hist.year, { warn: CFG.year.warn, crit: CFG.year.crit }))}
+        ${kpi('Ø na měsíc', hm(hist.avg), `z ${hist.months} ${hist.months === 1 ? 'měsíce' : hist.months < 5 ? 'měsíců' : 'měsíců'} s přesčasem`, level(hist.avg, CFG.person))}
+        ${kpi('Nejvyšší měsíc', hm(hist.max), '', level(hist.max, CFG.person))}
+        ${kpi('Měsíců bez přesčasu', num(gaps), gaps ? 've výkazu vůbec nebyl' : 'přesčas měl každý měsíc', gaps ? '' : 'warn')}
+      </div>
+
+      <div class="person-metric">
+        ${Object.keys(PERSON_METRICS).map((k) => `<button type="button" class="chip" data-pmetric="${k}"
+          aria-pressed="${k === ui.personMetric}">${esc(PERSON_METRICS[k].label)}</button>`).join('')}
+      </div>
+      <div class="chart-host" id="chart-person"></div>
+
+      <div class="table-wrap" style="margin-top:18px"><table>
+        <thead><tr>
+          <th>Měsíc</th><th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th><th class="num">Ročně</th>
+        </tr></thead>
+        <tbody>${hist.points.map((x) => {
+          if (x.t == null) {
+            return `<tr class="muted-row"><td>${esc(monthName(x.key))}</td>
+              <td colspan="4" class="hint">ve výkazu není — přesčas neměl</td>
+              <td class="num">${x.r == null ? '—' : hm(x.r)}</td></tr>`
+          }
+          const lvl = level(x.t, CFG.person)
+          return `<tr>
+            <td>${esc(monthName(x.key))}</td>
+            <td class="num">${hm(x.m)}</td>
+            <td class="num">${hm(x.e)}</td>
+            <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
+            <td class="num">${x.rank}. z ${x.of}</td>
+            <td class="num">${hm(x.r)}</td>
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+
+      <p class="hint" style="margin:14px 0 0">
+        ${esc(p.n)} · osobní číslo ${esc(String(p.o))} · ${esc(p.s)}${last.t == null
+          ? ' · v posledním měsíci ve výkazu není' : ''}
+      </p>`
+    } else if (q) {
+      const hits = PP.roster().filter((r) =>
+        fold(r.n).includes(q) || String(r.o).includes(q) || fold(r.s).includes(q)).slice(0, 8)
+      body = hits.length
+        ? `<ul class="person-hits">${hits.map((r) => `<li>
+            <button type="button" data-pick="${esc(String(r.o))}">
+              <span class="who">${mark(r.n, ui.personQuery)}<small>${esc(r.s)} · ${esc(String(r.o))}</small></span>
+              <span class="hint">${r.months} ${r.months === 1 ? 'měsíc' : r.months < 5 ? 'měsíce' : 'měsíců'}</span>
+            </button></li>`).join('')}</ul>`
+        : `<p class="hint">Nikdo neodpovídá hledání „${esc(ui.personQuery)}“.</p>`
+    } else {
+      body = `<p class="hint">Napište jméno, osobní číslo nebo středisko. Na jméno se dá
+        kliknout i v Žebříčku závodu a ve Střediscích.</p>`
+    }
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>Vývoj jednoho člověka</h2>
+        ${hist ? `<button class="btn ghost sm" type="button" id="person-clear">Vybrat jiného</button>` : ''}
+      </div>
+      ${hist ? '' : `<input type="search" id="person-search" placeholder="Hledat člověka…"
+        value="${esc(ui.personQuery)}" style="width:100%;max-width:420px;margin-bottom:14px">`}
+      ${body}
+    </div>`
+  }
+
+  function bindPersonCard() {
+    const input = $('#person-search')
+    if (input) {
+      input.addEventListener('input', () => {
+        ui.personQuery = input.value
+        renderCompare()
+        const again = $('#person-search')
+        if (again) {
+          again.focus()
+          again.setSelectionRange(again.value.length, again.value.length)
+        }
+      })
+    }
+    $$('#panel-compare [data-pick]').forEach((b) => b.addEventListener('click', () => {
+      ui.person = b.dataset.pick
+      ui.personQuery = ''
+      renderCompare()
+    }))
+    const clear = $('#person-clear')
+    if (clear) clear.addEventListener('click', () => { ui.person = null; renderCompare() })
+    $$('#panel-compare [data-pmetric]').forEach((b) => b.addEventListener('click', () => {
+      ui.personMetric = b.dataset.pmetric
+      renderCompare()
+    }))
+  }
+
+  /* ---------- Srovnání měsíců ---------- */
+  const CMP_COLS = [
+    { key: 'name', label: 'Středisko', num: false },
+    { key: 'prevTotal', label: 'Celkem A', num: true },
+    { key: 'total', label: 'Celkem B', num: true },
+    { key: 'dTotal', label: 'Δ celkem', num: true },
+    { key: 'prevAvg', label: 'Ø A', num: true },
+    { key: 'avg', label: 'Ø B', num: true },
+    { key: 'dAvg', label: 'Δ Ø', num: true },
+  ]
+
+  function renderCompare() {
+    const el = $('#panel-compare')
+    const keys = PP.data.keys()
+    if (keys.length < 2) {
+      el.innerHTML = emptyState('Vývoj a srovnání potřebují aspoň dva měsíce. Naimportujte další výkaz.')
+      return
+    }
+
+    // výchozí dvojice: aktuální měsíc proti tomu předchozímu
+    if (!keys.includes(ui.cmpB)) ui.cmpB = keys.includes(ui.month) ? ui.month : keys[0]
+    if (!keys.includes(ui.cmpA) || ui.cmpA === ui.cmpB) {
+      const i = keys.indexOf(ui.cmpB)
+      ui.cmpA = keys[i + 1] != null ? keys[i + 1] : keys[i - 1]
+    }
+
+    const recA = PP.data.month(ui.cmpA)
+    const recB = PP.data.month(ui.cmpB)
+    const sA = PP.stats(recA)
+    const sB = PP.stats(recB)
+    const cmp = PP.compare(recB, recA)
+    const A = monthShort(ui.cmpA)
+    const B = monthShort(ui.cmpB)
+
+    const picker = `<div class="card">
+      <div class="card-head"><h2>Které měsíce porovnat</h2>
+        <span class="hint">A je starší, B novější — Δ ukazuje změnu z A na B</span></div>
+      <div class="cmp-picker">
+        <label>A <select id="cmp-a">${keys.map((k) =>
+          `<option value="${esc(k)}" ${k === ui.cmpA ? 'selected' : ''}>${esc(monthName(k))}</option>`).join('')}</select></label>
+        <span class="cmp-arrow" aria-hidden="true">→</span>
+        <label>B <select id="cmp-b">${keys.map((k) =>
+          `<option value="${esc(k)}" ${k === ui.cmpB ? 'selected' : ''}>${esc(monthName(k))}</option>`).join('')}</select></label>
+        <button class="btn ghost sm" type="button" id="cmp-swap">Prohodit</button>
+      </div>
+    </div>`
+
+    const kpis = `<div class="grid kpis">
+      ${kpi('Δ přesčas celkem', (cmp.dTotal > 0 ? '+' : '−') + h1(Math.abs(cmp.dTotal)) + ' h',
+        `${h1(sA.total)} → ${h1(sB.total)} h`, cmp.dTotal > 0 ? 'crit' : 'good')}
+      ${kpi('Δ Ø na osobu', (cmp.dAvg > 0 ? '+' : '−') + hm(Math.abs(cmp.dAvg)),
+        `${hm(sA.avg)} → ${hm(sB.avg)}`, cmp.dAvg > 0 ? 'crit' : 'good')}
+      ${kpi('Δ lidí s přesčasem', (cmp.dPeople > 0 ? '+' : '') + num(cmp.dPeople),
+        `${num(sA.withOvertime)} → ${num(sB.withOvertime)}`)}
+      ${kpi('Δ proplaceno', (cmp.dPaidShare > 0 ? '+' : '−') + Math.abs(Math.round(cmp.dPaidShare * 100)) + ' p. b.',
+        `${pct(sA.paidShare)} → ${pct(sB.paidShare)}`)}
+      ${kpi('Vypadli', num(cmp.dropped.length), `byli v ${esc(A)}, v ${esc(B)} ne`, 'good')}
+      ${kpi('Přibyli', num(cmp.added.length), `v ${esc(A)} nebyli`, cmp.added.length ? 'warn' : '')}
+    </div>`
+
+    const dir = ui.cmpSort.dir === 'asc' ? 1 : -1
+    const sk = ui.cmpSort.key
+    const rows = cmp.centers.slice().sort((x, y) => {
+      if (sk === 'name') return dir * String(x.name).localeCompare(String(y.name), 'cs')
+      return dir * ((x[sk] == null ? -Infinity : x[sk]) - (y[sk] == null ? -Infinity : y[sk]))
+    })
+
+    const table = `<div class="card">
+      <div class="card-head"><h2>Střediska</h2>
+        <span class="hint">A = ${esc(monthName(ui.cmpA))} · B = ${esc(monthName(ui.cmpB))}</span></div>
+      <div class="table-wrap"><table id="cmp-table">
+        <thead><tr>${CMP_COLS.map((c) => `<th class="sortable${c.num ? ' num' : ''}" data-key="${c.key}"
+          aria-sort="${sk === c.key ? (ui.cmpSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+          >${esc(c.label)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map((c) => `<tr>
+          <td>${esc(c.name)}</td>
+          <td class="num">${c.prevTotal == null ? '—' : h1(c.prevTotal)}</td>
+          <td class="num">${h1(c.total)}</td>
+          <td class="num">${c.dTotal == null ? '<span class="tag">nové</span>' : delta(c.dTotal, h1)}</td>
+          <td class="num">${c.prevAvg == null ? '—' : hm(c.prevAvg)}</td>
+          <td class="num">${hm(c.avg)}</td>
+          <td class="num">${c.dAvg == null ? '<span class="tag">nové</span>' : delta(c.dAvg)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    const up = cmp.movers.filter((m) => m.d > 0).slice(0, 10)
+    const down = cmp.movers.filter((m) => m.d < 0).slice(-10).reverse()
+    const moverList = (list, tone) => list.length
+      ? `<ul class="change-list">${list.map((m) => `<li>
+          <span class="who">${esc(m.r.n)}<small>${esc(m.r.s)}</small></span>
+          <span class="amt">${delta(m.d)}<small>${hm(m.prev.t)} → ${hm(m.r.t)}</small></span>
+        </li>`).join('')}</ul>`
+      : '<p class="hint" style="margin:0">Nikdo.</p>'
+
+    const movers = `<div class="card">
+      <div class="card-head"><h2>Největší změny u lidí</h2>
+        <span class="hint">jen ti, kdo jsou v obou měsících — ${num(cmp.movers.length)} lidí</span></div>
+      <div class="change-cols">
+        <div>
+          <h3 class="change-title">Nejvíc přidali <span class="tag crit">${num(cmp.movers.filter((m) => m.d > 0).length)}</span></h3>
+          <p class="hint">Přesčas jim proti ${esc(A)} narostl.</p>
+          ${moverList(up)}
+        </div>
+        <div>
+          <h3 class="change-title">Nejvíc ubrali <span class="tag good">${num(cmp.movers.filter((m) => m.d < 0).length)}</span></h3>
+          <p class="hint">Přesčas jim proti ${esc(A)} klesl.</p>
+          ${moverList(down)}
+        </div>
+      </div>
+    </div>`
+
+    el.innerHTML = PUBLIC
+      ? trendCards() + picker + kpis + table
+      : trendCards() + personCard() + picker + kpis + table + movers +
+        changesCard(cmp, ui.cmpA, ui.cmpB)
+    drawTrends()
+    if (!PUBLIC) {
+      if (ui.person) drawPerson(PP.personHistory(ui.person))
+      bindPersonCard()
+    }
+    PP.watchCharts(() => {
+      drawTrends()
+      if (ui.person) drawPerson(PP.personHistory(ui.person))
+    })
+
+    $$('#panel-compare [data-metric]').forEach((b) => b.addEventListener('click', () => {
+      ui.metric = b.dataset.metric
+      renderCompare()
+    }))
+
+    $('#cmp-a').addEventListener('change', (e) => { ui.cmpA = e.target.value; renderCompare() })
+    $('#cmp-b').addEventListener('change', (e) => { ui.cmpB = e.target.value; renderCompare() })
+    $('#cmp-swap').addEventListener('click', () => {
+      const t = ui.cmpA; ui.cmpA = ui.cmpB; ui.cmpB = t
+      renderCompare()
+    })
+    $$('#cmp-table th.sortable').forEach((th) => th.addEventListener('click', () => {
+      const key = th.dataset.key
+      if (ui.cmpSort.key === key) ui.cmpSort.dir = ui.cmpSort.dir === 'asc' ? 'desc' : 'asc'
+      else ui.cmpSort = { key, dir: key === 'name' ? 'asc' : 'desc' }
+      renderCompare()
+    }))
+  }
+
+  /* ---------- Roční limit ---------- */
+  function renderYear() {
+    const el = $('#panel-year')
+    const rec = currentMonth()
+    if (!rec) { el.innerHTML = emptyState('Naimportujte Součtový výkaz a panel se naplní.'); return }
+    const s = currentStats()
+    const list = s.yearly.slice(0, 25)
+
+    el.innerHTML = `<div class="grid kpis">
+      ${kpi('Nad ' + CFG.year.warn + ' h', num(s.year150), 'nutná dohoda o práci přesčas', s.year150 ? 'warn' : 'good')}
+      ${kpi('Nad ' + CFG.year.crit + ' h', num(s.year250), 'zbývá do stropu méně než ' + (CFG.year.cap - CFG.year.crit) + ' h', s.year250 ? 'crit' : 'good')}
+      ${kpi('Na stropu ' + CFG.year.cap + ' h', num(s.yearCap), 'další přesčas už nelze nařídit', s.yearCap ? 'crit' : 'good')}
+      ${kpi('Nejvyšší roční součet', hm(s.yearly.length ? s.yearly[0].r : 0),
+        s.yearly.length ? `zbývá ${hm(Math.max(0, CFG.year.cap - s.yearly[0].r))}` : '',
+        s.yearly.length ? level(s.yearly[0].r, { warn: CFG.year.warn, crit: CFG.year.crit }) : '')}
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Nejblíž ročnímu stropu</h2>
+        <span class="hint">stav k ${esc(rec.period)} · strop ${CFG.year.cap} h</span>
+      </div>
+      ${list.map((r) => {
+        const lvl = r.r >= CFG.year.crit ? 'crit' : r.r > CFG.year.warn ? 'warn' : ''
+        const w = Math.min(100, (r.r / CFG.year.cap) * 100)
+        return `<div class="limit-row">
+          <div class="limit-head">
+            <span class="who">${esc(r.n)} <small>· ${esc(r.s)}</small></span>
+            <span class="amt">${hm(r.r)} <span class="hint">/ ${CFG.year.cap} h · zbývá ${hm(Math.max(0, CFG.year.cap - r.r))}</span></span>
+          </div>
+          <div class="limit-track"><span class="limit-fill ${lvl}" style="width:${w.toFixed(1)}%"></span></div>
+        </div>`
+      }).join('')}
+      <p class="hint" style="margin:14px 0 0">
+        Zobrazeno 25 lidí s nejvyšším ročním součtem. Roční součet je hodnota mzdové složky
+        „Přesčas roční součet“ ve výkazu, tedy stav od začátku roku.
+      </p>
+    </div>`
+  }
+
+  /* ---------- Import ---------- */
+  function renderImport() {
+    const el = $('#panel-import')
+    // tady se vypisuje všechno, i skrytý vzorek — jinak by nebylo poznat, co panel drží
+    const keys = PP.data.allKeys()
+    const shown = PP.data.keys()
+    const canHide = PP.data.canHideDemo()
+    const hiding = PP.data.hideDemo && canHide
+
+    el.innerHTML = `<div class="card">
+      <div class="card-head">
+        <h2>Import Součtového výkazu</h2>
+        <span class="hint">ukládá se do: ${esc(PP.store.backendName)}</span>
+      </div>
+      <div class="drop" id="drop">
+        <h3>Přetáhněte sem Součtový výkaz</h3>
+        <p>Podporuje <code>.xls</code> z mezd (HTML tabulka), <code>.xlsx</code>, i <code>.csv</code>.
+           Měsíc se pozná z období ve výkazu; existující měsíc se přepíše.</p>
+        <button class="btn" type="button" id="pick">Vybrat soubor…</button>
+        <input type="file" id="file" accept=".xls,.xlsx,.csv,.txt,.htm,.html" multiple class="visually-hidden">
+      </div>
+      <div class="log" id="log">${ui.log.map(logItemHtml).join('')}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Načtené měsíce</h2>
+        <span class="hint">${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}${
+          hiding ? ` · zobrazeno ${shown.length}` : ''}</span>
+      </div>
+
+      <label class="switch${canHide ? '' : ' off'}">
+        <input type="checkbox" id="hide-demo" ${hiding ? 'checked' : ''} ${canHide ? '' : 'disabled'}>
+        <span>
+          <strong>Skrýt ukázková data</strong>
+          <small>${canHide
+            ? 'Panel bude počítat jen s reálnými měsíci — včetně grafů vývoje.'
+            : PP.data.realKeys().length
+              ? 'Žádná ukázková data tu nejsou, není co skrývat.'
+              : 'Zatím tu nejsou žádná reálná data. Nejdřív naimportujte výkaz.'}</small>
+        </span>
+      </label>
+
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Měsíc</th><th>Období</th><th class="num">Lidí</th><th class="num">Přesčas</th>
+          <th>Zdroj</th><th>Soubor</th><th></th>
+        </tr></thead>
+        <tbody>${keys.map((k) => {
+          const rec = PP.data.month(k)
+          const st = PP.stats(rec)
+          const imported = PP.data.isImported(k)
+          const skryty = hiding && !shown.includes(k)
+          return `<tr${skryty ? ' class="muted-row"' : ''}>
+            <td>${esc(monthName(k))}${skryty ? ' <span class="tag">skryto</span>' : ''}</td>
+            <td>${esc(rec.period || '—')}</td>
+            <td class="num">${num(st.withOvertime)}</td>
+            <td class="num">${h1(st.total)} h</td>
+            <td>${rec.demo ? '<span class="tag warn">ukázka</span>' : imported ? '<span class="tag accent">import</span>' : '<span class="tag">vestavěné</span>'}</td>
+            <td>${esc(rec.file || '—')}</td>
+            <td>${imported ? `<button class="btn danger sm" type="button" data-remove="${esc(k)}">Smazat</button>` : ''}</td>
+          </tr>`
+        }).join('') || '<tr><td colspan="7" class="empty">Zatím žádná data.</td></tr>'}
+        </tbody>
+      </table></div>
+    </div>`
+
+    const hideBox = $('#hide-demo')
+    if (hideBox) hideBox.addEventListener('change', () => {
+      PP.data.setHideDemo(hideBox.checked)
+      ui.month = null      // vybraný měsíc mohl být právě skrytý
+      ui.person = null
+      ui.cmpA = null
+      ui.cmpB = null
+      refreshAll()
+    })
+
+    const fileInput = $('#file')
+    const drop = $('#drop')
+    $('#pick').addEventListener('click', () => fileInput.click())
+    fileInput.addEventListener('change', () => {
+      handleFiles(Array.prototype.slice.call(fileInput.files))
+      fileInput.value = ''
+    })
+    ;['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => {
+      e.preventDefault(); drop.classList.add('over')
+    }))
+    ;['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => {
+      e.preventDefault(); drop.classList.remove('over')
+    }))
+    drop.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files) handleFiles(Array.prototype.slice.call(e.dataTransfer.files))
+    })
+    $$('#panel-import [data-remove]').forEach((b) => b.addEventListener('click', async () => {
+      const key = b.dataset.remove
+      if (!window.confirm(`Opravdu smazat naimportovaný měsíc ${monthName(key)}?`)) return
+      await PP.data.removeMonth(key)
+      log('ok', `${monthName(key)} smazán.`)
+      refreshAll()
+    }))
+  }
+
+  const LOG_LIMIT = 20
+
+  function logItemHtml(entry) {
+    const icon = entry.kind === 'ok' ? '✓' : entry.kind === 'err' ? '✕' : '…'
+    return `<div class="log-item ${entry.kind}"><span aria-hidden="true">${icon}</span><span>${entry.html}</span></div>`
+  }
+
+  function renderLog() {
+    const box = $('#log')
+    if (box) box.innerHTML = ui.log.map(logItemHtml).join('')
+  }
+
+  /** Přidá záznam do logu importu a vrátí ho, aby šel později přepsat. */
+  function log(kind, html) {
+    const entry = { kind, html }
+    ui.log.unshift(entry)
+    ui.log.length = Math.min(ui.log.length, LOG_LIMIT)
+    renderLog()
+    return entry
+  }
+
+  async function handleFiles(files) {
+    for (const file of files) {
+      const busy = log('busy', `Zpracovávám <strong>${esc(file.name)}</strong>…`)
+      try {
+        const { key, record, kind, skipped } = await PP.parseReport(file)
+        const replaced = PP.data.month(key)
+        await PP.data.addMonth(key, record)
+        const st = PP.stats(PP.data.month(key))
+        busy.kind = 'ok'
+        busy.html = `<strong>${esc(monthName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
+          ${num(st.withOvertime)} lidí s přesčasem, ${h1(st.total)} h, ${num(record.people)} osob ve výkazu.
+          <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>`
+        ui.month = key
+      } catch (err) {
+        busy.kind = 'err'
+        busy.html = `<strong>${esc(file.name)}</strong> — ${esc(err && err.message ? err.message : String(err))}`
+      }
+      renderLog()
+    }
+    refreshAll()
+  }
+
+  /* ---------- Metodika ---------- */
+  function renderMethod() {
+    $('#panel-method').innerHTML = `<div class="card"><div class="prose">
+      <h3>Co se počítá jako přesčas</h3>
+      <p><strong>Přesčas = Přesčas do MEZD + Přesčas evidence.</strong> První složka jsou hodiny
+      poslané do výplaty, druhá zůstatek na kontě pracovní doby. Obě čte panel přímo z mzdových
+      složek Součtového výkazu, nic se nedopočítává.</p>
+      <p>Evidence může být <strong>záporná</strong> — to je odečet konta po proplacení. Proto může
+      člověku vyjít součet 0 i v měsíci, kdy má ve výkazu desítky hodin: hodiny se proplatily
+      a stejná částka odešla z konta.</p>
+
+      <h3>Prahové hodnoty</h3>
+      <ul>
+        <li><strong>Jednotlivec za měsíc:</strong> ${CFG.person.warn} h oranžová, ${CFG.person.crit} h červená.</li>
+        <li><strong>Středisko, Ø na osobu:</strong> ${CFG.center.warn} h oranžová, ${CFG.center.crit} h červená.</li>
+        <li><strong>Roční součet:</strong> ${CFG.year.warn} h oranžová, ${CFG.year.crit} h červená,
+            <strong>${CFG.year.cap} h</strong> zákonný strop.</li>
+      </ul>
+      <p>Prahy jsou provozní, ne zákonné — slouží k tomu, aby se v tabulce dalo rychle najít,
+      kde se hromadí zátěž. Jediné tvrdé číslo je roční strop.</p>
+
+      <h3>Legislativní kontext</h3>
+      <p>Zákoník práce omezuje <em>nařízený</em> přesčas na 150 h za kalendářní rok a v průměru
+      8 h týdně za vyrovnávací období. Nad rámec nařízeného přesčasu lze pracovat jen po
+      <strong>dohodě se zaměstnancem</strong>, celkem však nejvýše v průměru 8 h týdně, tedy
+      zhruba <strong>${CFG.year.cap} h ročně</strong>. Proto panel odděluje pásmo nad ${CFG.year.warn} h
+      (od kdy je potřeba dohoda) od pásma nad ${CFG.year.crit} h (kde už zbývá malá rezerva).</p>
+
+      <h3>Ø na osobu</h3>
+      <p>Průměr se počítá <strong>jen z lidí, kteří v daném měsíci přesčas vykázali</strong>, ne
+      z celého stavu střediska. Malé středisko se třemi lidmi tak vyjde vysoko, i když je v objemu
+      hodin zanedbatelné — proto je vedle žebříčku průměrů i tabulka s absolutními součty.</p>
+
+      <h3>Jak se čte Součtový výkaz</h3>
+      <ul>
+        <li>Formát se pozná z prvních bajtů: <code>PK</code> → <code>.xlsx</code>,
+            <code>D0CF</code> → starší binární <code>.xls</code>, jinak text.</li>
+        <li>Výkaz z mezd má sice příponu <code>.xls</code>, ale je to <strong>HTML tabulka</strong> —
+            parsuje se přes DOMParser a bere se <code>&lt;table&gt;</code> s nejvíc řádky.</li>
+        <li>Hlavička se hledá do 40. řádku podle sloupců <em>Příjmení a jméno</em>,
+            <em>Osobní číslo</em>, <em>Středisko</em>, <em>Mzdová složka</em> a <em>Hodiny</em>.</li>
+        <li>Období se bere z řádku nad hlavičkou začínajícího <em>Období:</em>, jinak z prvního
+            výskytu <code>d.m.rrrr - d.m.rrrr</code>.</li>
+        <li>Hodiny se čtou ve formátu <code>h:mm</code> i jako desetinné číslo, včetně znaménka.</li>
+        <li>Řádky se agregují na klíč <code>osobní číslo | středisko</code>.</li>
+      </ul>
+
+      <h3>Kde data leží</h3>
+      <p>Importované měsíce se ukládají do: <strong>${esc(PP.store.backendName)}</strong>.
+      Vestavěná data jsou součástí souboru <code>data/months.js</code> a importem se
+      pro daný měsíc přebijí; po smazání importu se zase objeví.</p>
+    </div></div>`
+  }
+
+  /* ---------- export do Excelu ---------- */
+  async function doExport() {
+    const btn = $('#export-btn')
+    const status = $('#export-status')
+    if (!ui.month || btn.disabled) return
+    const label = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'Exportuji…'
+    status.textContent = ''
+    status.className = 'export-status'
+    try {
+      const out = await PP.exportExcel(ui.month, previousKey())
+      status.textContent = out.name
+      status.className = 'export-status ok'
+    } catch (err) {
+      status.textContent = err && err.message ? err.message : String(err)
+      status.className = 'export-status err'
+    } finally {
+      btn.disabled = false
+      btn.textContent = label
+    }
+  }
+
+  /** Proklik ze jména na vývoj toho člověka. */
+  function bindPersonLinks(root) {
+    $$(root + ' [data-person]').forEach((b) => b.addEventListener('click', () => {
+      if (PP.data.keys().length < 2) return
+      ui.person = b.dataset.person
+      ui.personQuery = ''
+      go('compare')
+    }))
+  }
+
+  /* ---------- překreslení ---------- */
+  function render() {
+    renderDemoBanner()
+    switch (ui.section) {
+      case 'overview': return renderOverview()
+      case 'centers': return renderCenters()
+      case 'ranking': return renderRanking()
+      case 'compare': return renderCompare()
+      case 'year': return renderYear()
+      case 'import': return renderImport()
+      case 'method': return renderMethod()
+    }
+  }
+
+  function refreshAll() {
+    renderMonthPicker()
+    updateRailNote()
+    render()
+  }
+
+  function updateRailNote() {
+    const keys = PP.data.keys()
+    const note = $('#rail-note')
+    if (!keys.length) { note.textContent = 'Zatím bez dat.'; return }
+    note.textContent = `${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'} · ` +
+      `${monthShort(keys[keys.length - 1])} – ${monthShort(keys[0])}`
+  }
+
+  /* ---------- start ---------- */
+  async function init() {
+    initTheme()
+    renderNav()
+    await PP.data.init()
+    renderMonthPicker()
+    updateRailNote()
+
+    $('#month-select').addEventListener('change', (e) => {
+      ui.month = e.target.value
+      ui.center = null
+      render()
+    })
+    const exportBtn = $('#export-btn')
+    if (PUBLIC) exportBtn.hidden = true
+    else exportBtn.addEventListener('click', doExport)
+    window.addEventListener('hashchange', () => {
+      const id = location.hash.slice(1)
+      if (id && id !== ui.section) go(id)
+    })
+
+    const initial = location.hash.slice(1)
+    go(SECTIONS.some((s) => s.id === initial) ? initial : 'overview')
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init)
+  else init()
+})(window.PP)
+</script>
+</body>
+</html>

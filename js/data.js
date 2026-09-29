@@ -110,10 +110,50 @@ window.PP = window.PP || {}
 
   const cache = new WeakMap()
 
+  /**
+   * Souhrn nad agregovaným měsícem — takový záznam žádné lidi neobsahuje,
+   * jen předpočítaná čísla za střediska. Používá ho veřejné vydání panelu.
+   */
+  function aggregateStats(record) {
+    const s = record.summary
+    const centers = s.centers.map((c) => {
+      const avg = c.people ? c.total / c.people : 0
+      return Object.assign({}, c, { avg, level: PP.level(avg, PP.CFG.center), rows: [] })
+    })
+    return {
+      key: null,
+      aggregate: true,
+      people: record.people,
+      withOvertime: s.withOvertime,
+      total: s.total,
+      mezdy: s.mezdy,
+      evidence: s.evidence,
+      paidShare: s.total !== 0 ? s.mezdy / s.total : 0,
+      avg: s.withOvertime ? s.total / s.withOvertime : 0,
+      max: 0,                       // nejvyšší hodnota jednotlivce se nezveřejňuje
+      overWarn: s.overWarn,
+      overCrit: s.overCrit,
+      centers,
+      byAvg: centers.slice().sort((a, b) => b.avg - a.avg),
+      byTotal: centers.slice().sort((a, b) => b.total - a.total),
+      hist: s.hist,
+      yearly: [],                   // jmenné pohledy v agregátu neexistují
+      ranking: [],
+      year150: s.year150,
+      year250: s.year250,
+      yearCap: s.yearCap,
+    }
+  }
+
   /** Spočítá (a zapamatuje si) souhrn nad jedním měsícem. */
   PP.stats = function (record) {
     if (!record) return null
     if (cache.has(record)) return cache.get(record)
+    if (record.aggregate) {
+      const agg = aggregateStats(record)
+      cache.set(record, agg)
+      return agg
+    }
 
     const rows = record.rows || []
     const sum = (f) => rows.reduce((a, r) => a + (Number(r[f]) || 0), 0)
@@ -181,7 +221,7 @@ window.PP = window.PP || {}
   PP.roster = function () {
     const out = new Map()
     for (const key of PP.data.keys()) {          // od nejnovějšího
-      for (const r of PP.data.month(key).rows) {
+      for (const r of PP.data.month(key).rows || []) {
         const id = String(r.o)
         if (!out.has(id)) out.set(id, { o: r.o, n: r.n, s: r.s, months: 0 })
         out.get(id).months++
@@ -205,7 +245,7 @@ window.PP = window.PP || {}
     for (const k of keys) {
       const rec = PP.data.month(k)
       const stats = PP.stats(rec)
-      const row = rec.rows.find((r) => String(r.o) === wanted)
+      const row = (rec.rows || []).find((r) => String(r.o) === wanted)
       if (row) {
         person = { o: row.o, n: row.n, s: row.s }
         lastR = row.r
@@ -256,26 +296,34 @@ window.PP = window.PP || {}
         dTotal: p ? c.total - p.total : null,
       }
     })
+    // Osobní srovnání jde jen nad záznamy s řádky. Agregovaný měsíc (veřejné
+    // vydání) lidi vůbec neobsahuje, takže zůstane u čísel za střediska.
+    const rowsA = current.rows || []
+    const rowsB = previous.rows || []
+    const hasPeople = rowsA.length > 0 && rowsB.length > 0
+
     // Kdo mezi měsíci vypadl a kdo přibyl. Porovnává se podle osobního čísla,
     // ne podle klíče s pobočkou — kdo změnil středisko, není nový člověk.
-    const prevIds = new Set(previous.rows.map((r) => String(r.o)))
-    const curIds = new Set(current.rows.map((r) => String(r.o)))
-    const dropped = previous.rows
-      .filter((r) => !curIds.has(String(r.o)))
-      .sort((x, y) => y.t - x.t)
-    const added = current.rows
-      .filter((r) => !prevIds.has(String(r.o)))
-      .sort((x, y) => y.t - x.t)
+    const prevIds = new Set(rowsB.map((r) => String(r.o)))
+    const curIds = new Set(rowsA.map((r) => String(r.o)))
+    const dropped = hasPeople
+      ? rowsB.filter((r) => !curIds.has(String(r.o))).sort((x, y) => y.t - x.t)
+      : []
+    const added = hasPeople
+      ? rowsA.filter((r) => !prevIds.has(String(r.o))).sort((x, y) => y.t - x.t)
+      : []
 
     // kdo zůstal v obou měsících, seřazený podle změny přesčasu
-    const prevById = new Map(previous.rows.map((r) => [String(r.o), r]))
-    const movers = current.rows
-      .filter((r) => prevById.has(String(r.o)))
-      .map((r) => {
-        const p = prevById.get(String(r.o))
-        return { r, prev: p, d: r.t - p.t }
-      })
-      .sort((x, y) => y.d - x.d)
+    const prevById = new Map(rowsB.map((r) => [String(r.o), r]))
+    const movers = hasPeople
+      ? rowsA
+          .filter((r) => prevById.has(String(r.o)))
+          .map((r) => {
+            const p = prevById.get(String(r.o))
+            return { r, prev: p, d: r.t - p.t }
+          })
+          .sort((x, y) => y.d - x.d)
+      : []
 
     return {
       dTotal: a.total - b.total,
