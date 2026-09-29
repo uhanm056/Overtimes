@@ -275,15 +275,16 @@ bez serveru.
 
 Dvě věci k tomu:
 
-* `dist/` je v `.gitignore`. Je to výstup, ne zdroj — a se skutečnými daty by
-  obsahoval osobní údaje, zatímco repozitář je veřejný.
+* `dist/` je v `.gitignore`, stejně jako `data/months.local.js`. Jsou to
+  výstupy, ne zdroje — a se skutečnými daty obsahují osobní údaje, zatímco
+  repozitář je veřejný.
 * Prohlížeč váže `localStorage` u `file://` na umístění souboru. Novou verzi
   proto **přepište na stejné místo**, jinak přijdete o naimportované měsíce.
 
 ## Data
 
 ```bash
-npm run data                                  # přegeneruje ukázková data
+npm run data                                              # přegeneruje ukázková data
 node tools/report-to-data.mjs vykaz-07.xls vykaz-08.xls   # reálná data
 node tools/report-to-data.mjs --keep vykaz-09.xls         # přidat další měsíc
 ```
@@ -292,10 +293,21 @@ node tools/report-to-data.mjs --keep vykaz-09.xls         # přidat další měs
 samotný panel a rozparsuje soubory **stejným kódem, jaký běží v prohlížeči**.
 Co projde skriptem, projde i importem v UI.
 
-> **Pozor:** vygenerovaný `data/months.js` s reálnými daty obsahuje osobní
-> údaje (jméno, osobní číslo, středisko, přesčasy). Než ho commitnete nebo
-> panel někam nasadíte, ověřte, komu tato data smí být vidět. Ukázková data
-> jsou v repu proto, aby tuhle otázku nebylo nutné řešit hned.
+### Dva datové soubory, jeden veřejný a jeden ne
+
+| Soubor | Obsah | Git |
+| --- | --- | --- |
+| `data/months.js` | ukázková data, generuje `generate-demo-data.mjs` | **commituje se** |
+| `data/months.local.js` | reálná data, generuje `report-to-data.mjs` | **v `.gitignore`** |
+
+Reálná data se do `data/months.js` nezapisují **nikdy**. Ten soubor je
+sledovaný gitem, a je-li repozitář veřejný, byla by jména a osobní čísla na
+github.com k přečtení komukoli — řádek po řádku, stačí soubor otevřít
+v prohlížeči repa.
+
+`build-single-file.mjs` si `months.local.js` vezme přednostně, když existuje,
+a napíše, s jakými daty soubor postavil. Panel s reálnými čísly tak vznikne,
+aniž by cokoli opustilo váš počítač.
 
 ## Testy
 

@@ -6,12 +6,16 @@
  * ale k rozeslání se hodí jeden soubor: stáhnout, dvojklik, jede — žádná
  * složka, ze které nesmí nic vypadnout.
  *
+ * Existuje-li data/months.local.js (reálná data z report-to-data.mjs), vezme
+ * se přednostně před ukázkovými. Výsledek pak obsahuje osobní údaje — dist/
+ * je proto v .gitignore.
+ *
  * Pořadí skriptů se bere přímo z index.html, takže se nemůže rozejít.
  *
  * Spuštění:  node tools/build-single-file.mjs [výstup.html]
  * Výchozí:   dist/prescasovy-panel-plana.html
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -31,11 +35,17 @@ html = html.replace(
 )
 
 // skripty v pořadí, v jakém je uvádí index.html
+/* Když existují lokální reálná data, mají přednost před ukázkovými.
+   Vznikne tak panel s tvými čísly, aniž by cokoli šlo do repozitáře. */
+const LOCAL_DATA = 'data/months.local.js'
+const hasLocal = existsSync(join(ROOT, LOCAL_DATA))
+
 const scripts = []
 html = html.replace(/[ \t]*<script src="([^"]+)"><\/script>\n?/g, (_, src) => {
-  scripts.push(src)
-  return `\n<!-- ${src} -->\n<script>\n` +
-    safe(readFileSync(join(ROOT, src), 'utf8').trimEnd()) + '\n</script>\n'
+  const from = src === 'data/months.js' && hasLocal ? LOCAL_DATA : src
+  scripts.push(from)
+  return `\n<!-- ${from} -->\n<script>\n` +
+    safe(readFileSync(join(ROOT, from), 'utf8').trimEnd()) + '\n</script>\n'
 })
 
 if (!scripts.length) throw new Error('V index.html nejsou žádné <script src>, něco se rozešlo.')
@@ -48,4 +58,7 @@ writeFileSync(out, html, 'utf8')
 
 const kb = (Buffer.byteLength(html, 'utf8') / 1024).toFixed(0)
 console.log(`→ ${out} (${kb} KiB)`)
-console.log(`   vloženo: styles.css + ${scripts.length} skriptů (${scripts.join(', ')})`)
+console.log(`   vloženo: styles.css + ${scripts.length} skriptů`)
+console.log(hasLocal
+  ? '   data: ' + LOCAL_DATA + ' — REÁLNÁ, s osobními údaji. Soubor nikam nenahrávejte.'
+  : '   data: data/months.js — ukázková')
