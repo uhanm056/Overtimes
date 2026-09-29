@@ -31,9 +31,9 @@ const check = (name, actual, expected) => {
 const html = await readFile(OUT, 'utf8')
 
 /* ---------- osobní údaje ---------- */
-// zdrojová data, ze kterých se veřejné vydání staví
+// zdrojová data, ze kterých se veřejné vydání staví (vzorek pro testy)
 const src = {}
-new Function('window', await readFile(join(ROOT, 'data', 'months.js'), 'utf8'))(src)
+new Function('window', await readFile(join(ROOT, 'tests', 'fixtures', 'demo-months.js'), 'utf8'))(src)
 const source = src.PP_BUILTIN_MONTHS
 
 const names = new Set()

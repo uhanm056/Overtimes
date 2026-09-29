@@ -8,7 +8,7 @@
  * (sekce „Import výkazu“) nebo skriptem tools/report-to-data.mjs.
  *
  * Spuštění:  node tools/generate-demo-data.mjs
- * Výstup:    data/months.js
+ * Výstup:    tests/fixtures/demo-months.js
  */
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -435,15 +435,15 @@ const banner = `/*
  *
  * Vygenerováno skriptem tools/generate-demo-data.mjs (deterministicky, seed 20260907).
  * Jména, osobní čísla i hodiny jsou vymyšlené. Slouží k tomu, aby byl panel
- * po naklonování repa hned funkční. Reálné měsíce přidejte importem
- * Součtového výkazu v sekci „Import výkazu“ nebo skriptem tools/report-to-data.mjs.
+ * Nejsou součástí distribuovaného panelu — ten startuje prázdný. Slouží
+ * testům a příkazu build-public.mjs --demo.
  *
  * Soubor se needituje ručně — přegeneruje se skriptem.
  */
 `
 writeFileSync(
-  join(ROOT, 'data', 'months.js'),
+  join(ROOT, 'tests', 'fixtures', 'demo-months.js'),
   banner + 'window.PP_BUILTIN_MONTHS = ' + JSON.stringify(data, null, 0) + ';\n',
   'utf8'
 )
-console.log('→ data/months.js')
+console.log('→ tests/fixtures/demo-months.js')

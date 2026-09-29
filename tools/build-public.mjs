@@ -67,9 +67,16 @@ await page.evaluate(() => {
 const months = {}
 
 if (useDemo) {
-  const demo = await page.evaluate(() => window.PP_BUILTIN_MONTHS || {})
-  Object.assign(months, demo)
-  console.log(`Vstup: ukázková data (${Object.keys(demo).length} měsíců)`)
+  // panel se distribuuje bez dat, vzorek leží u testů
+  const fixture = join(ROOT, 'tests', 'fixtures', 'demo-months.js')
+  if (!existsSync(fixture)) {
+    console.error('Chybí ' + fixture + ' — spusťte: node tools/generate-demo-data.mjs')
+    await browser.close(); server.close(); process.exit(1)
+  }
+  const sandbox = {}
+  new Function('window', await readFile(fixture, 'utf8'))(sandbox)
+  Object.assign(months, sandbox.PP_BUILTIN_MONTHS || {})
+  console.log(`Vstup: ukázková data (${Object.keys(months).length} měsíců)`)
 } else {
   for (const file of files) {
     await page.setInputFiles('#pp-cli-file', [file])
