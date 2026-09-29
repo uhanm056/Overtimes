@@ -44,6 +44,8 @@
     sort: { key: 'total', dir: 'desc' },
     cmpSort: { key: 'dTotal', dir: 'desc' },
     metric: 'total',     // ukazatel v grafech vývoje
+    topBy: 'total',      // TOP střediska: podle součtu, nebo Ø na osobu
+    topOpen: {},         // rozbalená střediska v TOP přehledu
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
     personQuery: '',
@@ -264,11 +266,18 @@
     </div>`
 
     el.innerHTML = kpis +
+      topCentersCard(s) +
       `<div class="grid two">${avgChart}${histChart}</div>` +
       `<div class="grid two">${splitChart}${findings}</div>` +
       changesCard(cmp, prevK) +
       centerTable(s, cmp)
     bindCenterTable()
+    bindPersonLinks('#panel-overview')
+    bindCenterLinks('#panel-overview')
+    $$('#panel-overview [data-topby]').forEach((b) => b.addEventListener('click', () => {
+      ui.topBy = b.dataset.topby
+      renderOverview()
+    }))
   }
 
   function buildFindings(s, cmp, prevK) {
@@ -355,6 +364,62 @@
     </div>`
   }
 
+  /* ---------- TOP střediska a jejich lidé ----------
+     Přehled, ze kterého je vidět kde se přesčas hromadí a kdo ho tam dělá,
+     bez proklikávání středisko po středisku. */
+  const TOP_CENTERS = 6
+  const TOP_PEOPLE = 5
+
+  function topCentersCard(s) {
+    if (PUBLIC || !s.centers.length) return ''   // jmenná data se nezveřejňují
+
+    const byTotal = ui.topBy === 'total'
+    const list = (byTotal ? s.byTotal : s.byAvg).slice(0, TOP_CENTERS)
+    const max = byTotal ? list[0].total : list[0].avg
+
+    return `<div class="card">
+      <div class="card-head">
+        <h2>TOP střediska a jejich lidé</h2>
+        <span class="hint">${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem</span>
+      </div>
+
+      <div class="metric-switch" role="group" aria-label="Řazení středisek">
+        <button type="button" class="chip" data-topby="total" aria-pressed="${byTotal}">Podle součtu hodin</button>
+        <button type="button" class="chip" data-topby="avg" aria-pressed="${!byTotal}">Podle Ø na osobu</button>
+      </div>
+
+      <div class="topc">${list.map((c, i) => {
+        const hodnota = byTotal ? c.total : c.avg
+        const sirka = max > 0 ? Math.max(2, (hodnota / max) * 100) : 0
+        const lide = c.rows.slice(0, TOP_PEOPLE)
+        const zbytek = c.people - lide.length
+        return `<section class="topc-item">
+          <header class="topc-head">
+            <span class="topc-rank">${i + 1}.</span>
+            <span class="topc-name"><button type="button" class="link-center" data-center="${esc(c.name)}"
+                title="Otevřít detail střediska">${esc(c.name)}</button>${c.level
+              ? ` <span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</span>
+            <span class="topc-nums">
+              <strong>${byTotal ? h1(c.total) + ' h' : hm(c.avg)}</strong>
+              <small>${byTotal ? `Ø ${hm(c.avg)} · ${c.people} lidí` : `${h1(c.total)} h · ${c.people} lidí`}</small>
+            </span>
+          </header>
+          <div class="topc-bar"><span style="width:${sirka.toFixed(1)}%"></span></div>
+          <ol class="topc-people">${lide.map((r) => {
+            const lvl = level(r.t, CFG.person)
+            return `<li>
+              <button type="button" class="link-person" data-person="${esc(String(r.o))}"
+                title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button>
+              <span class="amt">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</span>
+            </li>`
+          }).join('')}
+          ${zbytek > 0 ? `<li class="more">a dalších ${num(zbytek)} ve středisku</li>` : ''}
+          </ol>
+        </section>`
+      }).join('')}</div>
+    </div>`
+  }
+
   const CENTER_COLS = [
     { key: 'name', label: 'Středisko', num: false },
     { key: 'people', label: 'Lidí', num: true },
@@ -388,7 +453,8 @@
         <tbody>${rows.map((c) => {
           const d = dmap.get(c.name)
           return `<tr>
-            <td>${esc(c.name)} ${c.level ? `<span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
+            <td><button type="button" class="link-center" data-center="${esc(c.name)}"
+              title="Otevřít detail střediska">${esc(c.name)}</button> ${c.level ? `<span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
             <td class="num">${num(c.people)}</td>
             <td class="num">${h1(c.total)}</td>
             <td class="num">${hm(c.avg)}</td>
@@ -748,13 +814,15 @@
       <div class="table-wrap" style="margin-top:18px"><table>
         <thead><tr>
           <th>Měsíc</th><th class="num">Do MEZD</th><th class="num">Evidence</th>
-          <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th><th class="num">Ročně</th>
+          <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th>
+          <th class="num">Ročně</th><th class="num">Δ ročně</th>
         </tr></thead>
         <tbody>${hist.points.map((x) => {
           if (x.t == null) {
             return `<tr class="muted-row"><td>${esc(monthName(x.key))}</td>
               <td colspan="4" class="hint">ve výkazu není — přesčas neměl</td>
-              <td class="num">${x.r == null ? '—' : hm(x.r)}</td></tr>`
+              <td class="num">${x.r == null ? '—' : hm(x.r)}</td>
+              <td class="num">${x.dr == null ? '—' : hm(x.dr)}</td></tr>`
           }
           const lvl = level(x.t, CFG.person)
           return `<tr>
@@ -764,11 +832,19 @@
             <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
             <td class="num">${x.rank}. z ${x.of}</td>
             <td class="num">${hm(x.r)}</td>
+            <td class="num">${x.dr == null ? '—'
+              : x.drMatches ? hm(x.dr)
+              : `<span class="tag crit" title="Roční součet přibyl o jinou hodnotu, než je měsíční přesčas">${hm(x.dr)}</span>`}</td>
           </tr>`
         }).join('')}</tbody>
       </table></div>
 
       <p class="hint" style="margin:14px 0 0">
+        <strong>Δ ročně</strong> je přírůstek ročního součtu proti předchozímu měsíci.
+        Měl by se rovnat sloupci Přesčas. Když se liší (červeně), počítá mzdový systém
+        do ročního součtu něco jiného než součet vykázaných přesčasů.
+      </p>
+      <p class="hint" style="margin:6px 0 0">
         ${esc(p.n)} · osobní číslo ${esc(String(p.o))} · ${esc(p.s)}${last.t == null
           ? ' · v posledním měsíci ve výkazu není' : ''}
       </p>`
@@ -977,6 +1053,39 @@
     const s = currentStats()
     const list = s.yearly.slice(0, 25)
 
+    const prevK = previousKey()
+    const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
+    const chk = cmp && cmp.annual.checked ? cmp.annual : null
+
+    const check = !chk ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Sedí roční součet na součet měsíců?</h2>
+        <span class="hint">${esc(monthShort(prevK))} → ${esc(monthShort(ui.month))} · ${num(chk.checked)} lidí v obou měsících</span>
+      </div>
+      ${chk.mismatched === 0
+        ? `<p class="hint" style="margin:0">Ano — u všech ${num(chk.checked)} lidí přibyl roční
+             součet přesně o jejich měsíční přesčas. Na roční limit se dá spolehnout.</p>`
+        : `<p class="hint" style="margin:0 0 12px">
+             <strong>U ${num(chk.mismatched)} z ${num(chk.checked)} lidí ne.</strong>
+             Roční součet jim přibyl o jinou hodnotu, než je jejich měsíční přesčas — mzdový
+             systém do něj tedy počítá něco jiného než součet vykázaných přesčasů. Prahy
+             ${CFG.year.warn} / ${CFG.year.crit} / ${CFG.year.cap} h níže měří to, co do
+             ročního součtu dává mzdový systém, ne součet sloupce Přesčas.</p>
+           <div class="table-wrap"><table>
+             <thead><tr><th>Jméno</th><th>Středisko</th>
+               <th class="num">Přesčas ${esc(monthShort(ui.month))}</th>
+               <th class="num">Δ ročně</th><th class="num">Rozdíl</th></tr></thead>
+             <tbody>${chk.examples.map((e) => `<tr>
+               <td class="name">${esc(e.row.n)}</td>
+               <td>${esc(e.row.s)}</td>
+               <td class="num">${hm(e.t)}</td>
+               <td class="num">${hm(e.dr)}</td>
+               <td class="num"><span class="tag crit">${e.diff > 0 ? '+' : '−'}${hm(Math.abs(e.diff))}</span></td>
+             </tr>`).join('')}</tbody>
+           </table></div>
+           <p class="hint" style="margin:12px 0 0">Ukázáno ${num(chk.examples.length)} největších rozdílů.</p>`}
+    </div>`
+
     el.innerHTML = `<div class="grid kpis">
       ${kpi('Nad ' + CFG.year.warn + ' h', num(s.year150), 'nutná dohoda o práci přesčas', s.year150 ? 'warn' : 'good')}
       ${kpi('Nad ' + CFG.year.crit + ' h', num(s.year250), 'zbývá do stropu méně než ' + (CFG.year.cap - CFG.year.crit) + ' h', s.year250 ? 'crit' : 'good')}
@@ -985,6 +1094,7 @@
         s.yearly.length ? `zbývá ${hm(Math.max(0, CFG.year.cap - s.yearly[0].r))}` : '',
         s.yearly.length ? level(s.yearly[0].r, { warn: CFG.year.warn, crit: CFG.year.crit }) : '')}
     </div>
+    ${check}
     <div class="card">
       <div class="card-head">
         <h2>Nejblíž ročnímu stropu</h2>
@@ -1200,6 +1310,14 @@
       btn.disabled = false
       btn.textContent = label
     }
+  }
+
+  /** Proklik z názvu střediska na jeho detail. */
+  function bindCenterLinks(root) {
+    $$(root + ' .link-center').forEach((b) => b.addEventListener('click', () => {
+      ui.center = b.dataset.center
+      go('centers')
+    }))
   }
 
   /** Proklik ze jména na vývoj toho člověka. */

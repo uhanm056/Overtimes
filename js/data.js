@@ -230,6 +230,20 @@ window.PP = window.PP || {}
     }
     if (!person) return null
 
+    /* Přírůstek ročního součtu proti předchozímu měsíci. Pokud mzdový systém
+       počítá roční součet jako kumulaci téhož, co je v měsíčním přesčasu,
+       musí `dr` vyjít stejně jako `t`. Když ne, měří ty dva sloupce něco
+       jiného — a je to potřeba vidět, protože na ročním součtu stojí hlídání
+       zákonného stropu. */
+    for (let i = 0; i < points.length; i++) {
+      const prev = i > 0 ? points[i - 1].r : null
+      const cur = points[i].r
+      points[i].dr = (i > 0 && prev != null && cur != null) ? Math.round((cur - prev) * 100) / 100 : null
+      points[i].drMatches = points[i].dr == null || points[i].t == null
+        ? null
+        : Math.abs(points[i].dr - points[i].t) <= 0.02
+    }
+
     const withOt = points.filter((p) => p.t != null)
     return {
       person,
@@ -289,7 +303,24 @@ window.PP = window.PP || {}
           .sort((x, y) => y.d - x.d)
       : []
 
+    /* Sedí roční součet na součet měsíců? Porovná se přírůstek ročního součtu
+       s měsíčním přesčasem u každého, kdo je v obou měsících. */
+    const annual = { checked: 0, mismatched: 0, examples: [] }
+    for (const m of movers) {
+      if (m.r.r == null || m.prev.r == null) continue
+      annual.checked++
+      const dr = Math.round((m.r.r - m.prev.r) * 100) / 100
+      if (Math.abs(dr - m.r.t) > 0.02) {
+        annual.mismatched++
+        if (annual.examples.length < 10) {
+          annual.examples.push({ row: m.r, dr, t: m.r.t, diff: Math.round((dr - m.r.t) * 100) / 100 })
+        }
+      }
+    }
+    annual.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+
     return {
+      annual,
       dTotal: a.total - b.total,
       dPeople: a.withOvertime - b.withOvertime,
       dAvg: a.avg - b.avg,

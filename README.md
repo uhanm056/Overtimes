@@ -24,11 +24,11 @@ Vzorek pro testy a pro `build-public.mjs --demo` se generuje do
 
 | Sekce | Obsah |
 | --- | --- |
-| **Přehled** | KPI dlaždice, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
+| **Přehled** | KPI dlaždice, TOP střediska i s jejich nejvytíženějšími lidmi, žebříček Ø hodin na osobu podle středisek, histogram rozložení, rozpad na MEZD vs. evidenci, tabulka všech středisek, automaticky odvozená zjištění |
 | **Střediska** | Výběr střediska přes chipy, KPI střediska, TOP 5 lidí, seznam všech |
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
 | **Vývoj a srovnání** | Graf vývoje závodu, středisek i jednoho člověka přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
-| **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h |
+| **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h, kontrola ročního součtu |
 | **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
 | **Metodika** | Jak se počítá, legislativní kontext |
 
@@ -164,6 +164,53 @@ Dvě věci, na kterých tu záleží:
   smyslem pohledu je vidět, kolik z povolených hodin je vyčerpáno. Měsíční
   pohled naopak prahové čáry 40 a 60 h kreslí jen když spadají do rozsahu dat;
   u člověka, který se k nim nepřiblížil, by graf jen zplacatily.
+
+## TOP střediska a jejich lidé
+
+Karta v Přehledu ukáže šest nejvytíženějších středisek a u každého pět lidí
+s nejvyšším přesčasem — bez proklikávání středisko po středisku.
+
+Prokliknout se dá obojí: **jméno** otevře vývoj toho člověka přes měsíce,
+**název střediska** jeho detail v sekci Střediska. Totéž funguje z tabulky
+„Všechna střediska“.
+
+Oba pohledy počítají ze stejného souhrnu, takže se nemůžou rozejít —
+a test to hlídá: po prokliku porovnává součet hodin, Ø na osobu, počet lidí
+i pořadí a hodiny TOP 5. Kdyby se čísla rozešla, panel by si odporoval
+a nikdo by nevěděl, čemu věřit.
+
+Přepínač nad kartou mění, co znamená „TOP":
+
+* **Podle součtu hodin** — kde se přesčas hromadí v objemu. Velká střediska
+  vyjdou nahoře i při nižším průměru.
+* **Podle Ø na osobu** — kde je zátěž nejvyšší na člověka. Nahoře skončí
+  i malá střediska, která v objemu nic neznamenají.
+
+Obojí je legitimní otázka a dávají jiné pořadí — proto přepínač, ne výběr
+za uživatele. U každého střediska se vždy ukazují obě čísla, ať je vidět,
+odkud se pořadí bere.
+
+Ve veřejném vydání karta není, protože obsahuje jména.
+
+## Sedí roční součet na součet měsíců?
+
+Panel čte roční součet z mzdové složky „Přesčas roční součet“ — nedopočítává
+ho. Co do ní mzdový systém počítá, to panel měří proti prahům
+150 / 250 / 416 h. **Nemusí to být totéž co součet vykázaných přesčasů.**
+
+Sekce Roční limit proto při dvou a více měsících porovná u každého, kdo je
+v obou, přírůstek ročního součtu s jeho měsíčním přesčasem:
+
+* **Sedí u všech** → roční součet je kumulací téhož, prahy měří to, co čekáte.
+* **U některých ne** → mzdový systém do ročního součtu počítá něco užšího
+  (třeba jen nařízený přesčas). Panel vypíše největší rozdíly i se jmény,
+  ať je kde začít.
+
+Stejná kontrola je i v kartě jednoho člověka jako sloupec **Δ ročně** —
+přírůstek proti předchozímu měsíci. Rozdíl se zvýrazní červeně.
+
+Není to chyba panelu ani mezd; je to rozdíl významu, o kterém je potřeba
+vědět, protože na ročním součtu stojí hlídání zákonného stropu.
 
 ## Export do Excelu
 
