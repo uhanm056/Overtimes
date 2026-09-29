@@ -144,6 +144,36 @@ console.log('\nProklik ze jména:')
 check('otevře se vývoj a srovnání', po.sekce, 'Vývoj a srovnání')
 check('vybraný člověk sedí', po.kdo.startsWith(jmeno) ? 'ano' : 'ne: ' + po.kdo, 'ano')
 
+/* ---------- kontrola ročního součtu ----------
+   Musí umět obojí: potvrdit, že součty sedí, a odhalit, když nesedí.
+   Test, který jen projde na správných datech, nedokazuje nic. */
+const annual = await page.evaluate(() => {
+  const d = window.PP.data
+  const keys = d.keys()
+  const cur = d.month(keys[0])
+  const prev = d.month(keys[1])
+  const sedi = window.PP.compare(cur, prev).annual
+
+  // rozbít: třem lidem nastavit roční součet pod jejich měsíční přesčas
+  const kopie = JSON.parse(JSON.stringify(cur))
+  let n = 0
+  for (const r of kopie.rows) {
+    if (n >= 3) break
+    if (r.t > 20) { r.r = Math.round(r.t * 0.85 * 100) / 100; n++ }
+  }
+  const nesedi = window.PP.compare(kopie, prev).annual
+  return { sedi, nesedi, rozbito: n }
+})
+
+console.log('\nKontrola ročního součtu:')
+check('na správných datech nic nehlásí', annual.sedi.mismatched, 0)
+check('kontrola opravdu něco porovnávala', annual.sedi.checked > 100 ? 'ano' : 'ne', 'ano')
+check('rozbité roční součty odhalí', annual.nesedi.mismatched, annual.rozbito)
+check('ukáže příklady k dohledání', annual.nesedi.examples.length, annual.rozbito)
+check('u příkladu sedí rozdíl',
+  Math.abs(annual.nesedi.examples[0].dr - annual.nesedi.examples[0].t
+    - annual.nesedi.examples[0].diff) < 0.02 ? 'ano' : 'ne', 'ano')
+
 await browser.close()
 server.close()
 console.log(fails.length ? `\n${fails.length} selhalo: ${fails.join(', ')}` : '\nVšechny kontroly prošly.')

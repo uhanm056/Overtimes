@@ -748,13 +748,15 @@
       <div class="table-wrap" style="margin-top:18px"><table>
         <thead><tr>
           <th>Měsíc</th><th class="num">Do MEZD</th><th class="num">Evidence</th>
-          <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th><th class="num">Ročně</th>
+          <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th>
+          <th class="num">Ročně</th><th class="num">Δ ročně</th>
         </tr></thead>
         <tbody>${hist.points.map((x) => {
           if (x.t == null) {
             return `<tr class="muted-row"><td>${esc(monthName(x.key))}</td>
               <td colspan="4" class="hint">ve výkazu není — přesčas neměl</td>
-              <td class="num">${x.r == null ? '—' : hm(x.r)}</td></tr>`
+              <td class="num">${x.r == null ? '—' : hm(x.r)}</td>
+              <td class="num">${x.dr == null ? '—' : hm(x.dr)}</td></tr>`
           }
           const lvl = level(x.t, CFG.person)
           return `<tr>
@@ -764,11 +766,19 @@
             <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
             <td class="num">${x.rank}. z ${x.of}</td>
             <td class="num">${hm(x.r)}</td>
+            <td class="num">${x.dr == null ? '—'
+              : x.drMatches ? hm(x.dr)
+              : `<span class="tag crit" title="Roční součet přibyl o jinou hodnotu, než je měsíční přesčas">${hm(x.dr)}</span>`}</td>
           </tr>`
         }).join('')}</tbody>
       </table></div>
 
       <p class="hint" style="margin:14px 0 0">
+        <strong>Δ ročně</strong> je přírůstek ročního součtu proti předchozímu měsíci.
+        Měl by se rovnat sloupci Přesčas. Když se liší (červeně), počítá mzdový systém
+        do ročního součtu něco jiného než součet vykázaných přesčasů.
+      </p>
+      <p class="hint" style="margin:6px 0 0">
         ${esc(p.n)} · osobní číslo ${esc(String(p.o))} · ${esc(p.s)}${last.t == null
           ? ' · v posledním měsíci ve výkazu není' : ''}
       </p>`
@@ -977,6 +987,39 @@
     const s = currentStats()
     const list = s.yearly.slice(0, 25)
 
+    const prevK = previousKey()
+    const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
+    const chk = cmp && cmp.annual.checked ? cmp.annual : null
+
+    const check = !chk ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Sedí roční součet na součet měsíců?</h2>
+        <span class="hint">${esc(monthShort(prevK))} → ${esc(monthShort(ui.month))} · ${num(chk.checked)} lidí v obou měsících</span>
+      </div>
+      ${chk.mismatched === 0
+        ? `<p class="hint" style="margin:0">Ano — u všech ${num(chk.checked)} lidí přibyl roční
+             součet přesně o jejich měsíční přesčas. Na roční limit se dá spolehnout.</p>`
+        : `<p class="hint" style="margin:0 0 12px">
+             <strong>U ${num(chk.mismatched)} z ${num(chk.checked)} lidí ne.</strong>
+             Roční součet jim přibyl o jinou hodnotu, než je jejich měsíční přesčas — mzdový
+             systém do něj tedy počítá něco jiného než součet vykázaných přesčasů. Prahy
+             ${CFG.year.warn} / ${CFG.year.crit} / ${CFG.year.cap} h níže měří to, co do
+             ročního součtu dává mzdový systém, ne součet sloupce Přesčas.</p>
+           <div class="table-wrap"><table>
+             <thead><tr><th>Jméno</th><th>Středisko</th>
+               <th class="num">Přesčas ${esc(monthShort(ui.month))}</th>
+               <th class="num">Δ ročně</th><th class="num">Rozdíl</th></tr></thead>
+             <tbody>${chk.examples.map((e) => `<tr>
+               <td class="name">${esc(e.row.n)}</td>
+               <td>${esc(e.row.s)}</td>
+               <td class="num">${hm(e.t)}</td>
+               <td class="num">${hm(e.dr)}</td>
+               <td class="num"><span class="tag crit">${e.diff > 0 ? '+' : '−'}${hm(Math.abs(e.diff))}</span></td>
+             </tr>`).join('')}</tbody>
+           </table></div>
+           <p class="hint" style="margin:12px 0 0">Ukázáno ${num(chk.examples.length)} největších rozdílů.</p>`}
+    </div>`
+
     el.innerHTML = `<div class="grid kpis">
       ${kpi('Nad ' + CFG.year.warn + ' h', num(s.year150), 'nutná dohoda o práci přesčas', s.year150 ? 'warn' : 'good')}
       ${kpi('Nad ' + CFG.year.crit + ' h', num(s.year250), 'zbývá do stropu méně než ' + (CFG.year.cap - CFG.year.crit) + ' h', s.year250 ? 'crit' : 'good')}
@@ -985,6 +1028,7 @@
         s.yearly.length ? `zbývá ${hm(Math.max(0, CFG.year.cap - s.yearly[0].r))}` : '',
         s.yearly.length ? level(s.yearly[0].r, { warn: CFG.year.warn, crit: CFG.year.crit }) : '')}
     </div>
+    ${check}
     <div class="card">
       <div class="card-head">
         <h2>Nejblíž ročnímu stropu</h2>

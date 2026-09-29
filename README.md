@@ -28,7 +28,7 @@ Vzorek pro testy a pro `build-public.mjs --demo` se generuje do
 | **Střediska** | Výběr střediska přes chipy, KPI střediska, TOP 5 lidí, seznam všech |
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
 | **Vývoj a srovnání** | Graf vývoje závodu, středisek i jednoho člověka přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
-| **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h |
+| **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h, kontrola ročního součtu |
 | **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
 | **Metodika** | Jak se počítá, legislativní kontext |
 
@@ -164,6 +164,26 @@ Dvě věci, na kterých tu záleží:
   smyslem pohledu je vidět, kolik z povolených hodin je vyčerpáno. Měsíční
   pohled naopak prahové čáry 40 a 60 h kreslí jen když spadají do rozsahu dat;
   u člověka, který se k nim nepřiblížil, by graf jen zplacatily.
+
+## Sedí roční součet na součet měsíců?
+
+Panel čte roční součet z mzdové složky „Přesčas roční součet“ — nedopočítává
+ho. Co do ní mzdový systém počítá, to panel měří proti prahům
+150 / 250 / 416 h. **Nemusí to být totéž co součet vykázaných přesčasů.**
+
+Sekce Roční limit proto při dvou a více měsících porovná u každého, kdo je
+v obou, přírůstek ročního součtu s jeho měsíčním přesčasem:
+
+* **Sedí u všech** → roční součet je kumulací téhož, prahy měří to, co čekáte.
+* **U některých ne** → mzdový systém do ročního součtu počítá něco užšího
+  (třeba jen nařízený přesčas). Panel vypíše největší rozdíly i se jmény,
+  ať je kde začít.
+
+Stejná kontrola je i v kartě jednoho člověka jako sloupec **Δ ročně** —
+přírůstek proti předchozímu měsíci. Rozdíl se zvýrazní červeně.
+
+Není to chyba panelu ani mezd; je to rozdíl významu, o kterém je potřeba
+vědět, protože na ročním součtu stojí hlídání zákonného stropu.
 
 ## Export do Excelu
 
