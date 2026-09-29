@@ -17,13 +17,24 @@
 
   const SECTIONS = [
     { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
-    { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska a jeho lidí.' },
+    { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska.' },
     { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
     { id: 'compare', label: 'Vývoj a srovnání', title: 'Vývoj a srovnání', sub: 'Jak se přesčas vyvíjí a co se změnilo mezi dvěma obdobími.' },
     { id: 'year', label: 'Roční limit', title: 'Roční limit', sub: 'Kdo se blíží zákonnému stropu 416 h/rok.' },
     { id: 'import', label: 'Import výkazu', title: 'Import výkazu', sub: 'Přidání dalšího měsíce ze Součtového výkazu.' },
     { id: 'method', label: 'Metodika', title: 'Metodika', sub: 'Jak se čísla počítají a co znamenají.' },
   ]
+
+  /* Veřejné vydání: agregáty za střediska, nic jmenného. Nastavuje ho
+     tools/build-public.mjs; interní panel běží bez něj. */
+  const PUBLIC = !!window.PP_PUBLIC
+
+  const PUBLIC_SECTIONS = ['overview', 'centers', 'compare', 'method']
+  if (PUBLIC) {
+    for (let i = SECTIONS.length - 1; i >= 0; i--) {
+      if (!PUBLIC_SECTIONS.includes(SECTIONS[i].id)) SECTIONS.splice(i, 1)
+    }
+  }
 
   const ui = {
     section: 'overview',
@@ -119,6 +130,15 @@
     if (!rec || !rec.demo) { box.hidden = true; box.innerHTML = ''; return }
     box.hidden = false
     box.className = 'demo-banner'
+    // Ve veřejném vydání není kam odkazovat — sekce Import tam neexistuje.
+    if (PUBLIC) {
+      box.innerHTML = `<span aria-hidden="true">⚠</span><div>
+        <strong>Ukázková data.</strong> Tenhle přehled je postavený z vygenerovaného
+        vzorku, ne ze skutečných výkazů. Čísla nic neznamenají.
+      </div>`
+      return
+    }
+
     // Jakmile jsou k dispozici reálná data, nabídne se rovnou schování vzorku —
     // míchat vymyšlené měsíce se skutečnými je v grafech vývoje zrádné.
     const canHide = PP.data.canHideDemo()
@@ -295,7 +315,7 @@
     }
     if (s.overCrit) {
       out.push(`${num(s.overCrit)} ${s.overCrit === 1 ? 'člověk překročil' : 'lidí překročilo'}
-        ${CFG.person.crit} h v jednom měsíci; maximum je ${hm(s.max)}.`)
+        ${CFG.person.crit} h v jednom měsíci` + (PUBLIC ? '.' : `; maximum je ${hm(s.max)}.`))
     }
     return out.length ? out : ['Za tento měsíc nejsou vykázané žádné přesčasové hodiny.']
   }
@@ -355,8 +375,9 @@
     { key: 'avg', label: 'Ø / osoba', num: true },
     { key: 'm', label: 'Do MEZD', num: true },
     { key: 'e', label: 'Evidence', num: true },
-    { key: 'max', label: 'Maximum', num: true },
-  ]
+    // Maximum je přesčas jednoho konkrétního člověka — ve veřejném vydání odpadá
+    { key: 'max', label: 'Maximum', num: true, internal: true },
+  ].filter((c) => !(c.internal && PUBLIC))
 
   function centerTable(s, cmp) {
     const dir = ui.sort.dir === 'asc' ? 1 : -1
@@ -386,7 +407,7 @@
             <td class="num">${hm(c.avg)}</td>
             <td class="num">${h1(c.m)}</td>
             <td class="num">${h1(c.e)}</td>
-            <td class="num">${hm(c.max)}</td>
+            ${PUBLIC ? '' : `<td class="num">${hm(c.max)}</td>`}
             ${cmp ? `<td class="num">${d && d.dAvg != null ? delta(d.dAvg) : '<span class="tag">nové</span>'}</td>` : ''}
           </tr>`
         }).join('')}</tbody>
@@ -428,7 +449,7 @@
     const share = s.total ? c.total / s.total : 0
     const kpis = `<div class="grid kpis">
       ${kpi('Přesčas celkem', h1(c.total) + ' h', `${pct(share)} přesčasu závodu`)}
-      ${kpi('Lidí s přesčasem', num(c.people), `maximum ${hm(c.max)}`)}
+      ${kpi('Lidí s přesčasem', num(c.people), PUBLIC ? 'v tomto měsíci' : `maximum ${hm(c.max)}`)}
       ${kpi('Ø na osobu', hm(c.avg),
         d && d.dAvg != null ? `proti ${esc(monthShort(prevK))} ${delta(d.dAvg)}` : 'práh ' + CFG.center.warn + ' / ' + CFG.center.crit + ' h',
         c.level)}
@@ -455,9 +476,9 @@
       </table></div>
     </div>`
 
-    // TOP 5 a plný seznam pod sebou — vedle sebe by se sedmisloupcová tabulka ořízla
-    el.innerHTML = chips + kpis + topCard + listCard
-    bindPersonLinks('#panel-centers')
+    // Ve veřejném vydání odpadá všechno jmenné — zůstanou jen čísla za středisko.
+    el.innerHTML = PUBLIC ? chips + kpis : chips + kpis + topCard + listCard
+    if (!PUBLIC) bindPersonLinks('#panel-centers')
     $$('#panel-centers .chip').forEach((b) => b.addEventListener('click', () => {
       ui.center = b.dataset.center
       renderCenters()
@@ -928,11 +949,15 @@
       </div>
     </div>`
 
-    el.innerHTML = trendCards() + personCard() + picker + kpis + table + movers +
-      changesCard(cmp, ui.cmpA, ui.cmpB)
+    el.innerHTML = PUBLIC
+      ? trendCards() + picker + kpis + table
+      : trendCards() + personCard() + picker + kpis + table + movers +
+        changesCard(cmp, ui.cmpA, ui.cmpB)
     drawTrends()
-    if (ui.person) drawPerson(PP.personHistory(ui.person))
-    bindPersonCard()
+    if (!PUBLIC) {
+      if (ui.person) drawPerson(PP.personHistory(ui.person))
+      bindPersonCard()
+    }
     PP.watchCharts(() => {
       drawTrends()
       if (ui.person) drawPerson(PP.personHistory(ui.person))
@@ -1269,7 +1294,9 @@
       ui.center = null
       render()
     })
-    $('#export-btn').addEventListener('click', doExport)
+    const exportBtn = $('#export-btn')
+    if (PUBLIC) exportBtn.hidden = true
+    else exportBtn.addEventListener('click', doExport)
     window.addEventListener('hashchange', () => {
       const id = location.hash.slice(1)
       if (id && id !== ui.section) go(id)
