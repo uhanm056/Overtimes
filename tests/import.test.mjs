@@ -74,11 +74,18 @@ const res = await page.evaluate(() => {
         people: m.people,
         total: Math.round(st.total * 100) / 100,
         novakovaE: nov.e,
+        novakovaM: nov.m,
         novakovaR: nov.r,
         novakovaT: nov.t,
       }
     })(),
     months: window.PP.data.keys().join(','),
+    comps: rec.comps,
+    otherComps: rec.otherComps,
+    // rozpad Novákové tak, jak ho uvidí detail člověka
+    novakovaComps: window.PP.personHistory(String(byName('Nováková Petra, Ing.').o))
+      .points.find((x) => x.key === '2026-09').comps
+      .map((c) => ({ ...c, bucket: window.PP.componentBucket(c.name) })),
   }
 })
 
@@ -95,6 +102,21 @@ check('Šimek součet (30:00 + -30:00)', res.simekT, 0)
 check('Šimek do MEZD', res.simekM, 30)
 check('diakritika z windows-1250', res.diacritics, 'G463 Prefix')
 
+console.log('\nRozpad na mzdové složky:')
+check('započítané složky', res.comps.join(' | '),
+  'Přesčas do MEZD | Přesčas evidence | Přesčas roční součet')
+check('nezapočítané složky', res.otherComps.map((c) => `${c[0]}×${c[1]}`).join(' | '),
+  'Základní mzda×5 | Dovolená×1')
+// řazeno podle velikosti, ať je nahoře to, co součet tvoří nejvíc
+check('Nováková — složky', res.novakovaComps.map((c) => c.name).join(' | '),
+  'Přesčas roční součet | Přesčas do MEZD | Přesčas evidence')
+check('Nováková — hodiny', res.novakovaComps.map((c) => c.h).join(' | '), '188.33 | 41 | -6.5')
+check('Nováková — řádků na složku', res.novakovaComps.map((c) => c.rows).join(' | '), '1 | 1 | 1')
+// do měsíčního přesčasu patří jen MEZD + evidence, roční součet ne
+check('Nováková — zařazení složek', res.novakovaComps.map((c) => c.bucket).join(' | '), 'r | m | e')
+check('Nováková — do měsíce se počítá jen MEZD a evidence',
+  res.novakovaComps.filter((c) => c.bucket !== 'r').reduce((a, c) => a + c.h, 0), 34.5)
+
 console.log('\nCSV (oddělovač ;, desetinné hodiny s čárkou):')
 check('lidí s přesčasem', res.csvRows, 5)
 check('celkem hodin', res.csvTotal, 140.33)
@@ -106,6 +128,8 @@ check('celkem hodin', res.merged.total, 140.33)
 check('Nováková evidence (-6:30 z navazujícího řádku)', res.merged.novakovaE, -6.5)
 check('Nováková roční součet (z navazujícího řádku)', res.merged.novakovaR, 188.33)
 check('Nováková součet', res.merged.novakovaT, 34.5)
+// kdyby se "Celkem přesčas do MEZD" započetlo, bylo by tu 75:30 místo 34:30
+check('Nováková do MEZD se nezdvojila mezisoučtem', res.merged.novakovaM, 41)
 
 console.log('\nSloučení měsíců:')
 // naimportované měsíce se vsunou na správné místo mezi vestavěné, řazeno od nejnovějšího
@@ -113,6 +137,44 @@ const months = res.months.split(',')
 check('nejnovější čtyři', months.slice(0, 4).join(','), '2026-11,2026-10,2026-09,2026-08')
 check('nejstarší je vestavěný leden', months[months.length - 1], '2026-01')
 check('seřazeno sestupně', String(months.join(',') === [...months].sort().reverse().join(',')), 'true')
+
+/* Rozpad v UI — kvůli tomuhle to celé je: u člověka musí jít kliknutím
+   na měsíc zobrazit řádky výkazu, ze kterých se jeho součet sečetl. */
+await page.click('#nav button[data-section="compare"]')
+await page.fill('#person-search', '20102')
+await page.waitForSelector('[data-pick="20102"]')
+await page.click('[data-pick="20102"]')
+await page.waitForSelector('[data-pbreak="2026-09"]')
+const zavreno = await page.$$eval('tr.breakdown-row', (r) => r.length)
+await page.click('[data-pbreak="2026-09"]')
+await page.waitForSelector('tr.breakdown-row')
+const rozpad = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('tr.breakdown-row table.mini tbody tr')]
+  return {
+    pocet: rows.length,
+    slozky: rows.map((r) => r.cells[0].textContent.trim()).join(' | '),
+    hodiny: rows.map((r) => r.cells[1].textContent.trim()).join(' | '),
+    kam: rows.map((r) => r.cells[3].textContent.trim()).join(' | '),
+    soucet: document.querySelector('tr.breakdown-row table.mini tfoot td.num').textContent.trim(),
+  }
+})
+
+console.log('\nRozpad v detailu člověka:')
+check('zavřený rozpad se nekreslí', zavreno, 0)
+check('rozbalí se tři složky', rozpad.pocet, 3)
+check('složky', rozpad.slozky, 'Přesčas roční součet | Přesčas do MEZD | Přesčas evidence')
+// hm() sází typografické minus U+2212
+check('hodiny v h:mm', rozpad.hodiny, '188:20 | 41:00 | \u22126:30')
+check('roční součet je označený jako nepočítaný do měsíce', rozpad.kam,
+  'jen roční součet | přesčasu za měsíc | přesčasu za měsíc')
+check('patička ukazuje měsíční přesčas', rozpad.soucet, '34:30')
+
+await page.click('[data-pbreak="2026-09"]')
+await page.waitForFunction(() => document.querySelectorAll('tr.breakdown-row').length === 0)
+check('druhé kliknutí rozpad zavře', await page.$$eval('tr.breakdown-row', (r) => r.length), 0)
+
+await page.click('#nav button[data-section="import"]')
+await page.waitForSelector('[data-remove="2026-09"]')
 
 // smazání importu vrátí panel do původního stavu
 await page.click('[data-remove="2026-09"]').catch(() => {})

@@ -92,6 +92,9 @@ function mergedReport() {
     rows.push(['', '', '', 'Přesčas evidence', p.e])
     rows.push(['', '', '', 'Přesčas roční součet', p.r])
     rows.push(['', '', '', 'Základní mzda', '168:00'])
+    // past: mezisoučet pojmenovaný jako přesčasová složka. Kdyby se započetl,
+    // měl by člověk hodiny dvakrát — přesně tak vznikne nesmyslně vysoký měsíc.
+    rows.push(['', '', '', 'Celkem přesčas do MEZD', p.m])
   }
   rows.push([NOISE.n, NOISE.o, NOISE.s, NOISE.c, NOISE.h])
   rows.push(['Celkem', '', '', '', '740:00'])

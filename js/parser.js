@@ -7,7 +7,13 @@
  *   • .csv / .txt                          → oddělovač ; , nebo tab
  *
  * Výstupem je záznam měsíce v datovém modelu panelu:
- *   { period, rawPeriod, people, rows: [{ n, o, s, m, e, t, r }], importedAt, file }
+ *   { period, rawPeriod, people, comps, rows: [{ n, o, s, m, e, t, r, c }], importedAt, file }
+ *
+ * `comps` je seznam názvů započítaných mzdových složek, `c` je rozpad člověka na ně
+ * jako trojice [index do comps, hodiny, počet řádků výkazu]. Díky tomu jde u každého
+ * ukázat, z čeho přesně jeho součet vznikl, aniž by se v každém řádku opakoval text.
+ * `otherComps` je naopak soupis složek, které parser nezapočítal — kdyby mezi nimi
+ * byla složka, která tam patřit má, je to na importu vidět.
  */
 window.PP = window.PP || {}
 
@@ -213,9 +219,16 @@ window.PP = window.PP || {}
     return isFinite(num) ? sign * num : 0
   }
 
+  /** Souhrnný řádek — "Celkem", "Součet za středisko", "Mezisoučet". */
+  const SUMMARY = /^(celkem|soucet|mezisoucet|total)\b/
+
   /** Zařazení mzdové složky: 'm' = do MEZD, 'e' = evidence, 'r' = roční součet, null = nezajímá nás. */
   function classify(component) {
     const c = PP.fold(component)
+    // Sestavy tisknou mezisoučty i do sloupce mzdové složky ("Celkem za osobu").
+    // Kdyby se takový řádek jmenoval "Celkem přesčas do MEZD", sečetl by se
+    // k jednotlivým složkám podruhé a člověku by hodiny vyskočily na dvojnásobek.
+    if (SUMMARY.test(c)) return null
     if (!c.includes('prescas')) return null
     if (c.includes('rocni') || c.includes('soucet')) return 'r'
     if (c.includes('eviden') || c.includes('konto')) return 'e'
@@ -243,6 +256,9 @@ window.PP = window.PP || {}
 
     const byPerson = new Map()      // osobní číslo|středisko → agregovaný řádek
     const everyone = new Set()      // všichni lidé ve výkazu, i bez přesčasu
+    const compNames = []            // započítané mzdové složky v pořadí prvního výskytu
+    const compIndex = new Map()
+    const otherComps = new Map()    // nezapočítané složky → kolik jich ve výkazu bylo
     let skipped = 0
 
     // Sestavy z mezd tisknou jméno, osobní číslo a středisko často jen na prvním
@@ -259,7 +275,7 @@ window.PP = window.PP || {}
       const center = String(row[cols.center] || '').trim()
 
       // souhrnné řádky "Celkem …" ukončují skupinu, identita se dál nedědí
-      if (/^(celkem|soucet|mezisoucet)/.test(PP.fold(name))) { last = null; continue }
+      if (SUMMARY.test(PP.fold(name))) { last = null; continue }
 
       let who
       if (!name && !id) {
@@ -279,8 +295,15 @@ window.PP = window.PP || {}
       }
       if (!who.o && !who.n) continue
 
-      const bucket = classify(row[cols.component])
-      if (!bucket) { skipped++; continue }
+      const component = String(row[cols.component] || '').trim()
+      const bucket = classify(component)
+      if (!bucket) {
+        skipped++
+        if (component && !SUMMARY.test(PP.fold(component))) {
+          otherComps.set(component, (otherComps.get(component) || 0) + 1)
+        }
+        continue
+      }
 
       const key = (who.o || who.n) + '|' + who.s
       const hours = parseHours(row[cols.hours])
@@ -290,10 +313,18 @@ window.PP = window.PP || {}
           n: who.n,
           o: /^\d+$/.test(String(who.o)) ? Number(who.o) : who.o,
           s: who.s, m: 0, e: 0, t: 0, r: 0,
+          c: new Map(),
         }
         byPerson.set(key, rec)
       }
       rec[bucket] += hours
+
+      let ci = compIndex.get(component)
+      if (ci == null) { ci = compNames.length; compNames.push(component); compIndex.set(component, ci) }
+      const cur = rec.c.get(ci) || { h: 0, rows: 0 }
+      cur.h += hours
+      cur.rows++
+      rec.c.set(ci, cur)
     }
 
     const round2 = (v) => Math.round(v * 100) / 100
@@ -303,6 +334,10 @@ window.PP = window.PP || {}
         rec.e = round2(rec.e)
         rec.r = round2(rec.r)
         rec.t = round2(rec.m + rec.e)
+        // [index složky, hodiny, kolik řádků výkazu se sečetlo]
+        rec.c = Array.from(rec.c.entries())
+          .map(([i, v]) => [i, round2(v.h), v.rows])
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
         return rec
       })
       .sort((a, b) => b.t - a.t || String(a.n).localeCompare(String(b.n), 'cs'))
@@ -321,12 +356,17 @@ window.PP = window.PP || {}
         // pojistka pro výkazy bez osobních čísel — stav nesmí být menší
         // než počet lidí, kteří v něm mají přesčas
         people: Math.max(everyone.size, rows.length),
+        comps: compNames,
+        otherComps: Array.from(otherComps.entries()).sort((a, b) => b[1] - a[1]),
         rows,
         importedAt: new Date().toISOString(),
         file: file.name,
       },
     }
   }
+
+  // zařazení složky potřebuje i UI, aby u rozpadu ukázalo, kam která patří
+  PP.componentBucket = classify
 
   // sdíleno s exportem — SheetJS se stahuje jen jednou, na požádání
   PP.loadSheetJS = loadSheetJS
