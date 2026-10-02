@@ -48,6 +48,7 @@
     topOpen: {},         // rozbalená střediska v TOP přehledu
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
+    personOpen: {},      // rozbalené měsíce v detailu člověka (rozpad složek)
     personQuery: '',
     cmpA: null,          // starší z porovnávaných měsíců
     cmpB: null,          // novější
@@ -787,6 +788,40 @@
     })
   }
 
+  /** Rozpad měsíce na mzdové složky — ukazuje, z čeho přesně součet vznikl. */
+  function breakdownRow(x) {
+    const list = x.comps || []
+    return `<tr class="breakdown-row"><td colspan="7">
+      <div class="breakdown">
+        <h4>Z čeho se ${esc(monthName(x.key))} skládá</h4>
+        <table class="mini"><thead><tr>
+          <th>Mzdová složka</th><th class="num">Hodiny</th>
+          <th class="num">Řádků</th><th>Počítá se do</th>
+        </tr></thead><tbody>
+        ${list.map((c) => {
+          const where = PP.componentBucket(c.name)
+          return `<tr>
+            <td>${esc(c.name)}</td>
+            <td class="num">${hm(c.h)}</td>
+            <td class="num">${num(c.rows)}</td>
+            <td>${where === 'r'
+              ? '<span class="hint">jen roční součet</span>'
+              : `<strong>přesčasu za měsíc</strong>`}</td>
+          </tr>`
+        }).join('')}
+        </tbody><tfoot><tr>
+          <td>Přesčas za měsíc = do MEZD + evidence</td>
+          <td class="num"><strong>${hm(x.t)}</strong></td>
+          <td class="num"></td><td></td>
+        </tr></tfoot></table>
+        ${list.some((c) => c.rows > 1)
+          ? `<p class="hint" style="margin:8px 0 0">Složka, u které je víc než jeden řádek,
+               byla ve výkazu vícekrát a hodiny se sečetly.</p>`
+          : ''}
+      </div>
+    </td></tr>`
+  }
+
   function personCard() {
     const q = fold(ui.personQuery)
     const hist = ui.person ? PP.personHistory(ui.person) : null
@@ -825,8 +860,14 @@
               <td class="num">${x.dr == null ? '—' : hm(x.dr)}</td></tr>`
           }
           const lvl = level(x.t, CFG.person)
+          const open = !!ui.personOpen[x.key]
+          const label = x.comps && x.comps.length
+            ? `<button type="button" class="link-plain" data-pbreak="${esc(x.key)}"
+                 aria-expanded="${open}" title="Ukázat, z jakých mzdových složek se součet skládá"
+                 >${esc(monthName(x.key))} <span class="caret">${open ? '▾' : '▸'}</span></button>`
+            : esc(monthName(x.key))
           return `<tr>
-            <td>${esc(monthName(x.key))}</td>
+            <td>${label}</td>
             <td class="num">${hm(x.m)}</td>
             <td class="num">${hm(x.e)}</td>
             <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
@@ -835,11 +876,15 @@
             <td class="num">${x.dr == null ? '—'
               : x.drMatches ? hm(x.dr)
               : `<span class="tag crit" title="Roční součet přibyl o jinou hodnotu, než je měsíční přesčas">${hm(x.dr)}</span>`}</td>
-          </tr>`
+          </tr>${open ? breakdownRow(x) : ''}`
         }).join('')}</tbody>
       </table></div>
 
       <p class="hint" style="margin:14px 0 0">
+        Kliknutím na měsíc se rozbalí <strong>rozpad na mzdové složky</strong> — přesně ty
+        řádky výkazu, které se do součtu sečetly.
+      </p>
+      <p class="hint" style="margin:6px 0 0">
         <strong>Δ ročně</strong> je přírůstek ročního součtu proti předchozímu měsíci.
         Měl by se rovnat sloupci Přesčas. Když se liší (červeně), počítá mzdový systém
         do ročního součtu něco jiného než součet vykázaných přesčasů.
@@ -890,12 +935,19 @@
     $$('#panel-compare [data-pick]').forEach((b) => b.addEventListener('click', () => {
       ui.person = b.dataset.pick
       ui.personQuery = ''
+      ui.personOpen = {}
       renderCompare()
     }))
     const clear = $('#person-clear')
-    if (clear) clear.addEventListener('click', () => { ui.person = null; renderCompare() })
+    if (clear) clear.addEventListener('click', () => { ui.person = null; ui.personOpen = {}; renderCompare() })
     $$('#panel-compare [data-pmetric]').forEach((b) => b.addEventListener('click', () => {
       ui.personMetric = b.dataset.pmetric
+      renderCompare()
+    }))
+    $$('#panel-compare [data-pbreak]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.pbreak
+      if (ui.personOpen[k]) delete ui.personOpen[k]
+      else ui.personOpen[k] = true
       renderCompare()
     }))
   }
@@ -1213,6 +1265,21 @@
     return entry
   }
 
+  /* Soupis mzdových složek za naimportovaný měsíc. Je to první věc, podle které
+     se pozná, že se do přesčasu počítá něco, co tam nepatří — nebo naopak nepočítá
+     složka, která tam patřit má. */
+  function compSummary(record) {
+    const used = record.comps || []
+    const other = record.otherComps || []
+    if (!used.length) return ''
+    return `<span class="hint comp-summary">
+      Započítáno: ${used.map((c) => `<strong>${esc(c)}</strong>`).join(', ')}.
+      ${other.length
+        ? `Nezapočítáno: ${other.slice(0, 12).map((c) => esc(c[0])).join(', ')}${other.length > 12 ? ' a další' : ''}.`
+        : ''}
+    </span>`
+  }
+
   async function handleFiles(files) {
     for (const file of files) {
       const busy = log('busy', `Zpracovávám <strong>${esc(file.name)}</strong>…`)
@@ -1224,7 +1291,8 @@
         busy.kind = 'ok'
         busy.html = `<strong>${esc(monthName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
           ${num(st.withOvertime)} lidí s přesčasem, ${h1(st.total)} h, ${num(record.people)} osob ve výkazu.
-          <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>`
+          <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>
+          ${compSummary(record)}`
         ui.month = key
       } catch (err) {
         busy.kind = 'err'

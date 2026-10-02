@@ -445,6 +445,27 @@ mark { background: var(--accent-soft); color: inherit; border-radius: 3px; paddi
 
 tr.muted-row td { color: var(--text-3); }
 
+/* ---------- rozpad měsíce na mzdové složky ---------- */
+.link-plain {
+  appearance: none; border: 0; background: transparent; padding: 0;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+  display: inline-flex; align-items: baseline; gap: 6px;
+}
+.link-plain:hover { color: var(--accent); }
+.link-plain .caret { color: var(--text-3); font-size: 11px; }
+.link-plain:hover .caret { color: var(--accent); }
+
+tr.breakdown-row > td { padding: 0 0 14px; background: var(--surface-2); }
+.breakdown { padding: 14px 16px 2px; }
+.breakdown h4 {
+  margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-3);
+}
+table.mini { width: auto; min-width: min(560px, 100%); font-size: 13px; }
+table.mini th, table.mini td { padding: 6px 14px 6px 0; border-bottom: 1px solid var(--line); }
+table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color: var(--text-2); }
+.comp-summary { display: block; margin-top: 2px; }
+
 /* ---------- srovnání měsíců ---------- */
 .cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .cmp-picker label { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
@@ -571,7 +592,7 @@ tr.muted-row td { color: var(--text-3); }
 }
 </style>
 <meta name="robots" content="noindex">
-<meta name="generator" content="build-public.mjs · 2026-09-29">
+<meta name="generator" content="build-public.mjs · 2026-10-02">
 </head>
 <body>
 
@@ -866,7 +887,13 @@ window.PP = window.PP || {}
  *   • .csv / .txt                          → oddělovač ; , nebo tab
  *
  * Výstupem je záznam měsíce v datovém modelu panelu:
- *   { period, rawPeriod, people, rows: [{ n, o, s, m, e, t, r }], importedAt, file }
+ *   { period, rawPeriod, people, comps, rows: [{ n, o, s, m, e, t, r, c }], importedAt, file }
+ *
+ * `comps` je seznam názvů započítaných mzdových složek, `c` je rozpad člověka na ně
+ * jako trojice [index do comps, hodiny, počet řádků výkazu]. Díky tomu jde u každého
+ * ukázat, z čeho přesně jeho součet vznikl, aniž by se v každém řádku opakoval text.
+ * `otherComps` je naopak soupis složek, které parser nezapočítal — kdyby mezi nimi
+ * byla složka, která tam patřit má, je to na importu vidět.
  */
 window.PP = window.PP || {}
 
@@ -1072,9 +1099,16 @@ window.PP = window.PP || {}
     return isFinite(num) ? sign * num : 0
   }
 
+  /** Souhrnný řádek — "Celkem", "Součet za středisko", "Mezisoučet". */
+  const SUMMARY = /^(celkem|soucet|mezisoucet|total)\b/
+
   /** Zařazení mzdové složky: 'm' = do MEZD, 'e' = evidence, 'r' = roční součet, null = nezajímá nás. */
   function classify(component) {
     const c = PP.fold(component)
+    // Sestavy tisknou mezisoučty i do sloupce mzdové složky ("Celkem za osobu").
+    // Kdyby se takový řádek jmenoval "Celkem přesčas do MEZD", sečetl by se
+    // k jednotlivým složkám podruhé a člověku by hodiny vyskočily na dvojnásobek.
+    if (SUMMARY.test(c)) return null
     if (!c.includes('prescas')) return null
     if (c.includes('rocni') || c.includes('soucet')) return 'r'
     if (c.includes('eviden') || c.includes('konto')) return 'e'
@@ -1102,6 +1136,9 @@ window.PP = window.PP || {}
 
     const byPerson = new Map()      // osobní číslo|středisko → agregovaný řádek
     const everyone = new Set()      // všichni lidé ve výkazu, i bez přesčasu
+    const compNames = []            // započítané mzdové složky v pořadí prvního výskytu
+    const compIndex = new Map()
+    const otherComps = new Map()    // nezapočítané složky → kolik jich ve výkazu bylo
     let skipped = 0
 
     // Sestavy z mezd tisknou jméno, osobní číslo a středisko často jen na prvním
@@ -1118,7 +1155,7 @@ window.PP = window.PP || {}
       const center = String(row[cols.center] || '').trim()
 
       // souhrnné řádky "Celkem …" ukončují skupinu, identita se dál nedědí
-      if (/^(celkem|soucet|mezisoucet)/.test(PP.fold(name))) { last = null; continue }
+      if (SUMMARY.test(PP.fold(name))) { last = null; continue }
 
       let who
       if (!name && !id) {
@@ -1138,8 +1175,15 @@ window.PP = window.PP || {}
       }
       if (!who.o && !who.n) continue
 
-      const bucket = classify(row[cols.component])
-      if (!bucket) { skipped++; continue }
+      const component = String(row[cols.component] || '').trim()
+      const bucket = classify(component)
+      if (!bucket) {
+        skipped++
+        if (component && !SUMMARY.test(PP.fold(component))) {
+          otherComps.set(component, (otherComps.get(component) || 0) + 1)
+        }
+        continue
+      }
 
       const key = (who.o || who.n) + '|' + who.s
       const hours = parseHours(row[cols.hours])
@@ -1149,10 +1193,18 @@ window.PP = window.PP || {}
           n: who.n,
           o: /^\d+$/.test(String(who.o)) ? Number(who.o) : who.o,
           s: who.s, m: 0, e: 0, t: 0, r: 0,
+          c: new Map(),
         }
         byPerson.set(key, rec)
       }
       rec[bucket] += hours
+
+      let ci = compIndex.get(component)
+      if (ci == null) { ci = compNames.length; compNames.push(component); compIndex.set(component, ci) }
+      const cur = rec.c.get(ci) || { h: 0, rows: 0 }
+      cur.h += hours
+      cur.rows++
+      rec.c.set(ci, cur)
     }
 
     const round2 = (v) => Math.round(v * 100) / 100
@@ -1162,6 +1214,10 @@ window.PP = window.PP || {}
         rec.e = round2(rec.e)
         rec.r = round2(rec.r)
         rec.t = round2(rec.m + rec.e)
+        // [index složky, hodiny, kolik řádků výkazu se sečetlo]
+        rec.c = Array.from(rec.c.entries())
+          .map(([i, v]) => [i, round2(v.h), v.rows])
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
         return rec
       })
       .sort((a, b) => b.t - a.t || String(a.n).localeCompare(String(b.n), 'cs'))
@@ -1180,12 +1236,17 @@ window.PP = window.PP || {}
         // pojistka pro výkazy bez osobních čísel — stav nesmí být menší
         // než počet lidí, kteří v něm mají přesčas
         people: Math.max(everyone.size, rows.length),
+        comps: compNames,
+        otherComps: Array.from(otherComps.entries()).sort((a, b) => b[1] - a[1]),
         rows,
         importedAt: new Date().toISOString(),
         file: file.name,
       },
     }
   }
+
+  // zařazení složky potřebuje i UI, aby u rozpadu ukázalo, kam která patří
+  PP.componentBucket = classify
 
   // sdíleno s exportem — SheetJS se stahuje jen jednou, na požádání
   PP.loadSheetJS = loadSheetJS
@@ -1836,6 +1897,10 @@ window.PP = window.PP || {}
         r: row ? row.r : (points.length ? lastR : null),
         rank: row ? stats.ranking.indexOf(row) + 1 : null,
         of: stats.withOvertime,
+        // rozpad na mzdové složky — ať je vidět, z čeho se součet skládá
+        comps: row && row.c && rec.comps
+          ? row.c.map(([i, h, n]) => ({ name: rec.comps[i] || '(bez názvu)', h, rows: n }))
+          : null,
         center: row ? stats.centers.find((c) => c.name === row.s) : null,
       })
     }
@@ -1997,6 +2062,7 @@ window.PP = window.PP || {}
     topOpen: {},         // rozbalená střediska v TOP přehledu
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
+    personOpen: {},      // rozbalené měsíce v detailu člověka (rozpad složek)
     personQuery: '',
     cmpA: null,          // starší z porovnávaných měsíců
     cmpB: null,          // novější
@@ -2736,6 +2802,40 @@ window.PP = window.PP || {}
     })
   }
 
+  /** Rozpad měsíce na mzdové složky — ukazuje, z čeho přesně součet vznikl. */
+  function breakdownRow(x) {
+    const list = x.comps || []
+    return `<tr class="breakdown-row"><td colspan="7">
+      <div class="breakdown">
+        <h4>Z čeho se ${esc(monthName(x.key))} skládá</h4>
+        <table class="mini"><thead><tr>
+          <th>Mzdová složka</th><th class="num">Hodiny</th>
+          <th class="num">Řádků</th><th>Počítá se do</th>
+        </tr></thead><tbody>
+        ${list.map((c) => {
+          const where = PP.componentBucket(c.name)
+          return `<tr>
+            <td>${esc(c.name)}</td>
+            <td class="num">${hm(c.h)}</td>
+            <td class="num">${num(c.rows)}</td>
+            <td>${where === 'r'
+              ? '<span class="hint">jen roční součet</span>'
+              : `<strong>přesčasu za měsíc</strong>`}</td>
+          </tr>`
+        }).join('')}
+        </tbody><tfoot><tr>
+          <td>Přesčas za měsíc = do MEZD + evidence</td>
+          <td class="num"><strong>${hm(x.t)}</strong></td>
+          <td class="num"></td><td></td>
+        </tr></tfoot></table>
+        ${list.some((c) => c.rows > 1)
+          ? `<p class="hint" style="margin:8px 0 0">Složka, u které je víc než jeden řádek,
+               byla ve výkazu vícekrát a hodiny se sečetly.</p>`
+          : ''}
+      </div>
+    </td></tr>`
+  }
+
   function personCard() {
     const q = fold(ui.personQuery)
     const hist = ui.person ? PP.personHistory(ui.person) : null
@@ -2774,8 +2874,14 @@ window.PP = window.PP || {}
               <td class="num">${x.dr == null ? '—' : hm(x.dr)}</td></tr>`
           }
           const lvl = level(x.t, CFG.person)
+          const open = !!ui.personOpen[x.key]
+          const label = x.comps && x.comps.length
+            ? `<button type="button" class="link-plain" data-pbreak="${esc(x.key)}"
+                 aria-expanded="${open}" title="Ukázat, z jakých mzdových složek se součet skládá"
+                 >${esc(monthName(x.key))} <span class="caret">${open ? '▾' : '▸'}</span></button>`
+            : esc(monthName(x.key))
           return `<tr>
-            <td>${esc(monthName(x.key))}</td>
+            <td>${label}</td>
             <td class="num">${hm(x.m)}</td>
             <td class="num">${hm(x.e)}</td>
             <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
@@ -2784,11 +2890,15 @@ window.PP = window.PP || {}
             <td class="num">${x.dr == null ? '—'
               : x.drMatches ? hm(x.dr)
               : `<span class="tag crit" title="Roční součet přibyl o jinou hodnotu, než je měsíční přesčas">${hm(x.dr)}</span>`}</td>
-          </tr>`
+          </tr>${open ? breakdownRow(x) : ''}`
         }).join('')}</tbody>
       </table></div>
 
       <p class="hint" style="margin:14px 0 0">
+        Kliknutím na měsíc se rozbalí <strong>rozpad na mzdové složky</strong> — přesně ty
+        řádky výkazu, které se do součtu sečetly.
+      </p>
+      <p class="hint" style="margin:6px 0 0">
         <strong>Δ ročně</strong> je přírůstek ročního součtu proti předchozímu měsíci.
         Měl by se rovnat sloupci Přesčas. Když se liší (červeně), počítá mzdový systém
         do ročního součtu něco jiného než součet vykázaných přesčasů.
@@ -2839,12 +2949,19 @@ window.PP = window.PP || {}
     $$('#panel-compare [data-pick]').forEach((b) => b.addEventListener('click', () => {
       ui.person = b.dataset.pick
       ui.personQuery = ''
+      ui.personOpen = {}
       renderCompare()
     }))
     const clear = $('#person-clear')
-    if (clear) clear.addEventListener('click', () => { ui.person = null; renderCompare() })
+    if (clear) clear.addEventListener('click', () => { ui.person = null; ui.personOpen = {}; renderCompare() })
     $$('#panel-compare [data-pmetric]').forEach((b) => b.addEventListener('click', () => {
       ui.personMetric = b.dataset.pmetric
+      renderCompare()
+    }))
+    $$('#panel-compare [data-pbreak]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.pbreak
+      if (ui.personOpen[k]) delete ui.personOpen[k]
+      else ui.personOpen[k] = true
       renderCompare()
     }))
   }
@@ -3162,6 +3279,21 @@ window.PP = window.PP || {}
     return entry
   }
 
+  /* Soupis mzdových složek za naimportovaný měsíc. Je to první věc, podle které
+     se pozná, že se do přesčasu počítá něco, co tam nepatří — nebo naopak nepočítá
+     složka, která tam patřit má. */
+  function compSummary(record) {
+    const used = record.comps || []
+    const other = record.otherComps || []
+    if (!used.length) return ''
+    return `<span class="hint comp-summary">
+      Započítáno: ${used.map((c) => `<strong>${esc(c)}</strong>`).join(', ')}.
+      ${other.length
+        ? `Nezapočítáno: ${other.slice(0, 12).map((c) => esc(c[0])).join(', ')}${other.length > 12 ? ' a další' : ''}.`
+        : ''}
+    </span>`
+  }
+
   async function handleFiles(files) {
     for (const file of files) {
       const busy = log('busy', `Zpracovávám <strong>${esc(file.name)}</strong>…`)
@@ -3173,7 +3305,8 @@ window.PP = window.PP || {}
         busy.kind = 'ok'
         busy.html = `<strong>${esc(monthName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
           ${num(st.withOvertime)} lidí s přesčasem, ${h1(st.total)} h, ${num(record.people)} osob ve výkazu.
-          <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>`
+          <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>
+          ${compSummary(record)}`
         ui.month = key
       } catch (err) {
         busy.kind = 'err'

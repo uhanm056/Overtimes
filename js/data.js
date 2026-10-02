@@ -225,6 +225,10 @@ window.PP = window.PP || {}
         r: row ? row.r : (points.length ? lastR : null),
         rank: row ? stats.ranking.indexOf(row) + 1 : null,
         of: stats.withOvertime,
+        // rozpad na mzdové složky — ať je vidět, z čeho se součet skládá
+        comps: row && row.c && rec.comps
+          ? row.c.map(([i, h, n]) => ({ name: rec.comps[i] || '(bez názvu)', h, rows: n }))
+          : null,
         center: row ? stats.centers.find((c) => c.name === row.s) : null,
       })
     }
