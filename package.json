@@ -9,7 +9,7 @@
     "start": "npx --yes http-server . -p 8080 -c-1 -o",
     "data": "node tools/generate-demo-data.mjs",
     "fixtures": "node tests/make-fixtures.mjs",
-    "test": "node tests/make-fixtures.mjs && node tests/import.test.mjs && node tests/export.test.mjs && node tests/trend.test.mjs && node tests/pubgen.test.mjs && node tools/build-public.mjs --demo && node tests/public.test.mjs",
+    "test": "node tests/make-fixtures.mjs && node tests/import.test.mjs && node tests/export.test.mjs && node tests/trend.test.mjs && node tests/pubgen.test.mjs && node tests/remote.test.mjs && node tools/build-public.mjs --demo && node tests/public.test.mjs",
     "public": "node tools/build-public.mjs"
   },
   "devDependencies": {
