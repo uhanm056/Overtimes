@@ -466,6 +466,14 @@ table.mini th, table.mini td { padding: 6px 14px 6px 0; border-bottom: 1px solid
 table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color: var(--text-2); }
 .comp-summary { display: block; margin-top: 2px; }
 
+/* ---------- veřejná verze ---------- */
+.pub-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pub-log { margin: 14px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; line-height: 1.75; }
+.pub-err {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--crit-soft); color: var(--crit); font-size: 13px;
+}
+
 /* ---------- srovnání měsíců ---------- */
 .cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .cmp-picker label { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
@@ -2010,6 +2018,213 @@ window.PP = window.PP || {}
 })(window.PP)
 </script>
 
+<!-- js/public.js -->
+<script>
+/* Veřejné vydání panelu — agregace, potlačení malých středisek a sestavení
+ * souboru pro GitHub Pages.
+ *
+ * Běží v prohlížeči, protože tam už data jsou. Milan tak nepotřebuje Node ani
+ * Playwright: naimportuje výkazy do panelu, klikne na Vygenerovat a dostane
+ * hotový index.html, který jen nahraje do repozitáře.
+ *
+ * Tentýž kód používá i tools/build-public.mjs, aby existovala jedna jediná
+ * definice toho, co se zveřejňuje. Kdyby se rozešly, lišila by se webová
+ * verze od té z příkazové řádky a nikdo by nevěděl, která platí.
+ */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  /** Pod tolik lidí se středisko nezveřejňuje samostatně. */
+  const MIN_PEOPLE = 5
+
+  const HIST = [
+    { to: 0, label: '≤ 0' }, { from: 0, to: 10, label: '0–10' },
+    { from: 10, to: 20, label: '10–20' }, { from: 20, to: 30, label: '20–30' },
+    { from: 30, to: 40, label: '30–40' }, { from: 40, to: 50, label: '40–50' },
+    { from: 50, to: 60, label: '50–60' }, { from: 60, to: Infinity, label: '60+' },
+  ]
+
+  const round2 = (v) => Math.round(v * 100) / 100
+
+  const stredisek = (n) => (n === 1 ? 'středisko' : n < 5 ? 'střediska' : 'středisek')
+
+  /**
+   * Z měsíců s řádky lidí udělá měsíce se samými souhrny.
+   * @returns {{months: object, suppressed: number, log: string[]}}
+   */
+  PP.publicMonths = function (months, CFG) {
+    const out = {}
+    const log = []
+    let suppressed = 0
+
+    for (const key of Object.keys(months).sort()) {
+      const rec = months[key]
+      const rows = rec.rows || []
+
+      const byCenter = new Map()
+      for (const r of rows) {
+        let c = byCenter.get(r.s)
+        if (!c) { c = { name: r.s, people: 0, total: 0, m: 0, e: 0 }; byCenter.set(r.s, c) }
+        c.people++; c.total += r.t; c.m += r.m; c.e += r.e
+      }
+
+      // Malá střediska se slučují. U tříčlenného by průměr na osobu prakticky
+      // prozradil přesčasy těch tří lidí — každý ví, kdo tam pracuje.
+      const big = []
+      const small = { name: 'Ostatní (malá střediska)', people: 0, total: 0, m: 0, e: 0 }
+      let smallCount = 0
+      for (const c of byCenter.values()) {
+        if (c.people >= MIN_PEOPLE) big.push(c)
+        else {
+          small.people += c.people; small.total += c.total; small.m += c.m; small.e += c.e
+          smallCount++
+        }
+      }
+
+      const centers = big.map((c) => ({
+        name: c.name, people: c.people,
+        total: round2(c.total), m: round2(c.m), e: round2(c.e),
+      }))
+      // Sloučený zbytek může být sám příliš malý — pak se nezveřejní vůbec.
+      if (small.people >= MIN_PEOPLE) {
+        centers.push({
+          name: small.name, people: small.people,
+          total: round2(small.total), m: round2(small.m), e: round2(small.e),
+        })
+      } else if (smallCount) {
+        suppressed += small.people
+      }
+
+      out[key] = {
+        period: rec.period,
+        rawPeriod: rec.rawPeriod,
+        people: rec.people,
+        aggregate: true,
+        // ať je i na zveřejněné stránce poznat, že jde o vzorek, ne o závod
+        demo: rec.demo || undefined,
+        summary: {
+          withOvertime: rows.length,
+          total: round2(rows.reduce((a, r) => a + r.t, 0)),
+          mezdy: round2(rows.reduce((a, r) => a + r.m, 0)),
+          evidence: round2(rows.reduce((a, r) => a + r.e, 0)),
+          overWarn: rows.filter((r) => r.t >= CFG.person.warn).length,
+          overCrit: rows.filter((r) => r.t >= CFG.person.crit).length,
+          year150: rows.filter((r) => r.r > CFG.year.warn).length,
+          year250: rows.filter((r) => r.r > CFG.year.crit).length,
+          yearCap: rows.filter((r) => r.r >= CFG.year.cap).length,
+          hist: HIST.map((b) => ({
+            label: b.label,
+            count: rows.filter((r) => (b.to === 0 ? r.t <= 0 : r.t > b.from && r.t <= b.to)).length,
+          })),
+          centers,
+        },
+      }
+
+      const label = PP.monthName ? PP.monthName(key) : key
+      log.push(`${label}: ${centers.length} ${stredisek(centers.length)} zveřejněno` +
+        (smallCount ? ` · ${smallCount} malých sloučeno` : ''))
+    }
+
+    return { months: out, suppressed, log }
+  }
+
+  /**
+   * Poslední pojistka před zápisem: projde hotový text a hledá v něm jakékoli
+   * jméno nebo osobní číslo ze zdrojových dat. Když něco najde, soubor se
+   * nesmí vydat — ať už to tam přiteklo odkudkoli.
+   */
+  PP.publicLeaks = function (text, months) {
+    const needles = new Set()
+    for (const rec of Object.values(months)) {
+      for (const r of rec.rows || []) { needles.add(String(r.n)); needles.add(String(r.o)) }
+    }
+    return [...needles].filter((n) => n && text.includes(n))
+  }
+
+  /* ---------- sestavení souboru v prohlížeči ---------- */
+
+  const safe = (code) => code.replace(/<\/(script)/gi, '<\\/$1')
+
+  /** Stáhne a vloží do dokumentu styly a skripty, které jsou zatím odkazem. */
+  async function inlineAssets(doc) {
+    const local = (url) => {
+      try { return new URL(url, location.href).origin === location.origin } catch (e) { return false }
+    }
+
+    for (const link of [...doc.querySelectorAll('link[rel="stylesheet"][href]')]) {
+      const href = link.getAttribute('href')
+      if (!local(href)) continue           // Google Fonts zůstávají odkazem
+      const css = await (await fetch(href)).text()
+      const style = doc.createElement('style')
+      style.textContent = css.trimEnd()
+      link.replaceWith(style)
+    }
+
+    for (const script of [...doc.querySelectorAll('script[src]')]) {
+      const src = script.getAttribute('src')
+      if (!local(src)) continue
+      const code = await (await fetch(src)).text()
+      const inlineScript = doc.createElement('script')
+      if (script.id) inlineScript.id = script.id
+      inlineScript.textContent = '\n' + safe(code.trimEnd()) + '\n'
+      script.replaceWith(inlineScript)
+    }
+  }
+
+  /**
+   * Postaví veřejnou verzi z právě běžícího panelu.
+   * @param {object} months  měsíce s řádky lidí (PP.data)
+   * @returns {Promise<{html: string, months: object, suppressed: number, log: string[]}>}
+   */
+  PP.buildPublicHtml = async function (months) {
+    if (!Object.keys(months).length) throw new Error('Nejsou naimportované žádné měsíce.')
+
+    const agg = PP.publicMonths(months, PP.CFG)
+
+    // Vychází se z živé stránky, ale všechno vykreslené se vyhodí. Právě
+    // v panelech jsou jména — kdyby tam zbyla, odnesl by si je výstup.
+    const doc = document.implementation.createHTMLDocument('')
+    doc.replaceChild(doc.importNode(document.documentElement, true), doc.documentElement)
+    doc.documentElement.setAttribute('data-theme', '')
+    for (const el of doc.querySelectorAll('.panel, #nav, #month-select, #demo-banner, #rail-note, #export-status')) {
+      el.innerHTML = ''
+    }
+
+    await inlineAssets(doc)
+
+    const data = doc.querySelector('#pp-data')
+    if (!data) throw new Error('V dokumentu chybí skript s daty (#pp-data).')
+    const serialized = JSON.stringify(agg.months)
+    data.removeAttribute('src')
+    data.textContent = '\nwindow.PP_PUBLIC = true;\nwindow.PP_BUILTIN_MONTHS = ' + safe(serialized) + ';\n'
+
+    const head = doc.querySelector('head')
+    const robots = doc.createElement('meta')
+    robots.setAttribute('name', 'robots')
+    robots.setAttribute('content', 'noindex')
+    head.appendChild(robots)
+    const gen = doc.createElement('meta')
+    gen.setAttribute('name', 'generator')
+    gen.setAttribute('content', 'panel · ' + new Date().toISOString().slice(0, 10))
+    head.appendChild(gen)
+
+    const html = '<!doctype html>\n' + doc.documentElement.outerHTML + '\n'
+
+    const leaked = PP.publicLeaks(html, months)
+    if (leaked.length) {
+      throw new Error('Ve výstupu se objevilo ' + leaked.length +
+        ' jmen nebo osobních čísel — soubor se nevydal. Nahlas to, je to chyba panelu.')
+    }
+
+    return { html, months: agg.months, suppressed: agg.suppressed, log: agg.log }
+  }
+
+  PP.PUBLIC_MIN_PEOPLE = MIN_PEOPLE
+})(window.PP)
+</script>
+
 <!-- js/app.js -->
 <script>
 /* Přesčasový panel Planá — UI. */
@@ -3231,6 +3446,26 @@ window.PP = window.PP || {}
         }).join('') || '<tr><td colspan="7" class="empty">Zatím žádná data.</td></tr>'}
         </tbody>
       </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Veřejná verze pro kolegy</h2>
+        <span class="hint">jen souhrny za střediska</span>
+      </div>
+      <p class="hint" style="margin:0 0 14px">
+        Vyrobí soubor <code>index.html</code>, ve kterém <strong>nejsou žádná jména
+        ani osobní čísla</strong> — jen součty a průměry za střediska. Střediska
+        pod ${num(PP.PUBLIC_MIN_PEOPLE)} lidí se slučují do „Ostatní“, aby průměr
+        neprozradil jednotlivce. Ten soubor se nahraje do složky <code>docs/</code>
+        v repozitáři a GitHub Pages ho vystaví na web.
+      </p>
+      <div class="pub-actions">
+        <button class="btn" type="button" id="pub-build"${keys.length ? '' : ' disabled'}>
+          Vygenerovat veřejnou verzi</button>
+        <span class="export-status" id="pub-status" role="status"></span>
+      </div>
+      <div id="pub-detail"></div>
     </div>`
 
     const fileInput = $('#file')
@@ -3256,6 +3491,53 @@ window.PP = window.PP || {}
       log('ok', `${monthName(key)} smazán.`)
       refreshAll()
     }))
+
+    const pub = $('#pub-build')
+    if (pub) pub.addEventListener('click', buildPublic)
+  }
+
+  /* Vygeneruje veřejné vydání přímo z prohlížeče. Reálná data nikam neodcházejí
+     — soubor vznikne tady a rovnou se stáhne. */
+  async function buildPublic() {
+    const btn = $('#pub-build')
+    const status = $('#pub-status')
+    const detail = $('#pub-detail')
+    btn.disabled = true
+    status.textContent = 'Generuji…'
+    detail.innerHTML = ''
+    try {
+      const months = {}
+      for (const k of PP.data.keys()) months[k] = PP.data.month(k)
+      const res = await PP.buildPublicHtml(months)
+
+      const blob = new Blob([res.html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'index.html'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+
+      const kb = Math.round(new Blob([res.html]).size / 1024)
+      status.textContent = 'Hotovo — staženo jako index.html'
+      detail.innerHTML = `<ul class="pub-log">
+        ${res.log.map((l) => `<li>${esc(l)}</li>`).join('')}
+        <li><strong>Kontrola: ve výstupu není žádné jméno ani osobní číslo.</strong></li>
+        ${res.suppressed ? `<li>${num(res.suppressed)} lidí v příliš malých střediscích se nezveřejnilo vůbec.</li>` : ''}
+        <li>${num(kb)} KiB · ${num(Object.keys(res.months).length)} měsíců</li>
+      </ul>
+      <p class="hint" style="margin:12px 0 0">
+        Nahrajte ho do repozitáře jako <code>docs/index.html</code> (na GitHubu
+        stačí soubor přetáhnout a potvrdit) — Pages se obnoví samy.
+      </p>`
+    } catch (err) {
+      status.textContent = ''
+      detail.innerHTML = `<p class="pub-err">${esc(err && err.message ? err.message : String(err))}</p>`
+    } finally {
+      btn.disabled = false
+    }
   }
 
   const LOG_LIMIT = 20

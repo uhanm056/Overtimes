@@ -453,6 +453,14 @@ table.mini th, table.mini td { padding: 6px 14px 6px 0; border-bottom: 1px solid
 table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color: var(--text-2); }
 .comp-summary { display: block; margin-top: 2px; }
 
+/* ---------- veřejná verze ---------- */
+.pub-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pub-log { margin: 14px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; line-height: 1.75; }
+.pub-err {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--crit-soft); color: var(--crit); font-size: 13px;
+}
+
 /* ---------- srovnání měsíců ---------- */
 .cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .cmp-picker label { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }

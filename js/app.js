@@ -1217,6 +1217,26 @@
         }).join('') || '<tr><td colspan="7" class="empty">Zatím žádná data.</td></tr>'}
         </tbody>
       </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Veřejná verze pro kolegy</h2>
+        <span class="hint">jen souhrny za střediska</span>
+      </div>
+      <p class="hint" style="margin:0 0 14px">
+        Vyrobí soubor <code>index.html</code>, ve kterém <strong>nejsou žádná jména
+        ani osobní čísla</strong> — jen součty a průměry za střediska. Střediska
+        pod ${num(PP.PUBLIC_MIN_PEOPLE)} lidí se slučují do „Ostatní“, aby průměr
+        neprozradil jednotlivce. Ten soubor se nahraje do složky <code>docs/</code>
+        v repozitáři a GitHub Pages ho vystaví na web.
+      </p>
+      <div class="pub-actions">
+        <button class="btn" type="button" id="pub-build"${keys.length ? '' : ' disabled'}>
+          Vygenerovat veřejnou verzi</button>
+        <span class="export-status" id="pub-status" role="status"></span>
+      </div>
+      <div id="pub-detail"></div>
     </div>`
 
     const fileInput = $('#file')
@@ -1242,6 +1262,53 @@
       log('ok', `${monthName(key)} smazán.`)
       refreshAll()
     }))
+
+    const pub = $('#pub-build')
+    if (pub) pub.addEventListener('click', buildPublic)
+  }
+
+  /* Vygeneruje veřejné vydání přímo z prohlížeče. Reálná data nikam neodcházejí
+     — soubor vznikne tady a rovnou se stáhne. */
+  async function buildPublic() {
+    const btn = $('#pub-build')
+    const status = $('#pub-status')
+    const detail = $('#pub-detail')
+    btn.disabled = true
+    status.textContent = 'Generuji…'
+    detail.innerHTML = ''
+    try {
+      const months = {}
+      for (const k of PP.data.keys()) months[k] = PP.data.month(k)
+      const res = await PP.buildPublicHtml(months)
+
+      const blob = new Blob([res.html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'index.html'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+
+      const kb = Math.round(new Blob([res.html]).size / 1024)
+      status.textContent = 'Hotovo — staženo jako index.html'
+      detail.innerHTML = `<ul class="pub-log">
+        ${res.log.map((l) => `<li>${esc(l)}</li>`).join('')}
+        <li><strong>Kontrola: ve výstupu není žádné jméno ani osobní číslo.</strong></li>
+        ${res.suppressed ? `<li>${num(res.suppressed)} lidí v příliš malých střediscích se nezveřejnilo vůbec.</li>` : ''}
+        <li>${num(kb)} KiB · ${num(Object.keys(res.months).length)} měsíců</li>
+      </ul>
+      <p class="hint" style="margin:12px 0 0">
+        Nahrajte ho do repozitáře jako <code>docs/index.html</code> (na GitHubu
+        stačí soubor přetáhnout a potvrdit) — Pages se obnoví samy.
+      </p>`
+    } catch (err) {
+      status.textContent = ''
+      detail.innerHTML = `<p class="pub-err">${esc(err && err.message ? err.message : String(err))}</p>`
+    } finally {
+      btn.disabled = false
+    }
   }
 
   const LOG_LIMIT = 20

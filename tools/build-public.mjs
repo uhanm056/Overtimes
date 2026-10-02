@@ -6,7 +6,7 @@
  * hodiny jednotlivců se do výstupu nedostanou — v souboru prostě nejsou,
  * takže je z něj nejde získat ani zobrazením zdroje.
  *
- * Střediska pod MIN_PEOPLE se slučují do „Ostatní“. U tříčlenného střediska
+ * Střediska pod pěti lidmi se slučují do „Ostatní“. U tříčlenného střediska
  * by průměr na osobu prakticky prozradil přesčasy těch tří lidí, protože
  * každý ví, kdo tam pracuje.
  *
@@ -24,9 +24,6 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT_DIR = join(ROOT, 'docs')
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
-
-/** Menší středisko se nezveřejňuje samostatně. */
-const MIN_PEOPLE = 5
 
 const args = process.argv.slice(2)
 const useDemo = args.includes('--demo')
@@ -98,100 +95,32 @@ if (!Object.keys(months).length) {
   await browser.close(); server.close(); process.exit(1)
 }
 
-/* ---------- agregace ---------- */
-const CFG = await page.evaluate(() => window.PP.CFG)
-await browser.close()
-server.close()
+/* ---------- agregace ----------
+   Počítá js/public.js, tedy přesně tentýž kód, jaký použije panel, když si
+   veřejnou verzi vygeneruje sám. Dvě implementace by se dřív nebo později
+   rozešly a nikdo by nevěděl, která z nich platí. */
+const agg = await page.evaluate((m) => {
+  const r = window.PP.publicMonths(m, window.PP.CFG)
+  return { months: r.months, suppressed: r.suppressed, log: r.log }
+}, months)
 
-const round2 = (v) => Math.round(v * 100) / 100
-
-const HIST = [
-  { to: 0, label: '≤ 0' }, { from: 0, to: 10, label: '0–10' },
-  { from: 10, to: 20, label: '10–20' }, { from: 20, to: 30, label: '20–30' },
-  { from: 30, to: 40, label: '30–40' }, { from: 40, to: 50, label: '40–50' },
-  { from: 50, to: 60, label: '50–60' }, { from: 60, to: Infinity, label: '60+' },
-]
-
-let suppressedTotal = 0
-const publicMonths = {}
-
-for (const key of Object.keys(months).sort()) {
-  const rec = months[key]
-  const rows = rec.rows || []
-
-  const byCenter = new Map()
-  for (const r of rows) {
-    let c = byCenter.get(r.s)
-    if (!c) { c = { name: r.s, people: 0, total: 0, m: 0, e: 0 }; byCenter.set(r.s, c) }
-    c.people++; c.total += r.t; c.m += r.m; c.e += r.e
-  }
-
-  // malá střediska sloučit — jinak by průměr prozradil jednotlivce
-  const big = []
-  const small = { name: 'Ostatní (malá střediska)', people: 0, total: 0, m: 0, e: 0 }
-  let smallCount = 0
-  for (const c of byCenter.values()) {
-    if (c.people >= MIN_PEOPLE) big.push(c)
-    else {
-      small.people += c.people; small.total += c.total; small.m += c.m; small.e += c.e
-      smallCount++
-    }
-  }
-  // Sloučený zbytek by sám mohl být malý — pak se nezveřejní vůbec.
-  const centers = big.map((c) => ({
-    name: c.name, people: c.people,
-    total: round2(c.total), m: round2(c.m), e: round2(c.e),
-  }))
-  if (small.people >= MIN_PEOPLE) {
-    centers.push({
-      name: small.name, people: small.people,
-      total: round2(small.total), m: round2(small.m), e: round2(small.e),
-    })
-  } else if (smallCount) {
-    suppressedTotal += small.people
-  }
-
-  publicMonths[key] = {
-    period: rec.period,
-    rawPeriod: rec.rawPeriod,
-    people: rec.people,
-    aggregate: true,
-    // ať je i na zveřejněné stránce poznat, že jde o vzorek, ne o závod
-    demo: rec.demo || undefined,
-    summary: {
-      withOvertime: rows.length,
-      total: round2(rows.reduce((a, r) => a + r.t, 0)),
-      mezdy: round2(rows.reduce((a, r) => a + r.m, 0)),
-      evidence: round2(rows.reduce((a, r) => a + r.e, 0)),
-      overWarn: rows.filter((r) => r.t >= CFG.person.warn).length,
-      overCrit: rows.filter((r) => r.t >= CFG.person.crit).length,
-      year150: rows.filter((r) => r.r > CFG.year.warn).length,
-      year250: rows.filter((r) => r.r > CFG.year.crit).length,
-      yearCap: rows.filter((r) => r.r >= CFG.year.cap).length,
-      hist: HIST.map((b) => ({
-        label: b.label,
-        count: rows.filter((r) => (b.to === 0 ? r.t <= 0 : r.t > b.from && r.t <= b.to)).length,
-      })),
-      centers,
-    },
-  }
-
-  const skryto = smallCount ? ` · ${smallCount} malých středisek sloučeno` : ''
-  console.log(`  ${key}: ${centers.length} středisek zveřejněno${skryto}`)
-}
+const publicMonths = agg.months
+const suppressedTotal = agg.suppressed
+for (const line of agg.log) console.log('  ' + line)
 
 /* ---------- pojistka: ve výstupu nesmí být nic jmenného ---------- */
 const serialized = JSON.stringify(publicMonths)
-const names = new Set()
-for (const rec of Object.values(months)) {
-  for (const r of rec.rows || []) { names.add(String(r.n)); names.add(String(r.o)) }
-}
-const leaked = [...names].filter((n) => n && serialized.includes(n))
+const leaked = await page.evaluate(
+  ([text, m]) => window.PP.publicLeaks(text, m), [serialized, months])
 if (leaked.length) {
   console.error(`✕ Ve výstupu se objevilo ${leaked.length} jmen nebo osobních čísel: ${leaked.slice(0, 3).join(', ')}`)
   console.error('  Nic se nezapsalo.')
+  await browser.close(); server.close()
   process.exit(1)
 }
+
+await browser.close()
+server.close()
 
 /* ---------- zápis ---------- */
 let html = await readFile(join(ROOT, 'index.html'), 'utf8')
@@ -205,7 +134,7 @@ html = html.replace(
 )
 
 const scripts = []
-html = html.replace(/[ \t]*<script src="([^"]+)"><\/script>\n?/g, (_, src) => {
+html = html.replace(/[ \t]*<script(?: id="([\w-]+)")? src="([^"]+)"><\/script>\n?/g, (_, id, src) => {
   if (src === 'data/months.js') {
     return '\n<!-- veřejné agregáty -->\n<script>\nwindow.PP_PUBLIC = true;\n' +
       'window.PP_BUILTIN_MONTHS = ' + safe(serialized) + ';\n</script>\n'

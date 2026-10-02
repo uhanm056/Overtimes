@@ -56,6 +56,7 @@ tools/generate-demo-data.mjs  vzorek pro testy → tests/fixtures/demo-months.js
 tools/report-to-data.mjs      převod reálných výkazů na data/months.js
 tools/build-single-file.mjs   slepení panelu do jednoho .html k rozeslání
 tools/build-public.mjs        veřejné vydání bez osobních údajů do docs/
+js/public.js                  agregace a sestavení veřejné verze (sdílí panel i nástroj)
 tests/                      vzorové výkazy a integrační test importu
 ```
 
@@ -268,10 +269,26 @@ Panel má dvě vydání z jednoho kódu:
 | Export do Excelu | ano | ne |
 | Přehled, souhrny za střediska, grafy vývoje | ano | ano |
 
+### Z panelu, bez instalace čehokoli
+
+V sekci **Import** je karta *Veřejná verze pro kolegy* s tlačítkem
+**Vygenerovat veřejnou verzi**. Vyrobí `index.html` a rovnou ho stáhne.
+Data se počítají v prohlížeči, kde už jsou — nikam se neodesílají.
+
+Stažený soubor pak stačí v repozitáři nahrát jako `docs/index.html`
+(na GitHubu drag & drop do složky `docs/` a *Commit changes*). Pages se
+obnoví samy, bez Node a bez příkazové řádky.
+
+### Z příkazové řádky
+
 ```bash
 node tools/build-public.mjs vykaz-07.xls vykaz-08.xls   # → docs/index.html
 node tools/build-public.mjs --demo                      # z ukázkových dat
 ```
+
+Obě cesty počítají totéž: agregaci dělá `js/public.js` a nástroj z příkazové
+řádky si ho pouští v prohlížeči. Dvě implementace by se dřív nebo později
+rozešly a nikdo by nevěděl, která platí.
 
 Do `docs/index.html` se zapisují **jen souhrny za střediska**. Řádky s lidmi
 v tom souboru nejsou — nejde je z něj získat ani zobrazením zdroje.
@@ -285,9 +302,16 @@ pět lidí, nezveřejní se vůbec a nástroj to napíše.
 
 ### Pojistka
 
-Než se cokoli zapíše, nástroj prohledá výstup na **každé jméno a každé osobní
-číslo** ze vstupu. Když najde jediný výskyt, nezapíše nic a skončí chybou.
-Totéž hlídá `tests/public.test.mjs` při každém běhu testů.
+Než se cokoli vydá, prohledá se hotový výstup na **každé jméno a každé osobní
+číslo** ze vstupu. Při jediném výskytu se soubor nevydá — v panelu se místo
+stažení objeví chybová hláška, nástroj z příkazové řádky skončí chybou a
+nezapíše nic. Platí to pro obě cesty, protože kontrolu dělá táž funkce
+(`PP.publicLeaks`).
+
+Generování se navíc nestaví z vykresleného panelu: všechny sekce se před
+serializací vyprázdní, takže se do výstupu nemůže dostat tabulka, která byla
+zrovna na obrazovce. Hlídají to `tests/pubgen.test.mjs` a
+`tests/public.test.mjs` při každém běhu testů.
 
 ### Zapnutí Pages
 
