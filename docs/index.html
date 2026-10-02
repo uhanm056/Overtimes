@@ -473,6 +473,40 @@ table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color
   margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
   background: var(--crit-soft); color: var(--crit); font-size: 13px;
 }
+.pub-ok {
+  margin: 14px 0 0; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--good-soft); color: var(--text); font-size: 13px;
+}
+.pub-ok .pub-log { margin-top: 8px; }
+.pub-sub {
+  margin: 0 0 4px; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-3);
+}
+h3.pub-sub + p { margin-top: 0; }
+.pub-note {
+  margin: 0 0 18px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text-2); font-size: 13px; line-height: 1.7;
+}
+.pub-login { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
+.pub-login label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 12px; color: var(--text-2);
+}
+.pub-login input {
+  font: inherit; font-size: 13px; padding: 7px 10px; min-width: 200px;
+  color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.pub-login input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.remote-note {
+  margin: 0 0 18px; padding: 9px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text-3); font-size: 12.5px;
+}
+.remote-note.warn { background: var(--warn-soft); color: var(--warn); }
+
+/* oddělit obě cesty publikování */
+hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px; }
 
 /* ---------- srovnání měsíců ---------- */
 .cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
@@ -644,6 +678,7 @@ table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color
     </header>
 
     <div id="demo-banner" hidden></div>
+    <p class="remote-note" id="remote-note" role="status" hidden></p>
 
     <div class="content">
       <section class="panel" id="panel-overview" aria-labelledby="section-title"></section>
@@ -658,6 +693,34 @@ table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color
 </div>
 
 <!-- Klasické skripty (ne moduly), aby šel panel otevřít i přímo z disku. -->
+
+<!-- data/firebase.js -->
+<script>
+/* Připojení ke sdílené databázi (Firebase Realtime Database).
+ *
+ * Dokud je tu null, je živé sdílení vypnuté a panel funguje jako dřív —
+ * data jen v prohlížeči. Postup nastavení je v README, část „Živé sdílení“.
+ *
+ * Tyhle údaje NEJSOU heslo. apiKey u Firebase je jen identifikátor projektu
+ * a běžně se posílá do prohlížeče; kdo smí číst a kdo zapisovat, rozhodují
+ * pravidla databáze (database.rules.json), ne tenhle soubor. Proto smí být
+ * v repozitáři i veřejně.
+ *
+ * Až budeš mít projekt založený, nahraď null tímhle a doplň své hodnoty:
+ *
+ *   window.PP_FIREBASE = {
+ *     apiKey: 'AIza…',
+ *     authDomain: 'prescasy-plana.firebaseapp.com',
+ *     databaseURL: 'https://prescasy-plana-default-rtdb.europe-west1.firebasedatabase.app',
+ *     projectId: 'prescasy-plana',
+ *     appId: '1:123…:web:abc…',
+ *   }
+ *
+ * Volitelně `sdk: 'https://www.gstatic.com/firebasejs/10.12.2'`, kdyby
+ * výchozí adresa SDK nefungovala.
+ */
+window.PP_FIREBASE = null
+</script>
 
 <!-- veřejné agregáty -->
 <script>
@@ -1729,6 +1792,15 @@ window.PP = window.PP || {}
       state.months[key] = Object.assign({ source: 'imported' }, record)
     },
 
+    /** Položí přes vestavěná data to, co přišlo z webu (veřejné vydání). */
+    setRemote(months) {
+      if (!months || !Object.keys(months).length) return false
+      for (const key in months) {
+        state.months[key] = Object.assign({ source: 'remote' }, months[key])
+      }
+      return true
+    },
+
     /** Smaže importovaný měsíc; pokud pro něj existují vestavěná data, vrátí se. */
     async removeMonth(key) {
       await PP.store.removeImported(key)
@@ -2225,6 +2297,186 @@ window.PP = window.PP || {}
 })(window.PP)
 </script>
 
+<!-- js/remote.js -->
+<script>
+/* Živé sdílení souhrnů přes Firebase Realtime Database.
+ *
+ * Co jde ven: VÝHRADNĚ agregáty za střediska z js/public.js. Jména ani osobní
+ * čísla databázi nikdy neuvidí — zůstávají v prohlížeči toho, kdo importuje.
+ * Zápis prochází touž kontrolou úniku jako stahovaný soubor; kdyby se v datech
+ * objevilo jediné jméno, neodešle se nic.
+ *
+ * Kdo smí co:
+ *   • čtení  — kdokoli přihlášený, i anonymně (souhrny nejsou osobní údaj)
+ *   • zápis  — jen účet uvedený v pravidlech databáze, přes e-mail a heslo
+ * Pravidla jsou v database.rules.json a vynucuje je server, ne tahle stránka.
+ *
+ * Konfigurace se doplňuje do window.PP_FIREBASE (viz README). Dokud tam není,
+ * je celá vrstva vypnutá a panel se chová jako dřív — jen s localStorage.
+ */
+window.PP = window.PP || {}
+
+;(function (PP) {
+  'use strict'
+
+  /* Kam se v databázi zapisuje. Verze v cestě je tu proto, aby se dal formát
+     později změnit, aniž by staré stránky četly něco, čemu nerozumí. */
+  const PATH = 'prescasy/v1/public'
+
+  /* Firebase SDK se stahuje až při prvním použití. Zkouší se postupně —
+     kdyby jedna adresa nebyla dostupná, jede se na další. Vlastní verzi lze
+     vynutit přes window.PP_FIREBASE.sdk. */
+  const SDK_BASES = [
+    'https://www.gstatic.com/firebasejs/10.12.2',
+    'https://www.gstatic.com/firebasejs/9.23.0',
+  ]
+  const SDK_PARTS = ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-database-compat.js']
+
+  const cfg = () => window.PP_FIREBASE || null
+
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = url
+      s.onload = resolve
+      s.onerror = () => reject(new Error('Nenačetl se ' + url))
+      document.head.appendChild(s)
+    })
+  }
+
+  let sdkPromise = null
+  function loadSdk() {
+    if (window.firebase && window.firebase.database) return Promise.resolve(window.firebase)
+    if (sdkPromise) return sdkPromise
+    const bases = cfg() && cfg().sdk ? [cfg().sdk] : SDK_BASES
+    sdkPromise = (async () => {
+      let last = null
+      for (const base of bases) {
+        try {
+          for (const part of SDK_PARTS) await loadScript(base + '/' + part)
+          if (window.firebase && window.firebase.database) return window.firebase
+          last = new Error('SDK se načetlo, ale firebase.database chybí.')
+        } catch (err) { last = err }
+      }
+      sdkPromise = null
+      throw new Error('Nepodařilo se načíst Firebase SDK. ' +
+        (last ? last.message + ' ' : '') +
+        'Zkontrolujte připojení, nebo doplňte do konfigurace vlastní adresu (sdk).')
+    })()
+    return sdkPromise
+  }
+
+  let app = null
+  async function fb() {
+    const c = cfg()
+    if (!c || !c.databaseURL || /__FIREBASE/.test(JSON.stringify(c))) {
+      throw new Error('Firebase není nastavený — v panelu chybí window.PP_FIREBASE (viz README).')
+    }
+    const firebase = await loadSdk()
+    if (!app) app = firebase.apps.length ? firebase.apps[0] : firebase.initializeApp(c)
+    return firebase
+  }
+
+  /* ---------- veřejné rozhraní ---------- */
+
+  const impl = {
+    name: 'Firebase RTDB',
+
+    /** Je vůbec kam se připojovat? */
+    configured() {
+      const c = cfg()
+      return !!(c && c.databaseURL && !/__FIREBASE/.test(JSON.stringify(c)))
+    },
+
+    /** Přihlásí se anonymně — potřeba i na pouhé čtení, pravidla to vyžadují. */
+    async connect() {
+      const firebase = await fb()
+      if (!firebase.auth().currentUser) await firebase.auth().signInAnonymously()
+      return true
+    },
+
+    /** Přihlášení účtem, který smí zapisovat. */
+    async signIn(email, password) {
+      const firebase = await fb()
+      const res = await firebase.auth().signInWithEmailAndPassword(email, password)
+      return { email: res.user.email, uid: res.user.uid }
+    },
+
+    async signOut() {
+      const firebase = await fb()
+      await firebase.auth().signOut()
+    },
+
+    /** Kdo je právě přihlášený; anonymní účet se nepočítá. */
+    async currentUser() {
+      const firebase = await fb()
+      const u = firebase.auth().currentUser
+      return u && !u.isAnonymous ? { email: u.email, uid: u.uid } : null
+    },
+
+    /** Jednorázové načtení zveřejněných souhrnů. */
+    async load() {
+      const firebase = await fb()
+      await this.connect()
+      const snap = await firebase.database().ref(PATH).get()
+      return snap.exists() ? snap.val() : null
+    },
+
+    /** Živé sledování — zavolá cb při každé změně. Vrací funkci pro odhlášení. */
+    async watch(cb) {
+      const firebase = await fb()
+      await this.connect()
+      const ref = firebase.database().ref(PATH)
+      const handler = ref.on('value', (snap) => cb(snap.exists() ? snap.val() : null))
+      return () => ref.off('value', handler)
+    },
+
+    /** Zápis souhrnů. Jedním update(), ať je stránka buď celá stará, nebo celá nová. */
+    async publish(payload) {
+      const firebase = await fb()
+      await firebase.database().ref(PATH).set(payload)
+    },
+  }
+
+  /* Testy a jiná úložiště si mohou podstrčit vlastní implementaci. */
+  function backend() { return window.PP_REMOTE_ADAPTER || impl }
+
+  PP.remote = {
+    get name() { return backend().name },
+    configured() { return backend().configured() },
+    connect() { return backend().connect() },
+    signIn(email, password) { return backend().signIn(email, password) },
+    signOut() { return backend().signOut() },
+    currentUser() { return backend().currentUser() },
+    load() { return backend().load() },
+    watch(cb) { return backend().watch(cb) },
+
+    /**
+     * Spočítá souhrny a zveřejní je. Před odesláním projde výsledek touž
+     * kontrolou jako stahovaný soubor — kdyby se do agregátů jakkoli dostalo
+     * jméno nebo osobní číslo, neodešle se vůbec nic.
+     */
+    async publishMonths(months) {
+      if (!Object.keys(months).length) throw new Error('Nejsou naimportované žádné měsíce.')
+      const agg = PP.publicMonths(months, PP.CFG)
+
+      const payload = {
+        months: agg.months,
+        updatedAt: new Date().toISOString(),
+      }
+      const leaked = PP.publicLeaks(JSON.stringify(payload), months)
+      if (leaked.length) {
+        throw new Error('V souhrnech se objevilo ' + leaked.length +
+          ' jmen nebo osobních čísel — neodeslalo se nic. Nahlas to, je to chyba panelu.')
+      }
+
+      await backend().publish(payload)
+      return { months: agg.months, suppressed: agg.suppressed, log: agg.log, updatedAt: payload.updatedAt }
+    },
+  }
+})(window.PP)
+</script>
+
 <!-- js/app.js -->
 <script>
 /* Přesčasový panel Planá — UI. */
@@ -2283,6 +2535,8 @@ window.PP = window.PP || {}
     cmpB: null,          // novější
     rankingLimit: 25,
     log: [],          // výsledky importů; přežijí překreslení panelu
+    admin: null,      // přihlášený účet, který smí publikovat
+    pubMsg: null,     // poslední hláška z publikování { kind, html }
   }
 
   /* ---------- motiv ---------- */
@@ -3453,16 +3707,23 @@ window.PP = window.PP || {}
         <h2>Veřejná verze pro kolegy</h2>
         <span class="hint">jen souhrny za střediska</span>
       </div>
-      <p class="hint" style="margin:0 0 14px">
-        Vyrobí soubor <code>index.html</code>, ve kterém <strong>nejsou žádná jména
-        ani osobní čísla</strong> — jen součty a průměry za střediska. Střediska
-        pod ${num(PP.PUBLIC_MIN_PEOPLE)} lidí se slučují do „Ostatní“, aby průměr
-        neprozradil jednotlivce. Ten soubor se nahraje do složky <code>docs/</code>
-        v repozitáři a GitHub Pages ho vystaví na web.
+      <p class="hint" style="margin:0 0 18px">
+        Ven jdou <strong>jen součty a průměry za střediska</strong> — žádná jména,
+        žádná osobní čísla. Střediska pod ${num(PP.PUBLIC_MIN_PEOPLE)} lidí se
+        slučují do „Ostatní“, aby průměr neprozradil jednotlivce.
+      </p>
+      ${livePublish(keys)}
+
+      <hr class="pub-split">
+      <h3 class="pub-sub">Nebo soubor ke stažení</h3>
+      <p class="hint" style="margin:0 0 12px">
+        Tentýž obsah jako soubor <code>index.html</code>. Nahraje se do složky
+        <code>docs/</code> v repozitáři a GitHub Pages ho vystaví — funguje
+        i bez databáze, jen se to musí udělat ručně po každém importu.
       </p>
       <div class="pub-actions">
-        <button class="btn" type="button" id="pub-build"${keys.length ? '' : ' disabled'}>
-          Vygenerovat veřejnou verzi</button>
+        <button class="btn ghost" type="button" id="pub-build"${keys.length ? '' : ' disabled'}>
+          Vygenerovat soubor</button>
         <span class="export-status" id="pub-status" role="status"></span>
       </div>
       <div id="pub-detail"></div>
@@ -3494,6 +3755,111 @@ window.PP = window.PP || {}
 
     const pub = $('#pub-build')
     if (pub) pub.addEventListener('click', buildPublic)
+    bindLivePublish()
+  }
+
+  /* Živé publikování: souhrny se pošlou do sdílené databáze a kolegové je
+     vidí hned, bez nahrávání souboru. Ven jdou jen agregáty — jména zůstávají
+     tady v prohlížeči. */
+  function livePublish(keys) {
+    if (!PP.remote.configured()) {
+      return `<p class="pub-note">
+        <strong>Živé sdílení zatím není nastavené.</strong> Až bude, naimportovaný
+        výkaz se jedním kliknutím propíše kolegům na web a nebude se nic nahrávat
+        ručně. Postup je v README (<code>window.PP_FIREBASE</code>).
+      </p>`
+    }
+    const who = ui.admin
+    const msg = ui.pubMsg
+      ? `<div class="pub-${ui.pubMsg.kind}">${ui.pubMsg.html}</div>`
+      : ''
+
+    if (!who) {
+      return `<h3 class="pub-sub">Publikovat na web</h3>
+      <p class="hint" style="margin:0 0 12px">
+        Zapisovat smí jen váš účet. Přihlaste se a souhrny se pošlou kolegům.
+      </p>
+      <form class="pub-login" id="pub-login">
+        <label>E-mail <input type="email" id="pub-email" autocomplete="username" required></label>
+        <label>Heslo <input type="password" id="pub-pass" autocomplete="current-password" required></label>
+        <button class="btn" type="submit">Přihlásit</button>
+        <span class="export-status" id="pub-live-status" role="status"></span>
+      </form>
+      ${msg}`
+    }
+
+    return `<h3 class="pub-sub">Publikovat na web</h3>
+    <p class="hint" style="margin:0 0 12px">
+      Přihlášen <strong>${esc(who.email)}</strong>. Odejdou jen souhrny za
+      střediska — jména a osobní čísla zůstanou tady.
+    </p>
+    <div class="pub-actions">
+      <button class="btn" type="button" id="pub-live"${keys.length ? '' : ' disabled'}>
+        Publikovat ${num(keys.length)} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</button>
+      <button class="btn ghost sm" type="button" id="pub-logout">Odhlásit</button>
+      <span class="export-status" id="pub-live-status" role="status"></span>
+    </div>
+    ${msg}`
+  }
+
+  function bindLivePublish() {
+    const form = $('#pub-login')
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const status = $('#pub-live-status')
+        status.textContent = 'Přihlašuji…'
+        try {
+          ui.admin = await PP.remote.signIn($('#pub-email').value.trim(), $('#pub-pass').value)
+          ui.pubMsg = null
+        } catch (err) {
+          ui.pubMsg = { kind: 'err', html: esc(loginError(err)) }
+        }
+        renderImport()
+      })
+    }
+
+    const logout = $('#pub-logout')
+    if (logout) logout.addEventListener('click', async () => {
+      try { await PP.remote.signOut() } catch (err) { /* odhlášení nesmí zablokovat UI */ }
+      ui.admin = null
+      ui.pubMsg = null
+      renderImport()
+    })
+
+    const live = $('#pub-live')
+    if (live) live.addEventListener('click', async () => {
+      const status = $('#pub-live-status')
+      live.disabled = true
+      status.textContent = 'Odesílám…'
+      try {
+        const months = {}
+        for (const k of PP.data.keys()) months[k] = PP.data.month(k)
+        const res = await PP.remote.publishMonths(months)
+        ui.pubMsg = {
+          kind: 'ok',
+          html: `<strong>Zveřejněno.</strong> Kolegové vidí nová čísla hned.
+            <ul class="pub-log">${res.log.map((l) => `<li>${esc(l)}</li>`).join('')}
+            <li><strong>Kontrola: v odeslaných datech není žádné jméno ani osobní číslo.</strong></li>
+            ${res.suppressed ? `<li>${num(res.suppressed)} lidí v příliš malých střediscích se nezveřejnilo vůbec.</li>` : ''}
+            </ul>`,
+        }
+      } catch (err) {
+        ui.pubMsg = { kind: 'err', html: esc(err && err.message ? err.message : String(err)) }
+      }
+      renderImport()
+    })
+  }
+
+  /** Firebase hlásí chyby kódem; přeložit je na něco, co se dá přečíst. */
+  function loginError(err) {
+    const code = (err && err.code) || ''
+    if (/user-not-found|invalid-credential|wrong-password|invalid-login/.test(code)) {
+      return 'Nesprávný e-mail nebo heslo.'
+    }
+    if (/too-many-requests/.test(code)) return 'Příliš mnoho pokusů, zkuste to za chvíli.'
+    if (/network/.test(code)) return 'Nepodařilo se spojit se serverem.'
+    return err && err.message ? err.message : String(err)
   }
 
   /* Vygeneruje veřejné vydání přímo z prohlížeče. Reálná data nikam neodcházejí
@@ -3722,6 +4088,49 @@ window.PP = window.PP || {}
       `${monthShort(keys[keys.length - 1])} – ${monthShort(keys[0])}`
   }
 
+  /* Na veřejné stránce se čísla berou ze sdílené databáze, aby kolegové viděli
+     to, co je právě naimportované, a ne stav z doby, kdy se stránka stavěla.
+     Když se spojení nepovede, zůstanou data zapečená v souboru — stránka
+     nesmí zůstat prázdná jen proto, že je síť mimo. */
+  async function loadRemote() {
+    if (!PP.remote.configured()) return
+    const note = $('#remote-note')
+    try {
+      const data = await PP.remote.load()
+      if (data && data.months && PP.data.setRemote(data.months)) {
+        ui.month = null
+        refreshAll()
+        if (note) {
+          note.hidden = false
+          note.textContent = 'Aktuální data z ' + stamp(data.updatedAt) + '.'
+        }
+      }
+      PP.remote.watch((fresh) => {
+        if (!fresh || !fresh.months) return
+        if (!PP.data.setRemote(fresh.months)) return
+        refreshAll()
+        if (note) {
+          note.hidden = false
+          note.textContent = 'Aktuální data z ' + stamp(fresh.updatedAt) + '.'
+        }
+      }).catch(() => {})
+    } catch (err) {
+      if (note) {
+        note.hidden = false
+        note.className = 'remote-note warn'
+        note.textContent = 'Nepodařilo se načíst aktuální data, zobrazena jsou poslední známá.'
+      }
+    }
+  }
+
+  /** ISO čas na „2. 10. 2026 v 13:45“. */
+  function stamp(iso) {
+    const d = new Date(iso)
+    if (isNaN(d)) return 'neznámého času'
+    return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} v ` +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+  }
+
   /* ---------- start ---------- */
   async function init() {
     initTheme()
@@ -3745,6 +4154,8 @@ window.PP = window.PP || {}
 
     const initial = location.hash.slice(1)
     go(SECTIONS.some((s) => s.id === initial) ? initial : 'overview')
+
+    if (PUBLIC) loadRemote()
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init)

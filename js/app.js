@@ -54,6 +54,8 @@
     cmpB: null,          // novější
     rankingLimit: 25,
     log: [],          // výsledky importů; přežijí překreslení panelu
+    admin: null,      // přihlášený účet, který smí publikovat
+    pubMsg: null,     // poslední hláška z publikování { kind, html }
   }
 
   /* ---------- motiv ---------- */
@@ -1224,16 +1226,23 @@
         <h2>Veřejná verze pro kolegy</h2>
         <span class="hint">jen souhrny za střediska</span>
       </div>
-      <p class="hint" style="margin:0 0 14px">
-        Vyrobí soubor <code>index.html</code>, ve kterém <strong>nejsou žádná jména
-        ani osobní čísla</strong> — jen součty a průměry za střediska. Střediska
-        pod ${num(PP.PUBLIC_MIN_PEOPLE)} lidí se slučují do „Ostatní“, aby průměr
-        neprozradil jednotlivce. Ten soubor se nahraje do složky <code>docs/</code>
-        v repozitáři a GitHub Pages ho vystaví na web.
+      <p class="hint" style="margin:0 0 18px">
+        Ven jdou <strong>jen součty a průměry za střediska</strong> — žádná jména,
+        žádná osobní čísla. Střediska pod ${num(PP.PUBLIC_MIN_PEOPLE)} lidí se
+        slučují do „Ostatní“, aby průměr neprozradil jednotlivce.
+      </p>
+      ${livePublish(keys)}
+
+      <hr class="pub-split">
+      <h3 class="pub-sub">Nebo soubor ke stažení</h3>
+      <p class="hint" style="margin:0 0 12px">
+        Tentýž obsah jako soubor <code>index.html</code>. Nahraje se do složky
+        <code>docs/</code> v repozitáři a GitHub Pages ho vystaví — funguje
+        i bez databáze, jen se to musí udělat ručně po každém importu.
       </p>
       <div class="pub-actions">
-        <button class="btn" type="button" id="pub-build"${keys.length ? '' : ' disabled'}>
-          Vygenerovat veřejnou verzi</button>
+        <button class="btn ghost" type="button" id="pub-build"${keys.length ? '' : ' disabled'}>
+          Vygenerovat soubor</button>
         <span class="export-status" id="pub-status" role="status"></span>
       </div>
       <div id="pub-detail"></div>
@@ -1265,6 +1274,111 @@
 
     const pub = $('#pub-build')
     if (pub) pub.addEventListener('click', buildPublic)
+    bindLivePublish()
+  }
+
+  /* Živé publikování: souhrny se pošlou do sdílené databáze a kolegové je
+     vidí hned, bez nahrávání souboru. Ven jdou jen agregáty — jména zůstávají
+     tady v prohlížeči. */
+  function livePublish(keys) {
+    if (!PP.remote.configured()) {
+      return `<p class="pub-note">
+        <strong>Živé sdílení zatím není nastavené.</strong> Až bude, naimportovaný
+        výkaz se jedním kliknutím propíše kolegům na web a nebude se nic nahrávat
+        ručně. Postup je v README (<code>window.PP_FIREBASE</code>).
+      </p>`
+    }
+    const who = ui.admin
+    const msg = ui.pubMsg
+      ? `<div class="pub-${ui.pubMsg.kind}">${ui.pubMsg.html}</div>`
+      : ''
+
+    if (!who) {
+      return `<h3 class="pub-sub">Publikovat na web</h3>
+      <p class="hint" style="margin:0 0 12px">
+        Zapisovat smí jen váš účet. Přihlaste se a souhrny se pošlou kolegům.
+      </p>
+      <form class="pub-login" id="pub-login">
+        <label>E-mail <input type="email" id="pub-email" autocomplete="username" required></label>
+        <label>Heslo <input type="password" id="pub-pass" autocomplete="current-password" required></label>
+        <button class="btn" type="submit">Přihlásit</button>
+        <span class="export-status" id="pub-live-status" role="status"></span>
+      </form>
+      ${msg}`
+    }
+
+    return `<h3 class="pub-sub">Publikovat na web</h3>
+    <p class="hint" style="margin:0 0 12px">
+      Přihlášen <strong>${esc(who.email)}</strong>. Odejdou jen souhrny za
+      střediska — jména a osobní čísla zůstanou tady.
+    </p>
+    <div class="pub-actions">
+      <button class="btn" type="button" id="pub-live"${keys.length ? '' : ' disabled'}>
+        Publikovat ${num(keys.length)} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</button>
+      <button class="btn ghost sm" type="button" id="pub-logout">Odhlásit</button>
+      <span class="export-status" id="pub-live-status" role="status"></span>
+    </div>
+    ${msg}`
+  }
+
+  function bindLivePublish() {
+    const form = $('#pub-login')
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const status = $('#pub-live-status')
+        status.textContent = 'Přihlašuji…'
+        try {
+          ui.admin = await PP.remote.signIn($('#pub-email').value.trim(), $('#pub-pass').value)
+          ui.pubMsg = null
+        } catch (err) {
+          ui.pubMsg = { kind: 'err', html: esc(loginError(err)) }
+        }
+        renderImport()
+      })
+    }
+
+    const logout = $('#pub-logout')
+    if (logout) logout.addEventListener('click', async () => {
+      try { await PP.remote.signOut() } catch (err) { /* odhlášení nesmí zablokovat UI */ }
+      ui.admin = null
+      ui.pubMsg = null
+      renderImport()
+    })
+
+    const live = $('#pub-live')
+    if (live) live.addEventListener('click', async () => {
+      const status = $('#pub-live-status')
+      live.disabled = true
+      status.textContent = 'Odesílám…'
+      try {
+        const months = {}
+        for (const k of PP.data.keys()) months[k] = PP.data.month(k)
+        const res = await PP.remote.publishMonths(months)
+        ui.pubMsg = {
+          kind: 'ok',
+          html: `<strong>Zveřejněno.</strong> Kolegové vidí nová čísla hned.
+            <ul class="pub-log">${res.log.map((l) => `<li>${esc(l)}</li>`).join('')}
+            <li><strong>Kontrola: v odeslaných datech není žádné jméno ani osobní číslo.</strong></li>
+            ${res.suppressed ? `<li>${num(res.suppressed)} lidí v příliš malých střediscích se nezveřejnilo vůbec.</li>` : ''}
+            </ul>`,
+        }
+      } catch (err) {
+        ui.pubMsg = { kind: 'err', html: esc(err && err.message ? err.message : String(err)) }
+      }
+      renderImport()
+    })
+  }
+
+  /** Firebase hlásí chyby kódem; přeložit je na něco, co se dá přečíst. */
+  function loginError(err) {
+    const code = (err && err.code) || ''
+    if (/user-not-found|invalid-credential|wrong-password|invalid-login/.test(code)) {
+      return 'Nesprávný e-mail nebo heslo.'
+    }
+    if (/too-many-requests/.test(code)) return 'Příliš mnoho pokusů, zkuste to za chvíli.'
+    if (/network/.test(code)) return 'Nepodařilo se spojit se serverem.'
+    return err && err.message ? err.message : String(err)
   }
 
   /* Vygeneruje veřejné vydání přímo z prohlížeče. Reálná data nikam neodcházejí
@@ -1493,6 +1607,49 @@
       `${monthShort(keys[keys.length - 1])} – ${monthShort(keys[0])}`
   }
 
+  /* Na veřejné stránce se čísla berou ze sdílené databáze, aby kolegové viděli
+     to, co je právě naimportované, a ne stav z doby, kdy se stránka stavěla.
+     Když se spojení nepovede, zůstanou data zapečená v souboru — stránka
+     nesmí zůstat prázdná jen proto, že je síť mimo. */
+  async function loadRemote() {
+    if (!PP.remote.configured()) return
+    const note = $('#remote-note')
+    try {
+      const data = await PP.remote.load()
+      if (data && data.months && PP.data.setRemote(data.months)) {
+        ui.month = null
+        refreshAll()
+        if (note) {
+          note.hidden = false
+          note.textContent = 'Aktuální data z ' + stamp(data.updatedAt) + '.'
+        }
+      }
+      PP.remote.watch((fresh) => {
+        if (!fresh || !fresh.months) return
+        if (!PP.data.setRemote(fresh.months)) return
+        refreshAll()
+        if (note) {
+          note.hidden = false
+          note.textContent = 'Aktuální data z ' + stamp(fresh.updatedAt) + '.'
+        }
+      }).catch(() => {})
+    } catch (err) {
+      if (note) {
+        note.hidden = false
+        note.className = 'remote-note warn'
+        note.textContent = 'Nepodařilo se načíst aktuální data, zobrazena jsou poslední známá.'
+      }
+    }
+  }
+
+  /** ISO čas na „2. 10. 2026 v 13:45“. */
+  function stamp(iso) {
+    const d = new Date(iso)
+    if (isNaN(d)) return 'neznámého času'
+    return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} v ` +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+  }
+
   /* ---------- start ---------- */
   async function init() {
     initTheme()
@@ -1516,6 +1673,8 @@
 
     const initial = location.hash.slice(1)
     go(SECTIONS.some((s) => s.id === initial) ? initial : 'overview')
+
+    if (PUBLIC) loadRemote()
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init)

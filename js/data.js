@@ -49,6 +49,15 @@ window.PP = window.PP || {}
       state.months[key] = Object.assign({ source: 'imported' }, record)
     },
 
+    /** Položí přes vestavěná data to, co přišlo z webu (veřejné vydání). */
+    setRemote(months) {
+      if (!months || !Object.keys(months).length) return false
+      for (const key in months) {
+        state.months[key] = Object.assign({ source: 'remote' }, months[key])
+      }
+      return true
+    },
+
     /** Smaže importovaný měsíc; pokud pro něj existují vestavěná data, vrátí se. */
     async removeMonth(key) {
       await PP.store.removeImported(key)

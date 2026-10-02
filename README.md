@@ -57,6 +57,9 @@ tools/report-to-data.mjs      převod reálných výkazů na data/months.js
 tools/build-single-file.mjs   slepení panelu do jednoho .html k rozeslání
 tools/build-public.mjs        veřejné vydání bez osobních údajů do docs/
 js/public.js                  agregace a sestavení veřejné verze (sdílí panel i nástroj)
+js/remote.js                  živé sdílení souhrnů přes Firebase RTDB
+data/firebase.js              připojení k databázi — doplň, nebo nech null
+database.rules.json           pravidla databáze: kdo smí číst a kdo zapisovat
 tests/                      vzorové výkazy a integrační test importu
 ```
 
@@ -312,6 +315,66 @@ Generování se navíc nestaví z vykresleného panelu: všechny sekce se před
 serializací vyprázdní, takže se do výstupu nemůže dostat tabulka, která byla
 zrovna na obrazovce. Hlídají to `tests/pubgen.test.mjs` a
 `tests/public.test.mjs` při každém běhu testů.
+
+## Živé sdílení souhrnů
+
+Nahrávat soubor po každém importu je otrava. Když se zapne živé sdílení,
+naimportuješ výkaz a kolegové vidí nová čísla hned — stránka si je vezme
+ze sdílené databáze sama.
+
+**Ven jdou jen souhrny za střediska.** Jména a osobní čísla databázi nikdy
+neuvidí, zůstávají v prohlížeči toho, kdo importuje. Posílaná data procházejí
+touž kontrolou úniku jako stahovaný soubor; při jediném jménu se neodešle nic.
+
+| | Kde to je |
+| --- | --- |
+| Úplná data se jmény | jen v tvém prohlížeči (`localStorage`) |
+| Souhrny za střediska | Firebase RTDB, čte je veřejná stránka |
+| Kdo smí zapisovat | jediný účet, vynucují pravidla databáze |
+| Kdo smí číst | kdokoli přihlášený, i anonymně |
+
+### Nastavení, jednou
+
+1. **Projekt** — [console.firebase.google.com](https://console.firebase.google.com)
+   → *Add project*, jméno třeba `prescasy-plana`. Google Analytics vypni,
+   není k ničemu potřeba.
+2. **Databáze** — *Build → Realtime Database → Create Database*, oblast
+   **europe-west1 (Belgium)**, režim *Locked mode* (pravidla se nahrají vzápětí).
+3. **Pravidla** — v záložce *Rules* přepiš obsah souborem
+   [`database.rules.json`](database.rules.json) z tohohle repozitáře.
+   `__ADMIN_UID__` zatím nech být, doplní se v kroku 5.
+4. **Přihlašování** — *Build → Authentication → Get started*, zapni
+   **Anonymous** (kvůli čtení) a **Email/Password** (kvůli tobě).
+   V *Users → Add user* si založ účet, kterým budeš publikovat.
+5. **UID** — ve výpisu *Users* je u tvého účtu *User UID*. Zkopíruj ho
+   do pravidel místo `__ADMIN_UID__` a dej *Publish*. Teď smíš zapisovat
+   jedině ty.
+6. **Konfigurace** — *Project settings → General → Your apps → Web app*.
+   Vyplň údaje do [`data/firebase.js`](data/firebase.js) místo `null`
+   (apiKey není heslo, smí být i ve veřejném repozitáři — kdo co smí,
+   rozhodují pravidla).
+7. Přegeneruj panel i veřejnou stránku:
+   ```bash
+   node tools/build-single-file.mjs    # panel pro tebe
+   node tools/build-public.mjs --demo  # docs/index.html pro Pages
+   ```
+   a pushni. Veřejná stránka si od té chvíle bere čísla z databáze; to, co je
+   v souboru zapečené, slouží už jen jako záloha, když je síť mimo.
+
+### Používání
+
+V panelu, sekce **Import** → *Veřejná verze pro kolegy* → přihlas se e-mailem
+a heslem z kroku 4 a klikni na **Publikovat**. Karta vypíše, co se zveřejnilo.
+Otevřené stránky kolegů se obnoví samy, bez načítání.
+
+Odhlášení je hned vedle. Heslo se nikam neukládá, po zavření panelu se přihlašuješ
+znovu.
+
+### Když databáze nejede
+
+Veřejná stránka napíše, že se nepodařilo načíst aktuální data, a ukáže
+poslední zapečená. Nikdy nezůstane prázdná. Panel se chová stejně jako dřív —
+import i localStorage fungují bez ohledu na síť.
 
 ### Zapnutí Pages
 

@@ -460,6 +460,40 @@ table.mini tfoot td { border-bottom: 0; border-top: 2px solid var(--line); color
   margin: 14px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
   background: var(--crit-soft); color: var(--crit); font-size: 13px;
 }
+.pub-ok {
+  margin: 14px 0 0; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--good-soft); color: var(--text); font-size: 13px;
+}
+.pub-ok .pub-log { margin-top: 8px; }
+.pub-sub {
+  margin: 0 0 4px; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-3);
+}
+h3.pub-sub + p { margin-top: 0; }
+.pub-note {
+  margin: 0 0 18px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text-2); font-size: 13px; line-height: 1.7;
+}
+.pub-login { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
+.pub-login label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 12px; color: var(--text-2);
+}
+.pub-login input {
+  font: inherit; font-size: 13px; padding: 7px 10px; min-width: 200px;
+  color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.pub-login input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.remote-note {
+  margin: 0 0 18px; padding: 9px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text-3); font-size: 12.5px;
+}
+.remote-note.warn { background: var(--warn-soft); color: var(--warn); }
+
+/* oddělit obě cesty publikování */
+hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px; }
 
 /* ---------- srovnání měsíců ---------- */
 .cmp-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
