@@ -41,10 +41,11 @@ const LOCAL_DATA = 'data/months.local.js'
 const hasLocal = existsSync(join(ROOT, LOCAL_DATA))
 
 const scripts = []
-html = html.replace(/[ \t]*<script src="([^"]+)"><\/script>\n?/g, (_, src) => {
+html = html.replace(/[ \t]*<script(?: id="([\w-]+)")? src="([^"]+)"><\/script>\n?/g, (_, id, src) => {
   const from = src === 'data/months.js' && hasLocal ? LOCAL_DATA : src
   scripts.push(from)
-  return `\n<!-- ${from} -->\n<script>\n` +
+  // id zůstává — generátor veřejné verze podle něj najde skript s daty
+  return `\n<!-- ${from} -->\n<script${id ? ` id="${id}"` : ''}>\n` +
     safe(readFileSync(join(ROOT, from), 'utf8').trimEnd()) + '\n</script>\n'
 })
 
