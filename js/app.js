@@ -1111,33 +1111,80 @@
     const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
     const chk = cmp && cmp.annual.checked ? cmp.annual : null
 
-    const check = !chk ? '' : `<div class="card">
+    const VERDICT = {
+      move: {
+        tone: 'good',
+        title: 'Evidence je pohyb za měsíc — výpočet panelu sedí',
+        text: `Roční součet přibývá přesně o <strong>Do MEZD + Evidence</strong>, tedy
+          o to, co panel ukazuje ve sloupci Přesčas. Na měsíční i roční čísla se dá
+          spolehnout.`,
+      },
+      balance: {
+        tone: 'crit',
+        title: 'Evidence je STAV konta, ne pohyb — panel přesčas nadhodnocuje',
+        text: `Roční součet nepřibývá o <strong>Do MEZD + Evidence</strong>, ale o
+          <strong>Do MEZD + (Evidence tento měsíc − Evidence minulý měsíc)</strong>.
+          Sloupec Evidence tedy není, kolik hodin do konta za měsíc přibylo, ale kolik
+          jich na kontě ke konci měsíce <em>je</em>. Panel ten zůstatek připočítává
+          každý měsíc znovu, takže <strong>měsíční přesčas vychází příliš vysoko</strong> —
+          u člověka s velkým kontem klidně dvojnásobek. Roční součet z mzdového systému
+          je naopak správně.`,
+      },
+      unclear: {
+        tone: 'warn',
+        title: 'Ani jeden výklad nesedí',
+        text: `Přírůstek ročního součtu neodpovídá ani <strong>MEZD + Evidence</strong>,
+          ani <strong>MEZD + přírůstek konta</strong>. Mzdový systém do ročního součtu
+          počítá ještě něco dalšího.`,
+      },
+    }
+    const v = chk ? VERDICT[chk.verdict] : null
+    const pct = (n) => chk.checked ? Math.round((n / chk.checked) * 100) : 0
+
+    const check = !chk || !v ? '' : `<div class="card">
       <div class="card-head">
-        <h2>Sedí roční součet na součet měsíců?</h2>
+        <h2>Co vlastně znamená sloupec Evidence?</h2>
         <span class="hint">${esc(monthShort(prevK))} → ${esc(monthShort(ui.month))} · ${num(chk.checked)} lidí v obou měsících</span>
       </div>
-      ${chk.mismatched === 0
-        ? `<p class="hint" style="margin:0">Ano — u všech ${num(chk.checked)} lidí přibyl roční
-             součet přesně o jejich měsíční přesčas. Na roční limit se dá spolehnout.</p>`
-        : `<p class="hint" style="margin:0 0 12px">
-             <strong>U ${num(chk.mismatched)} z ${num(chk.checked)} lidí ne.</strong>
-             Roční součet jim přibyl o jinou hodnotu, než je jejich měsíční přesčas — mzdový
-             systém do něj tedy počítá něco jiného než součet vykázaných přesčasů. Prahy
-             ${CFG.year.warn} / ${CFG.year.crit} / ${CFG.year.cap} h níže měří to, co do
-             ročního součtu dává mzdový systém, ne součet sloupce Přesčas.</p>
-           <div class="table-wrap"><table>
-             <thead><tr><th>Jméno</th><th>Středisko</th>
-               <th class="num">Přesčas ${esc(monthShort(ui.month))}</th>
-               <th class="num">Δ ročně</th><th class="num">Rozdíl</th></tr></thead>
-             <tbody>${chk.examples.map((e) => `<tr>
-               <td class="name">${esc(e.row.n)}</td>
-               <td>${esc(e.row.s)}</td>
-               <td class="num">${hm(e.t)}</td>
-               <td class="num">${hm(e.dr)}</td>
-               <td class="num"><span class="tag crit">${e.diff > 0 ? '+' : '−'}${hm(Math.abs(e.diff))}</span></td>
-             </tr>`).join('')}</tbody>
-           </table></div>
-           <p class="hint" style="margin:12px 0 0">Ukázáno ${num(chk.examples.length)} největších rozdílů.</p>`}
+
+      <p class="hint" style="margin:0 0 14px">
+        Rozsoudit to umí roční součet z mzdového systému: o kolik přibude mezi dvěma
+        měsíci, tolik ten měsíc přesčasu doopravdy bylo. Panel to porovnal u každého,
+        kdo je v obou měsících.
+      </p>
+
+      <div class="method-rows">
+        <div class="method-row${chk.verdict === 'move' ? ' win' : ''}">
+          <span class="method-formula">Do MEZD + Evidence <small>— evidence je pohyb za měsíc</small></span>
+          <span class="method-score"><strong>${num(chk.okMove)}</strong> z ${num(chk.checked)} · ${pct(chk.okMove)} %</span>
+        </div>
+        <div class="method-row${chk.verdict === 'balance' ? ' win' : ''}">
+          <span class="method-formula">Do MEZD + přírůstek konta <small>— evidence je zůstatek ke konci měsíce</small></span>
+          <span class="method-score"><strong>${num(chk.okBalance)}</strong> z ${num(chk.checked)} · ${pct(chk.okBalance)} %</span>
+        </div>
+      </div>
+
+      <div class="method-verdict ${v.tone}">
+        <strong>${esc(v.title)}</strong>
+        <p>${v.text}</p>
+      </div>
+
+      ${chk.neither ? `<p class="hint" style="margin:14px 0 0">
+        U ${num(chk.neither)} lidí nesedí ani jedna varianta. Největší rozdíly:
+      </p>
+      <div class="table-wrap" style="margin-top:10px"><table>
+        <thead><tr><th>Jméno</th><th>Středisko</th>
+          <th class="num">Δ ročně</th>
+          <th class="num">MEZD + evidence</th>
+          <th class="num">MEZD + přírůstek</th></tr></thead>
+        <tbody>${chk.examples.map((e) => `<tr>
+          <td class="name">${esc(e.row.n)}</td>
+          <td>${esc(e.row.s)}</td>
+          <td class="num">${hm(e.dr)}</td>
+          <td class="num">${hm(e.asMove)}</td>
+          <td class="num">${hm(e.asBalance)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : ''}
     </div>`
 
     el.innerHTML = `<div class="grid kpis">

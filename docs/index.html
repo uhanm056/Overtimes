@@ -505,6 +505,28 @@ h3.pub-sub + p { margin-top: 0; }
 }
 .remote-note.warn { background: var(--warn-soft); color: var(--warn); }
 
+/* ---------- která metodika sedí ---------- */
+.method-rows { display: grid; gap: 8px; }
+.method-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 8px 16px; padding: 11px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid transparent;
+}
+.method-row.win { background: var(--accent-soft); border-color: var(--accent); }
+.method-formula { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.method-formula small { display: block; font-weight: 400; color: var(--text-3); font-size: 12px; }
+.method-score { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.method-row.win .method-score strong { color: var(--accent); }
+
+.method-verdict {
+  margin-top: 16px; padding: 13px 15px; border-radius: var(--radius-sm);
+  border-left: 3px solid; font-size: 13px; line-height: 1.7;
+}
+.method-verdict p { margin: 5px 0 0; color: var(--text-2); }
+.method-verdict.good { background: var(--good-soft); border-color: var(--good); }
+.method-verdict.warn { background: var(--warn-soft); border-color: var(--warn); }
+.method-verdict.crit { background: var(--crit-soft); border-color: var(--crit); }
+
 /* oddělit obě cesty publikování */
 hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px; }
 
@@ -2006,6 +2028,58 @@ window.PP = window.PP || {}
   }
 
   /** Porovnání dvou měsíců — delta na osobu i na středisko. */
+  /* Který výklad sloupce „Přesčas evidence“ odpovídá mzdovému systému?
+     Jsou v úvaze dva:
+
+       A) evidence je POHYB za měsíc      → přesčas = MEZD + evidence
+       B) evidence je STAV konta na konci → přesčas = MEZD + (evidence − evidence předchozího měsíce)
+
+     Rozsoudit to umí roční součet: o kolik přibude mezi dvěma měsíci, tolik
+     ten měsíc přesčasu bylo. Porovná se tedy přírůstek ročního součtu s oběma
+     variantami u každého, kdo je v obou měsících. Rozdíl mezi A a B není
+     kosmetický — u člověka s velkým kontem je A klidně dvojnásobek. */
+  const round2 = (v) => Math.round(v * 100) / 100
+
+  function methodCheck(movers) {
+    const out = {
+      checked: 0,
+      okMove: 0,        // varianta A
+      okBalance: 0,     // varianta B
+      neither: 0,
+      examples: [],
+    }
+    for (const m of movers) {
+      if (m.r.r == null || m.prev.r == null || m.prev.e == null) continue
+      out.checked++
+      const dr = round2(m.r.r - m.prev.r)
+      const asMove = m.r.t
+      const asBalance = round2(m.r.m + (m.r.e - m.prev.e))
+      const fitsMove = Math.abs(dr - asMove) <= 0.02
+      const fitsBalance = Math.abs(dr - asBalance) <= 0.02
+      if (fitsMove) out.okMove++
+      if (fitsBalance) out.okBalance++
+      if (!fitsMove && !fitsBalance) {
+        out.neither++
+        if (out.examples.length < 10) {
+          out.examples.push({ row: m.r, dr, asMove, asBalance, diff: round2(dr - asMove) })
+        }
+      }
+    }
+    out.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+
+    /* Vyhrává ta varianta, která sedí aspoň u 95 % lidí a zároveň výrazně líp
+       než ta druhá. Když ani jedna, měří mzdový systém něco dalšího a je lepší
+       to přiznat, než si vybrat. */
+    const share = (n) => (out.checked ? n / out.checked : 0)
+    out.verdict = !out.checked ? null
+      : share(out.okBalance) >= 0.95 && out.okBalance > out.okMove ? 'balance'
+      : share(out.okMove) >= 0.95 && out.okMove > out.okBalance ? 'move'
+      : 'unclear'
+    // zpětná kompatibilita se starou kartou
+    out.mismatched = out.checked - out.okMove
+    return out
+  }
+
   PP.compare = function (current, previous) {
     if (!current || !previous) return null
     const a = PP.stats(current)
@@ -2052,21 +2126,7 @@ window.PP = window.PP || {}
           .sort((x, y) => y.d - x.d)
       : []
 
-    /* Sedí roční součet na součet měsíců? Porovná se přírůstek ročního součtu
-       s měsíčním přesčasem u každého, kdo je v obou měsících. */
-    const annual = { checked: 0, mismatched: 0, examples: [] }
-    for (const m of movers) {
-      if (m.r.r == null || m.prev.r == null) continue
-      annual.checked++
-      const dr = Math.round((m.r.r - m.prev.r) * 100) / 100
-      if (Math.abs(dr - m.r.t) > 0.02) {
-        annual.mismatched++
-        if (annual.examples.length < 10) {
-          annual.examples.push({ row: m.r, dr, t: m.r.t, diff: Math.round((dr - m.r.t) * 100) / 100 })
-        }
-      }
-    }
-    annual.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+    const annual = methodCheck(movers)
 
     return {
       annual,
@@ -3588,33 +3648,80 @@ window.PP = window.PP || {}
     const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
     const chk = cmp && cmp.annual.checked ? cmp.annual : null
 
-    const check = !chk ? '' : `<div class="card">
+    const VERDICT = {
+      move: {
+        tone: 'good',
+        title: 'Evidence je pohyb za měsíc — výpočet panelu sedí',
+        text: `Roční součet přibývá přesně o <strong>Do MEZD + Evidence</strong>, tedy
+          o to, co panel ukazuje ve sloupci Přesčas. Na měsíční i roční čísla se dá
+          spolehnout.`,
+      },
+      balance: {
+        tone: 'crit',
+        title: 'Evidence je STAV konta, ne pohyb — panel přesčas nadhodnocuje',
+        text: `Roční součet nepřibývá o <strong>Do MEZD + Evidence</strong>, ale o
+          <strong>Do MEZD + (Evidence tento měsíc − Evidence minulý měsíc)</strong>.
+          Sloupec Evidence tedy není, kolik hodin do konta za měsíc přibylo, ale kolik
+          jich na kontě ke konci měsíce <em>je</em>. Panel ten zůstatek připočítává
+          každý měsíc znovu, takže <strong>měsíční přesčas vychází příliš vysoko</strong> —
+          u člověka s velkým kontem klidně dvojnásobek. Roční součet z mzdového systému
+          je naopak správně.`,
+      },
+      unclear: {
+        tone: 'warn',
+        title: 'Ani jeden výklad nesedí',
+        text: `Přírůstek ročního součtu neodpovídá ani <strong>MEZD + Evidence</strong>,
+          ani <strong>MEZD + přírůstek konta</strong>. Mzdový systém do ročního součtu
+          počítá ještě něco dalšího.`,
+      },
+    }
+    const v = chk ? VERDICT[chk.verdict] : null
+    const pct = (n) => chk.checked ? Math.round((n / chk.checked) * 100) : 0
+
+    const check = !chk || !v ? '' : `<div class="card">
       <div class="card-head">
-        <h2>Sedí roční součet na součet měsíců?</h2>
+        <h2>Co vlastně znamená sloupec Evidence?</h2>
         <span class="hint">${esc(monthShort(prevK))} → ${esc(monthShort(ui.month))} · ${num(chk.checked)} lidí v obou měsících</span>
       </div>
-      ${chk.mismatched === 0
-        ? `<p class="hint" style="margin:0">Ano — u všech ${num(chk.checked)} lidí přibyl roční
-             součet přesně o jejich měsíční přesčas. Na roční limit se dá spolehnout.</p>`
-        : `<p class="hint" style="margin:0 0 12px">
-             <strong>U ${num(chk.mismatched)} z ${num(chk.checked)} lidí ne.</strong>
-             Roční součet jim přibyl o jinou hodnotu, než je jejich měsíční přesčas — mzdový
-             systém do něj tedy počítá něco jiného než součet vykázaných přesčasů. Prahy
-             ${CFG.year.warn} / ${CFG.year.crit} / ${CFG.year.cap} h níže měří to, co do
-             ročního součtu dává mzdový systém, ne součet sloupce Přesčas.</p>
-           <div class="table-wrap"><table>
-             <thead><tr><th>Jméno</th><th>Středisko</th>
-               <th class="num">Přesčas ${esc(monthShort(ui.month))}</th>
-               <th class="num">Δ ročně</th><th class="num">Rozdíl</th></tr></thead>
-             <tbody>${chk.examples.map((e) => `<tr>
-               <td class="name">${esc(e.row.n)}</td>
-               <td>${esc(e.row.s)}</td>
-               <td class="num">${hm(e.t)}</td>
-               <td class="num">${hm(e.dr)}</td>
-               <td class="num"><span class="tag crit">${e.diff > 0 ? '+' : '−'}${hm(Math.abs(e.diff))}</span></td>
-             </tr>`).join('')}</tbody>
-           </table></div>
-           <p class="hint" style="margin:12px 0 0">Ukázáno ${num(chk.examples.length)} největších rozdílů.</p>`}
+
+      <p class="hint" style="margin:0 0 14px">
+        Rozsoudit to umí roční součet z mzdového systému: o kolik přibude mezi dvěma
+        měsíci, tolik ten měsíc přesčasu doopravdy bylo. Panel to porovnal u každého,
+        kdo je v obou měsících.
+      </p>
+
+      <div class="method-rows">
+        <div class="method-row${chk.verdict === 'move' ? ' win' : ''}">
+          <span class="method-formula">Do MEZD + Evidence <small>— evidence je pohyb za měsíc</small></span>
+          <span class="method-score"><strong>${num(chk.okMove)}</strong> z ${num(chk.checked)} · ${pct(chk.okMove)} %</span>
+        </div>
+        <div class="method-row${chk.verdict === 'balance' ? ' win' : ''}">
+          <span class="method-formula">Do MEZD + přírůstek konta <small>— evidence je zůstatek ke konci měsíce</small></span>
+          <span class="method-score"><strong>${num(chk.okBalance)}</strong> z ${num(chk.checked)} · ${pct(chk.okBalance)} %</span>
+        </div>
+      </div>
+
+      <div class="method-verdict ${v.tone}">
+        <strong>${esc(v.title)}</strong>
+        <p>${v.text}</p>
+      </div>
+
+      ${chk.neither ? `<p class="hint" style="margin:14px 0 0">
+        U ${num(chk.neither)} lidí nesedí ani jedna varianta. Největší rozdíly:
+      </p>
+      <div class="table-wrap" style="margin-top:10px"><table>
+        <thead><tr><th>Jméno</th><th>Středisko</th>
+          <th class="num">Δ ročně</th>
+          <th class="num">MEZD + evidence</th>
+          <th class="num">MEZD + přírůstek</th></tr></thead>
+        <tbody>${chk.examples.map((e) => `<tr>
+          <td class="name">${esc(e.row.n)}</td>
+          <td>${esc(e.row.s)}</td>
+          <td class="num">${hm(e.dr)}</td>
+          <td class="num">${hm(e.asMove)}</td>
+          <td class="num">${hm(e.asBalance)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : ''}
     </div>`
 
     el.innerHTML = `<div class="grid kpis">
