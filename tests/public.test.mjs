@@ -109,6 +109,32 @@ const centers = await page.evaluate(() => ({
 check('výběr střediska funguje', centers.chipy > 3 ? 'ano' : 'ne', 'ano')
 check('žádná prokliknutelná jména', centers.jmena, 0)
 
+/* Karta TOP středisek zůstává i veřejně — je to nejčitelnější část přehledu —
+   ale jmenné seznamy z ní musí zmizet. */
+await page.click('#nav button[data-section="overview"]')
+await page.waitForSelector('.topc-item')
+const top = await page.evaluate(() => ({
+  nadpis: document.querySelector('.card:has(.topc) h2').textContent.trim(),
+  strediska: document.querySelectorAll('.topc-item').length,
+  lide: document.querySelectorAll('.topc-people').length,
+  jmena: document.querySelectorAll('.topc .link-person').length,
+  proklik: document.querySelectorAll('.topc .link-center').length,
+}))
+console.log('\nTOP střediska ve veřejném vydání:')
+check('karta je vidět', top.nadpis, 'TOP střediska')
+check('nejmenuje se „a jejich lidé“', /jejich lidé/.test(top.nadpis) ? 'jmenuje' : 'ne', 'ne')
+check('střediska se vypsala', top.strediska > 1 ? 'ano' : 'ne', 'ano')
+check('seznamy lidí nejsou', top.lide, 0)
+check('ani jedno jméno', top.jmena, 0)
+check('proklik na detail střediska funguje', top.proklik, top.strediska)
+
+await page.click('[data-topby="avg"]')
+await page.waitForTimeout(200)
+check('přepínač na Ø na osobu funguje',
+  await page.$$eval('.topc-item', (e) => e.length) > 1 ? 'ano' : 'ne', 'ano')
+check('ani po přepnutí tam nejsou jména',
+  await page.$$eval('.topc .link-person', (e) => e.length), 0)
+
 await browser.close()
 console.log(fails.length ? `\n${fails.length} selhalo: ${fails.join(', ')}` : '\nVšechny kontroly prošly.')
 process.exit(fails.length ? 1 : 0)
