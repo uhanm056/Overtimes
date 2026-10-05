@@ -56,6 +56,7 @@
     log: [],          // výsledky importů; přežijí překreslení panelu
     admin: null,      // přihlášený účet, který smí publikovat
     pubMsg: null,     // poslední hláška z publikování { kind, html }
+    diag: null,       // výsledek kontroly spojení
   }
 
   /* ---------- motiv ---------- */
@@ -1388,6 +1389,8 @@
     const msg = ui.pubMsg
       ? `<div class="pub-${ui.pubMsg.kind}">${ui.pubMsg.html}</div>`
       : ''
+    const diag = `<button class="btn ghost sm" type="button" id="pub-diag">Zkontrolovat spojení</button>`
+    const diagOut = ui.diag ? diagHtml(ui.diag) : ''
 
     if (!who) {
       return `<h3 class="pub-sub">Publikovat na web</h3>
@@ -1398,9 +1401,10 @@
         <label>E-mail <input type="email" id="pub-email" autocomplete="username" required></label>
         <label>Heslo <input type="password" id="pub-pass" autocomplete="current-password" required></label>
         <button class="btn" type="submit">Přihlásit</button>
+        ${diag}
         <span class="export-status" id="pub-live-status" role="status"></span>
       </form>
-      ${msg}`
+      ${msg}${diagOut}`
     }
 
     return `<h3 class="pub-sub">Publikovat na web</h3>
@@ -1412,9 +1416,33 @@
       <button class="btn" type="button" id="pub-live"${keys.length ? '' : ' disabled'}>
         Publikovat ${num(keys.length)} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</button>
       <button class="btn ghost sm" type="button" id="pub-logout">Odhlásit</button>
+      ${diag}
       <span class="export-status" id="pub-live-status" role="status"></span>
     </div>
-    ${msg}`
+    ${msg}${diagOut}`
+  }
+
+  function diagHtml(steps) {
+    const vse = steps.every((x) => x.ok)
+    return `<div class="pub-diag">
+      <h4>Kontrola spojení</h4>
+      <ol>${steps.map((x) => `<li class="${x.ok ? 'ok' : 'err'}">
+        <span aria-hidden="true">${x.ok ? '✓' : '✕'}</span>
+        <span><strong>${esc(x.name)}</strong>${x.detail ? ` — ${esc(x.detail)}` : ''}</span>
+      </li>`).join('')}</ol>
+      ${vse
+        ? `<p class="hint" style="margin:10px 0 0">
+             Přihlášení samo o sobě k zápisu nestačí — povolí ho až pravidla databáze.
+             <strong>UID výše se musí přesně shodovat</strong> s tím v pravidlech
+             (Firebase Console → Realtime Database → Rules). Jestli se liší, publikování
+             skončí na „permission denied“.
+           </p>`
+        : `<p class="hint" style="margin:10px 0 0">
+             Pošlete tenhle výpis a půjde to doladit — každý řádek ukazuje na jiné místo:
+             konfigurace je v souboru, spojení a přihlašování ve Firebase Console
+             v sekci Authentication, zápis v pravidlech databáze.
+           </p>`}
+    </div>`
   }
 
   function bindLivePublish() {
@@ -1439,6 +1467,19 @@
       try { await PP.remote.signOut() } catch (err) { /* odhlášení nesmí zablokovat UI */ }
       ui.admin = null
       ui.pubMsg = null
+      renderImport()
+    })
+
+    const diagBtn = $('#pub-diag')
+    if (diagBtn) diagBtn.addEventListener('click', async () => {
+      diagBtn.disabled = true
+      const status = $('#pub-live-status')
+      if (status) status.textContent = 'Kontroluji…'
+      try {
+        ui.diag = await PP.remote.diagnose()
+      } catch (err) {
+        ui.diag = [{ name: 'Kontrola', ok: false, detail: (err && err.message) || String(err) }]
+      }
       renderImport()
     })
 
