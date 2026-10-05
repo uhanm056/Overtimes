@@ -142,6 +142,16 @@ window.PP = window.PP || {}
     state.method = info.verdict
     state.methodInfo = info
 
+    /* Agregáty z webu řádky s lidmi nemají, takže se v nich nedá nic změřit.
+       Metodiku s sebou nesou od toho, kdo je zveřejnil — bez ní by veřejná
+       stránka popisovala sloupce jinak než panel, ze kterého čísla vyšla. */
+    if (!info.checked) {
+      for (const k of Object.keys(state.months).sort().reverse()) {
+        const rec = state.months[k]
+        if (rec && rec.aggregate && rec.method) { state.method = rec.method; break }
+      }
+    }
+
     // ukázkové měsíce zůstávají, jak jsou
     for (const k of Object.keys(state.months)) {
       const rec = state.months[k]
@@ -245,7 +255,11 @@ window.PP = window.PP || {}
     const sum = (f) => rows.reduce((a, r) => a + (Number(r[f]) || 0), 0)
     const total = sum('t')
     const mezdy = sum('m')
-    const evidence = sum('e')
+    /* Druhá složka je to, co k proplaceným hodinám zbývá do celku — ne syrový
+       sloupec evidence. Když se počítá přes přírůstek konta, je zbytek právě
+       ten přírůstek; sečíst syrové zůstatky by dalo číslo, které k součtu
+       nepasuje, a v tabulce by Do MEZD + Evidence nedávalo Celkem. */
+    const evidence = round2(total - mezdy)
 
     const centers = new Map()
     for (const r of rows) {
@@ -257,7 +271,7 @@ window.PP = window.PP || {}
       c.people++
       c.total += r.t
       c.m += r.m
-      c.e += r.e
+      c.e += r.t - r.m
       if (r.t > c.max) c.max = r.t
       c.rows.push(r)
     }
@@ -347,6 +361,7 @@ window.PP = window.PP || {}
         r: row ? row.r : (points.length ? lastR : null),
         rank: row ? stats.ranking.indexOf(row) + 1 : null,
         of: stats.withOvertime,
+        de: row ? row.de : null,
         // rozpad na mzdové složky — ať je vidět, z čeho se součet skládá
         comps: row && row.c && rec.comps
           ? row.c.map(([i, h, n]) => ({ name: rec.comps[i] || '(bez názvu)', h, rows: n }))

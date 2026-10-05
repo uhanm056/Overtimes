@@ -128,6 +128,11 @@
     return i >= 0 && i + 1 < keys.length ? keys[i + 1] : null
   }
 
+  /* Druhá složka přesčasu se jmenuje podle toho, co znamená. Když je evidence
+     zůstatek konta, je tím, co se k proplaceným hodinám přičítá, její přírůstek
+     — a „Evidence“ by v záhlaví sloupce lhalo. */
+  const evidenceLabel = () => (PP.data.method === 'balance' ? 'Přírůstek konta' : 'Evidence')
+
   /* ---------- jak se počítá přesčas ----------
      Když měření ukáže, že evidence je zůstatek konta, panel počítá jinak, než
      co je doslova ve výkazu. To se nesmí stát potichu — kdo si čísla
@@ -146,9 +151,10 @@
     box.innerHTML = `<span aria-hidden="true">${chybi ? '⚠' : 'ⓘ'}</span><div>
       <strong>Přesčas se počítá jako Do MEZD + přírůstek konta.</strong>
       Sloupec <em>Přesčas evidence</em> ve výkazu není pohyb za měsíc, ale zůstatek
-      konta ke konci měsíce — ověřeno proti ročnímu součtu u
-      ${num(info.okBalance || 0)} z ${num(info.checked || 0)} lidí. Sečíst MEZD
-      a evidenci by přesčas nafouklo, protože by se zůstatek počítal každý měsíc znovu.
+      konta ke konci měsíce${info.checked
+        ? ` — ověřeno proti ročnímu součtu u ${num(info.okBalance || 0)} z ${num(info.checked)} lidí`
+        : ''}. Sečíst MEZD a evidenci by přesčas nafouklo, protože by se zůstatek
+      počítal každý měsíc znovu.
       ${chybi
         ? `<br><strong>${esc(monthName(ui.month))} je nejstarší naimportovaný měsíc</strong>,
            takže se u něj přírůstek konta nemá od čeho odrazit a čísla jsou nadhodnocená
@@ -287,7 +293,7 @@
       </div>
       <div class="legend">
         <span><i class="dot" style="background:var(--accent)"></i>Do MEZD ${h1(s.mezdy)} h · ${pct(s.paidShare)}</span>
-        <span><i class="dot" style="background:var(--accent-2);opacity:.5"></i>Evidence ${h1(s.evidence)} h · ${pct(1 - s.paidShare)}</span>
+        <span><i class="dot" style="background:var(--accent-2);opacity:.5"></i>${esc(evidenceLabel())} ${h1(s.evidence)} h · ${pct(1 - s.paidShare)}</span>
       </div>
       <p class="hint" style="margin:12px 0 0">
         Záporná evidence znamená odečet konta po proplacení — proto může někomu vyjít součet 0
@@ -455,13 +461,15 @@
     </div>`
   }
 
-  const CENTER_COLS = [
+  /* Funkce, ne konstanta: popisek druhé složky závisí na naměřené metodice,
+     a ta se při načtení skriptu ještě neví. */
+  const centerCols = () => [
     { key: 'name', label: 'Středisko', num: false },
     { key: 'people', label: 'Lidí', num: true },
     { key: 'total', label: 'Celkem', num: true },
     { key: 'avg', label: 'Ø / osoba', num: true },
     { key: 'm', label: 'Do MEZD', num: true },
-    { key: 'e', label: 'Evidence', num: true },
+    { key: 'e', label: evidenceLabel(), num: true },
     // Maximum je přesčas jednoho konkrétního člověka — ve veřejném vydání odpadá
     { key: 'max', label: 'Maximum', num: true, internal: true },
   ].filter((c) => !(c.internal && PUBLIC))
@@ -480,7 +488,7 @@
       </div>
       <div class="table-wrap"><table id="center-table">
         <thead><tr>
-          ${CENTER_COLS.map((c) => `<th class="sortable${c.num ? ' num' : ''}" data-key="${c.key}"
+          ${centerCols().map((c) => `<th class="sortable${c.num ? ' num' : ''}" data-key="${c.key}"
             aria-sort="${key === c.key ? (ui.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"
             >${esc(c.label)}</th>`).join('')}
           ${cmp ? '<th class="num">Δ Ø</th>' : ''}
@@ -557,7 +565,7 @@
       <div class="table-wrap"><table>
         <thead><tr>
           <th class="rank">#</th><th>Jméno</th><th class="num">Os. č.</th>
-          <th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>
           <th class="num">Přesčas</th><th class="num">Ročně</th>
         </tr></thead>
         <tbody>${c.rows.map((r, i) => personRow(r, i + 1)).join('')}</tbody>
@@ -611,7 +619,7 @@
       <div class="table-wrap"><table>
         <thead><tr>
           <th class="rank">#</th><th>Jméno</th><th>Středisko</th>
-          <th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>
           <th class="num">Přesčas</th><th class="num">Ročně</th>
         </tr></thead>
         <tbody>${shown.length
@@ -882,7 +890,7 @@
 
       <div class="table-wrap" style="margin-top:18px"><table>
         <thead><tr>
-          <th>Měsíc</th><th class="num">Do MEZD</th><th class="num">Evidence</th>
+          <th>Měsíc</th><th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>
           <th class="num">Přesčas</th><th class="num">Pořadí v závodě</th>
           <th class="num">Ročně</th><th class="num">Δ ročně</th>
         </tr></thead>
@@ -903,7 +911,11 @@
           return `<tr>
             <td>${label}</td>
             <td class="num">${hm(x.m)}</td>
-            <td class="num">${hm(x.e)}</td>
+            <td class="num">${PP.data.method === 'balance'
+              ? (x.de == null
+                  ? `<span class="hint" title="Chybí předchozí měsíc, přírůstek se nemá od čeho odrazit">—</span>`
+                  : hm(x.de))
+              : hm(x.e)}</td>
             <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
             <td class="num">${x.rank}. z ${x.of}</td>
             <td class="num">${hm(x.r)}</td>

@@ -45,7 +45,7 @@ window.PP = window.PP || {}
       for (const r of rows) {
         let c = byCenter.get(r.s)
         if (!c) { c = { name: r.s, people: 0, total: 0, m: 0, e: 0 }; byCenter.set(r.s, c) }
-        c.people++; c.total += r.t; c.m += r.m; c.e += r.e
+        c.people++; c.total += r.t; c.m += r.m; c.e += r.t - r.m
       }
 
       // Malá střediska se slučují. U tříčlenného by průměr na osobu prakticky
@@ -80,13 +80,19 @@ window.PP = window.PP || {}
         rawPeriod: rec.rawPeriod,
         people: rec.people,
         aggregate: true,
+        /* Podle čeho se čísla spočítala. Bez toho by veřejná stránka nemohla
+           říct, proč nesedí na sestavu z mezd — sama to změřit nemůže, protože
+           řádky s lidmi v ní nejsou. */
+        method: (PP.data && PP.data.method) || undefined,
+        methodIncomplete: rec.methodIncomplete || undefined,
         // ať je i na zveřejněné stránce poznat, že jde o vzorek, ne o závod
         demo: rec.demo || undefined,
         summary: {
           withOvertime: rows.length,
           total: round2(rows.reduce((a, r) => a + r.t, 0)),
           mezdy: round2(rows.reduce((a, r) => a + r.m, 0)),
-          evidence: round2(rows.reduce((a, r) => a + r.e, 0)),
+          // zbytek do celku, ne syrový sloupec evidence — viz js/data.js
+          evidence: round2(rows.reduce((a, r) => a + (r.t - r.m), 0)),
           overWarn: rows.filter((r) => r.t >= CFG.person.warn).length,
           overCrit: rows.filter((r) => r.t >= CFG.person.crit).length,
           year150: rows.filter((r) => r.r > CFG.year.warn).length,
