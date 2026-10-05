@@ -222,13 +222,20 @@ const annual = await page.evaluate(() => {
 })
 
 console.log('\nKontrola ročního součtu:')
-check('na správných datech nic nehlásí', annual.sedi.mismatched, 0)
+check('na správných datech nic nehlásí', annual.sedi.neither, 0)
 check('kontrola opravdu něco porovnávala', annual.sedi.checked > 100 ? 'ano' : 'ne', 'ano')
-check('rozbité roční součty odhalí', annual.nesedi.mismatched, annual.rozbito)
+// ve vzorku je evidence pohyb za měsíc, takže musí vyhrát „MEZD + evidence“
+check('rozsudek na vzorku', annual.sedi.verdict, 'move')
+check('sedí u všech', annual.sedi.okMove, annual.sedi.checked)
+check('rozbité roční součty odhalí', annual.nesedi.neither, annual.rozbito)
 check('ukáže příklady k dohledání', annual.nesedi.examples.length, annual.rozbito)
 check('u příkladu sedí rozdíl',
-  Math.abs(annual.nesedi.examples[0].dr - annual.nesedi.examples[0].t
+  Math.abs(annual.nesedi.examples[0].dr - annual.nesedi.examples[0].asMove
     - annual.nesedi.examples[0].diff) < 0.02 ? 'ano' : 'ne', 'ano')
+// Pár lidí mimo nesmí verdiktem pohnout — u 3 ze 175 je to pořád 98 %.
+// Překlopit ho smí až systematický nesoulad, na to je tests/method.test.mjs.
+check('pár rozbitých rozsudkem nehne', annual.nesedi.verdict, 'move')
+check('ale vypíšou se', annual.nesedi.neither > 0 ? 'ano' : 'ne', 'ano')
 
 await browser.close()
 server.close()

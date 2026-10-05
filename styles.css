@@ -492,6 +492,28 @@ h3.pub-sub + p { margin-top: 0; }
 }
 .remote-note.warn { background: var(--warn-soft); color: var(--warn); }
 
+/* ---------- která metodika sedí ---------- */
+.method-rows { display: grid; gap: 8px; }
+.method-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 8px 16px; padding: 11px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid transparent;
+}
+.method-row.win { background: var(--accent-soft); border-color: var(--accent); }
+.method-formula { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.method-formula small { display: block; font-weight: 400; color: var(--text-3); font-size: 12px; }
+.method-score { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.method-row.win .method-score strong { color: var(--accent); }
+
+.method-verdict {
+  margin-top: 16px; padding: 13px 15px; border-radius: var(--radius-sm);
+  border-left: 3px solid; font-size: 13px; line-height: 1.7;
+}
+.method-verdict p { margin: 5px 0 0; color: var(--text-2); }
+.method-verdict.good { background: var(--good-soft); border-color: var(--good); }
+.method-verdict.warn { background: var(--warn-soft); border-color: var(--warn); }
+.method-verdict.crit { background: var(--crit-soft); border-color: var(--crit); }
+
 /* oddělit obě cesty publikování */
 hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px; }
 

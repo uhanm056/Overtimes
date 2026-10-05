@@ -270,6 +270,58 @@ window.PP = window.PP || {}
   }
 
   /** Porovnání dvou měsíců — delta na osobu i na středisko. */
+  /* Který výklad sloupce „Přesčas evidence“ odpovídá mzdovému systému?
+     Jsou v úvaze dva:
+
+       A) evidence je POHYB za měsíc      → přesčas = MEZD + evidence
+       B) evidence je STAV konta na konci → přesčas = MEZD + (evidence − evidence předchozího měsíce)
+
+     Rozsoudit to umí roční součet: o kolik přibude mezi dvěma měsíci, tolik
+     ten měsíc přesčasu bylo. Porovná se tedy přírůstek ročního součtu s oběma
+     variantami u každého, kdo je v obou měsících. Rozdíl mezi A a B není
+     kosmetický — u člověka s velkým kontem je A klidně dvojnásobek. */
+  const round2 = (v) => Math.round(v * 100) / 100
+
+  function methodCheck(movers) {
+    const out = {
+      checked: 0,
+      okMove: 0,        // varianta A
+      okBalance: 0,     // varianta B
+      neither: 0,
+      examples: [],
+    }
+    for (const m of movers) {
+      if (m.r.r == null || m.prev.r == null || m.prev.e == null) continue
+      out.checked++
+      const dr = round2(m.r.r - m.prev.r)
+      const asMove = m.r.t
+      const asBalance = round2(m.r.m + (m.r.e - m.prev.e))
+      const fitsMove = Math.abs(dr - asMove) <= 0.02
+      const fitsBalance = Math.abs(dr - asBalance) <= 0.02
+      if (fitsMove) out.okMove++
+      if (fitsBalance) out.okBalance++
+      if (!fitsMove && !fitsBalance) {
+        out.neither++
+        if (out.examples.length < 10) {
+          out.examples.push({ row: m.r, dr, asMove, asBalance, diff: round2(dr - asMove) })
+        }
+      }
+    }
+    out.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+
+    /* Vyhrává ta varianta, která sedí aspoň u 95 % lidí a zároveň výrazně líp
+       než ta druhá. Když ani jedna, měří mzdový systém něco dalšího a je lepší
+       to přiznat, než si vybrat. */
+    const share = (n) => (out.checked ? n / out.checked : 0)
+    out.verdict = !out.checked ? null
+      : share(out.okBalance) >= 0.95 && out.okBalance > out.okMove ? 'balance'
+      : share(out.okMove) >= 0.95 && out.okMove > out.okBalance ? 'move'
+      : 'unclear'
+    // zpětná kompatibilita se starou kartou
+    out.mismatched = out.checked - out.okMove
+    return out
+  }
+
   PP.compare = function (current, previous) {
     if (!current || !previous) return null
     const a = PP.stats(current)
@@ -316,21 +368,7 @@ window.PP = window.PP || {}
           .sort((x, y) => y.d - x.d)
       : []
 
-    /* Sedí roční součet na součet měsíců? Porovná se přírůstek ročního součtu
-       s měsíčním přesčasem u každého, kdo je v obou měsících. */
-    const annual = { checked: 0, mismatched: 0, examples: [] }
-    for (const m of movers) {
-      if (m.r.r == null || m.prev.r == null) continue
-      annual.checked++
-      const dr = Math.round((m.r.r - m.prev.r) * 100) / 100
-      if (Math.abs(dr - m.r.t) > 0.02) {
-        annual.mismatched++
-        if (annual.examples.length < 10) {
-          annual.examples.push({ row: m.r, dr, t: m.r.t, diff: Math.round((dr - m.r.t) * 100) / 100 })
-        }
-      }
-    }
-    annual.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+    const annual = methodCheck(movers)
 
     return {
       annual,
