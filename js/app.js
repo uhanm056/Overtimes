@@ -1721,6 +1721,20 @@
     render()
   }
 
+  /* Verze sestavení, viditelně. Bez ní se nedá poznat, jestli se člověk dívá
+     na čerstvou stránku, nebo na kopii, kterou mu drží cache — a ta otázka
+     se jinak vrací pokaždé, když něco nesedí. */
+  function updateBuildNote() {
+    const el = $('#rail-build')
+    if (!el) return
+    const meta = document.querySelector('meta[name="generator"]')
+    const stamp = meta ? (/(\d{4}-\d{2}-\d{2})/.exec(meta.content) || [])[1] : null
+    if (!stamp) { el.hidden = true; return }
+    const [y, m, d] = stamp.split('-')
+    el.hidden = false
+    el.textContent = `verze ${Number(d)}. ${Number(m)}. ${y}`
+  }
+
   function updateRailNote() {
     const keys = PP.data.keys()
     const note = $('#rail-note')
@@ -1779,6 +1793,7 @@
     await PP.data.init()
     renderMonthPicker()
     updateRailNote()
+    updateBuildNote()
 
     $('#month-select').addEventListener('change', (e) => {
       ui.month = e.target.value

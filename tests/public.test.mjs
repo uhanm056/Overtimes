@@ -82,6 +82,11 @@ const ui = await page.evaluate(() => ({
 }))
 
 console.log('\nPanel:')
+/* Bez viditelné verze se nedá poznat, jestli se člověk dívá na čerstvou
+   stránku, nebo na kopii z cache. */
+const dnes = new Date()
+const ocekavano = `verze ${dnes.getDate()}. ${dnes.getMonth() + 1}. ${dnes.getFullYear()}`
+check('verze sestavení je vidět', await page.textContent('#rail-build'), ocekavano)
 check('jen neosobní sekce', ui.sekce, 'overview,centers,compare,method')
 check('sloupec Maximum (hodnota jednotlivce) chybí',
   ui.sloupce.includes('Maximum') ? 'je tam' : 'chybí', 'chybí')
