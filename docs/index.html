@@ -513,6 +513,17 @@ h3.pub-sub + p { margin-top: 0; }
 }
 .pub-login input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+.pub-diag { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.pub-diag h4 {
+  margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.pub-diag ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.pub-diag li { display: flex; gap: 9px; align-items: baseline; font-size: 13px; line-height: 1.55; }
+.pub-diag li.ok > span:first-child { color: var(--good); }
+.pub-diag li.err > span:first-child { color: var(--crit); }
+.pub-diag li.err { color: var(--crit); }
+
 .remote-note {
   margin: 0 0 18px; padding: 9px 14px; border-radius: var(--radius-sm);
   background: var(--surface-2); color: var(--text-3); font-size: 12.5px;
@@ -2635,6 +2646,13 @@ window.PP = window.PP || {}
       return () => ref.off('value', handler)
     },
 
+    /** Kdo je přihlášený podle serveru, včetně anonymního účtu. */
+    async authState() {
+      const firebase = await fb()
+      const u = firebase.auth().currentUser
+      return u ? { uid: u.uid, email: u.email || null, anonymous: !!u.isAnonymous } : null
+    },
+
     /** Zápis souhrnů. Jedním update(), ať je stránka buď celá stará, nebo celá nová. */
     async publish(payload) {
       const firebase = await fb()
@@ -2645,8 +2663,58 @@ window.PP = window.PP || {}
   /* Testy a jiná úložiště si mohou podstrčit vlastní implementaci. */
   function backend() { return window.PP_REMOTE_ADAPTER || impl }
 
+  /* Když spojení nefunguje, je potřeba vědět KDE — jinak se hádá mezi
+     konfigurací, SDK, přihlášením a pravidly databáze. Projde se to po
+     krocích a každý řekne buď „ok“, nebo přesnou chybu. */
+  async function diagnose() {
+    const steps = []
+    const step = async (name, fn) => {
+      try {
+        const detail = await fn()
+        steps.push({ name, ok: true, detail: detail || '' })
+        return true
+      } catch (err) {
+        steps.push({ name, ok: false, detail: (err && err.message) || String(err) })
+        return false
+      }
+    }
+    const b = backend()
+
+    const okCfg = await step('Konfigurace databáze', async () => {
+      if (!b.configured()) throw new Error('V panelu není vyplněná window.PP_FIREBASE.')
+      const c = window.PP_FIREBASE || {}
+      return c.databaseURL || b.name
+    })
+    if (!okCfg) return steps
+
+    const okConn = await step('Spojení a anonymní přihlášení', async () => {
+      await b.connect()
+      return 'navázáno'
+    })
+    if (!okConn) return steps
+
+    await step('Čtení zveřejněných dat', async () => {
+      const data = await b.load()
+      if (!data) return 'připojeno, ale zatím nic zveřejněno'
+      const n = data.months ? Object.keys(data.months).length : 0
+      return `${n} ${n === 1 ? 'měsíc' : n < 5 ? 'měsíce' : 'měsíců'}` +
+        (data.updatedAt ? `, naposled ${data.updatedAt.slice(0, 16).replace('T', ' ')}` : '')
+    })
+
+    await step('Přihlášení k zápisu', async () => {
+      const who = b.authState ? await b.authState() : null
+      if (!who) throw new Error('Nikdo není přihlášený.')
+      if (who.anonymous) throw new Error('Jste přihlášen jen anonymně — na zápis je potřeba e-mail a heslo.')
+      return `${who.email} · UID ${who.uid}`
+    })
+
+    return steps
+  }
+
   PP.remote = {
     get name() { return backend().name },
+    diagnose,
+    authState() { return (backend().authState || impl.authState).call(backend()) },
     configured() { return backend().configured() },
     connect() { return backend().connect() },
     signIn(email, password) { return backend().signIn(email, password) },
@@ -2754,6 +2822,7 @@ window.PP = window.PP || {}
     log: [],          // výsledky importů; přežijí překreslení panelu
     admin: null,      // přihlášený účet, který smí publikovat
     pubMsg: null,     // poslední hláška z publikování { kind, html }
+    diag: null,       // výsledek kontroly spojení
   }
 
   /* ---------- motiv ---------- */
@@ -4086,6 +4155,8 @@ window.PP = window.PP || {}
     const msg = ui.pubMsg
       ? `<div class="pub-${ui.pubMsg.kind}">${ui.pubMsg.html}</div>`
       : ''
+    const diag = `<button class="btn ghost sm" type="button" id="pub-diag">Zkontrolovat spojení</button>`
+    const diagOut = ui.diag ? diagHtml(ui.diag) : ''
 
     if (!who) {
       return `<h3 class="pub-sub">Publikovat na web</h3>
@@ -4096,9 +4167,10 @@ window.PP = window.PP || {}
         <label>E-mail <input type="email" id="pub-email" autocomplete="username" required></label>
         <label>Heslo <input type="password" id="pub-pass" autocomplete="current-password" required></label>
         <button class="btn" type="submit">Přihlásit</button>
+        ${diag}
         <span class="export-status" id="pub-live-status" role="status"></span>
       </form>
-      ${msg}`
+      ${msg}${diagOut}`
     }
 
     return `<h3 class="pub-sub">Publikovat na web</h3>
@@ -4110,9 +4182,33 @@ window.PP = window.PP || {}
       <button class="btn" type="button" id="pub-live"${keys.length ? '' : ' disabled'}>
         Publikovat ${num(keys.length)} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</button>
       <button class="btn ghost sm" type="button" id="pub-logout">Odhlásit</button>
+      ${diag}
       <span class="export-status" id="pub-live-status" role="status"></span>
     </div>
-    ${msg}`
+    ${msg}${diagOut}`
+  }
+
+  function diagHtml(steps) {
+    const vse = steps.every((x) => x.ok)
+    return `<div class="pub-diag">
+      <h4>Kontrola spojení</h4>
+      <ol>${steps.map((x) => `<li class="${x.ok ? 'ok' : 'err'}">
+        <span aria-hidden="true">${x.ok ? '✓' : '✕'}</span>
+        <span><strong>${esc(x.name)}</strong>${x.detail ? ` — ${esc(x.detail)}` : ''}</span>
+      </li>`).join('')}</ol>
+      ${vse
+        ? `<p class="hint" style="margin:10px 0 0">
+             Přihlášení samo o sobě k zápisu nestačí — povolí ho až pravidla databáze.
+             <strong>UID výše se musí přesně shodovat</strong> s tím v pravidlech
+             (Firebase Console → Realtime Database → Rules). Jestli se liší, publikování
+             skončí na „permission denied“.
+           </p>`
+        : `<p class="hint" style="margin:10px 0 0">
+             Pošlete tenhle výpis a půjde to doladit — každý řádek ukazuje na jiné místo:
+             konfigurace je v souboru, spojení a přihlašování ve Firebase Console
+             v sekci Authentication, zápis v pravidlech databáze.
+           </p>`}
+    </div>`
   }
 
   function bindLivePublish() {
@@ -4137,6 +4233,19 @@ window.PP = window.PP || {}
       try { await PP.remote.signOut() } catch (err) { /* odhlášení nesmí zablokovat UI */ }
       ui.admin = null
       ui.pubMsg = null
+      renderImport()
+    })
+
+    const diagBtn = $('#pub-diag')
+    if (diagBtn) diagBtn.addEventListener('click', async () => {
+      diagBtn.disabled = true
+      const status = $('#pub-live-status')
+      if (status) status.textContent = 'Kontroluji…'
+      try {
+        ui.diag = await PP.remote.diagnose()
+      } catch (err) {
+        ui.diag = [{ name: 'Kontrola', ok: false, detail: (err && err.message) || String(err) }]
+      }
       renderImport()
     })
 

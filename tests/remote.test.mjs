@@ -55,6 +55,7 @@ window.PP_REMOTE_ADAPTER = {
   },
   async signOut() { this.user = null },
   async currentUser() { return this.user },
+  async authState() { return this.user ? { uid: this.user.uid, email: this.user.email, anonymous: false } : null },
   async load() { return this.store },
   async watch(cb) { this.watchers.push(cb); return function () {} },
   async publish(payload) {
@@ -82,7 +83,20 @@ await page.waitForSelector('#drop')
 await page.setInputFiles('#file', [join(FIX, 'souctovy-vykaz-2026-09.xls')])
 await page.waitForSelector('#log .log-item.ok')
 
-console.log('Bez přihlášení:')
+/* ---------- kontrola spojení ----------
+   Když uživatel napíše „nefunguje to“, musí panel sám říct kde. */
+await page.click('#pub-diag')
+await page.waitForSelector('.pub-diag li')
+const diagAnon = await page.$$eval('.pub-diag li', (li) =>
+  li.map((x) => (x.classList.contains('ok') ? 'ok' : 'ERR') + ' ' + x.querySelector('strong').textContent))
+
+console.log('Kontrola spojení bez přihlášení:')
+check('zkontroluje konfiguraci', diagAnon[0], 'ok Konfigurace databáze')
+check('zkontroluje spojení', diagAnon[1], 'ok Spojení a anonymní přihlášení')
+check('zkontroluje čtení', diagAnon[2], 'ok Čtení zveřejněných dat')
+check('a najde, že chybí přihlášení k zápisu', diagAnon[3], 'ERR Přihlášení k zápisu')
+
+console.log('\nBez přihlášení:')
 check('tlačítko Publikovat není', await page.$$eval('#pub-live', (e) => e.length), 0)
 check('nabízí se přihlášení', await page.$$eval('#pub-login', (e) => e.length), 1)
 check('v databázi nic není', await page.evaluate(() => window.PP_REMOTE_ADAPTER.store), 'null')
@@ -99,6 +113,15 @@ await page.fill('#pub-email', 'sef@zavod.cz')
 await page.fill('#pub-pass', 'tajne')
 await page.click('#pub-login button[type=submit]')
 await page.waitForSelector('#pub-live')
+// po přihlášení musí kontrola projít celá a ukázat UID, které patří do pravidel
+await page.click('#pub-diag')
+await page.waitForSelector('.pub-diag li.ok:nth-child(4)', { timeout: 10000 })
+const diagAdmin = await page.$$eval('.pub-diag li', (li) =>
+  li.map((x) => (x.classList.contains('ok') ? 'ok' : 'ERR') + ' ' + x.textContent.replace(/\s+/g, ' ').trim()))
+console.log('\nKontrola spojení po přihlášení:')
+check('projde celá', diagAdmin.filter((x) => x.startsWith('ERR')).length, 0)
+check('ukáže účet i UID', /sef@zavod\.cz · UID u1/.test(diagAdmin[3]) ? 'ano' : 'ne: ' + diagAdmin[3], 'ano')
+
 await page.click('#pub-live')
 // čekat na kterýkoli výsledek, ať se u chyby nečeká zbytečně do timeoutu
 await page.waitForSelector('.pub-ok, .pub-err', { timeout: 15000 })

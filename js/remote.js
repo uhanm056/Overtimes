@@ -130,6 +130,13 @@ window.PP = window.PP || {}
       return () => ref.off('value', handler)
     },
 
+    /** Kdo je přihlášený podle serveru, včetně anonymního účtu. */
+    async authState() {
+      const firebase = await fb()
+      const u = firebase.auth().currentUser
+      return u ? { uid: u.uid, email: u.email || null, anonymous: !!u.isAnonymous } : null
+    },
+
     /** Zápis souhrnů. Jedním update(), ať je stránka buď celá stará, nebo celá nová. */
     async publish(payload) {
       const firebase = await fb()
@@ -140,8 +147,58 @@ window.PP = window.PP || {}
   /* Testy a jiná úložiště si mohou podstrčit vlastní implementaci. */
   function backend() { return window.PP_REMOTE_ADAPTER || impl }
 
+  /* Když spojení nefunguje, je potřeba vědět KDE — jinak se hádá mezi
+     konfigurací, SDK, přihlášením a pravidly databáze. Projde se to po
+     krocích a každý řekne buď „ok“, nebo přesnou chybu. */
+  async function diagnose() {
+    const steps = []
+    const step = async (name, fn) => {
+      try {
+        const detail = await fn()
+        steps.push({ name, ok: true, detail: detail || '' })
+        return true
+      } catch (err) {
+        steps.push({ name, ok: false, detail: (err && err.message) || String(err) })
+        return false
+      }
+    }
+    const b = backend()
+
+    const okCfg = await step('Konfigurace databáze', async () => {
+      if (!b.configured()) throw new Error('V panelu není vyplněná window.PP_FIREBASE.')
+      const c = window.PP_FIREBASE || {}
+      return c.databaseURL || b.name
+    })
+    if (!okCfg) return steps
+
+    const okConn = await step('Spojení a anonymní přihlášení', async () => {
+      await b.connect()
+      return 'navázáno'
+    })
+    if (!okConn) return steps
+
+    await step('Čtení zveřejněných dat', async () => {
+      const data = await b.load()
+      if (!data) return 'připojeno, ale zatím nic zveřejněno'
+      const n = data.months ? Object.keys(data.months).length : 0
+      return `${n} ${n === 1 ? 'měsíc' : n < 5 ? 'měsíce' : 'měsíců'}` +
+        (data.updatedAt ? `, naposled ${data.updatedAt.slice(0, 16).replace('T', ' ')}` : '')
+    })
+
+    await step('Přihlášení k zápisu', async () => {
+      const who = b.authState ? await b.authState() : null
+      if (!who) throw new Error('Nikdo není přihlášený.')
+      if (who.anonymous) throw new Error('Jste přihlášen jen anonymně — na zápis je potřeba e-mail a heslo.')
+      return `${who.email} · UID ${who.uid}`
+    })
+
+    return steps
+  }
+
   PP.remote = {
     get name() { return backend().name },
+    diagnose,
+    authState() { return (backend().authState || impl.authState).call(backend()) },
     configured() { return backend().configured() },
     connect() { return backend().connect() },
     signIn(email, password) { return backend().signIn(email, password) },
