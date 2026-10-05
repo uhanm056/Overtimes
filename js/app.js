@@ -411,8 +411,11 @@
   const TOP_CENTERS = 6
   const TOP_PEOPLE = 5
 
+  /* Ve veřejném vydání je to nejpřehlednější karta celého panelu, takže se
+     neruší — jen se z ní vypustí jmenné seznamy. Souhrn za středisko osobní
+     údaj není, žebříček lidí ano. */
   function topCentersCard(s) {
-    if (PUBLIC || !s.centers.length) return ''   // jmenná data se nezveřejňují
+    if (!s.centers.length) return ''
 
     const byTotal = ui.topBy === 'total'
     const list = (byTotal ? s.byTotal : s.byAvg).slice(0, TOP_CENTERS)
@@ -420,8 +423,10 @@
 
     return `<div class="card">
       <div class="card-head">
-        <h2>TOP střediska a jejich lidé</h2>
-        <span class="hint">${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem</span>
+        <h2>${PUBLIC ? 'TOP střediska' : 'TOP střediska a jejich lidé'}</h2>
+        <span class="hint">${PUBLIC
+          ? `${TOP_CENTERS} středisek s nejvyšším přesčasem`
+          : `${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem`}</span>
       </div>
 
       <div class="metric-switch" role="group" aria-label="Řazení středisek">
@@ -432,8 +437,8 @@
       <div class="topc">${list.map((c, i) => {
         const hodnota = byTotal ? c.total : c.avg
         const sirka = max > 0 ? Math.max(2, (hodnota / max) * 100) : 0
-        const lide = c.rows.slice(0, TOP_PEOPLE)
-        const zbytek = c.people - lide.length
+        const lide = PUBLIC ? [] : c.rows.slice(0, TOP_PEOPLE)
+        const zbytek = PUBLIC ? 0 : c.people - lide.length
         return `<section class="topc-item">
           <header class="topc-head">
             <span class="topc-rank">${i + 1}.</span>
@@ -446,7 +451,7 @@
             </span>
           </header>
           <div class="topc-bar"><span style="width:${sirka.toFixed(1)}%"></span></div>
-          <ol class="topc-people">${lide.map((r) => {
+          ${PUBLIC ? '' : `<ol class="topc-people">${lide.map((r) => {
             const lvl = level(r.t, CFG.person)
             return `<li>
               <button type="button" class="link-person" data-person="${esc(String(r.o))}"
@@ -455,7 +460,7 @@
             </li>`
           }).join('')}
           ${zbytek > 0 ? `<li class="more">a dalších ${num(zbytek)} ve středisku</li>` : ''}
-          </ol>
+          </ol>`}
         </section>`
       }).join('')}</div>
     </div>`
