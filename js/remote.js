@@ -157,7 +157,17 @@ window.PP = window.PP || {}
      */
     async publishMonths(months) {
       if (!Object.keys(months).length) throw new Error('Nejsou naimportované žádné měsíce.')
-      const agg = PP.publicMonths(months, PP.CFG)
+
+      /* Ukázkové měsíce do sdílené databáze nepatří. Soubor ke stažení je smí
+         obsahovat — slouží jako ukázka, než se naimportuje první výkaz — ale
+         tohle je ostrý provoz a kolegové by vymyšlená čísla nepoznali. */
+      const real = {}
+      for (const k of Object.keys(months)) if (!months[k].demo) real[k] = months[k]
+      if (!Object.keys(real).length) {
+        throw new Error('Jsou načtené jen ukázkové měsíce — není co zveřejnit. Naimportujte výkaz.')
+      }
+
+      const agg = PP.publicMonths(real, PP.CFG)
 
       /* Projít JSONem: Firebase na hodnotě undefined zápis odmítne a agregáty
          jich pár obsahují (třeba `demo` u neukázkových měsíců). Zároveň tím
@@ -166,7 +176,7 @@ window.PP = window.PP || {}
         months: agg.months,
         updatedAt: new Date().toISOString(),
       }))
-      const leaked = PP.publicLeaks(JSON.stringify(payload), months)
+      const leaked = PP.publicLeaks(JSON.stringify(payload), real)
       if (leaked.length) {
         throw new Error('V souhrnech se objevilo ' + leaked.length +
           ' jmen nebo osobních čísel — neodeslalo se nic. Nahlas to, je to chyba panelu.')
