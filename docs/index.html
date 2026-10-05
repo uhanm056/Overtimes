@@ -202,6 +202,10 @@ a { color: var(--accent); }
 
 .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
 .rail-note { color: var(--rail-text-2); font-size: 11.5px; line-height: 1.45; padding: 0 6px; }
+.rail-build {
+  margin: 3px 0 0; padding: 0 6px; font-size: 11px; line-height: 1.4;
+  color: var(--rail-text-2); opacity: .6; font-variant-numeric: tabular-nums;
+}
 
 .theme-toggle {
   appearance: none; cursor: pointer; font: inherit;
@@ -685,6 +689,7 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 
     <div class="rail-foot">
       <p class="rail-note" id="rail-note"></p>
+      <p class="rail-build" id="rail-build"></p>
       <button class="theme-toggle" id="theme-toggle" type="button">
         <span id="theme-label">Motiv: systém</span>
         <span aria-hidden="true">◐</span>
@@ -4414,6 +4419,20 @@ window.PP = window.PP || {}
     render()
   }
 
+  /* Verze sestavení, viditelně. Bez ní se nedá poznat, jestli se člověk dívá
+     na čerstvou stránku, nebo na kopii, kterou mu drží cache — a ta otázka
+     se jinak vrací pokaždé, když něco nesedí. */
+  function updateBuildNote() {
+    const el = $('#rail-build')
+    if (!el) return
+    const meta = document.querySelector('meta[name="generator"]')
+    const stamp = meta ? (/(\d{4}-\d{2}-\d{2})/.exec(meta.content) || [])[1] : null
+    if (!stamp) { el.hidden = true; return }
+    const [y, m, d] = stamp.split('-')
+    el.hidden = false
+    el.textContent = `verze ${Number(d)}. ${Number(m)}. ${y}`
+  }
+
   function updateRailNote() {
     const keys = PP.data.keys()
     const note = $('#rail-note')
@@ -4472,6 +4491,7 @@ window.PP = window.PP || {}
     await PP.data.init()
     renderMonthPicker()
     updateRailNote()
+    updateBuildNote()
 
     $('#month-select').addEventListener('change', (e) => {
       ui.month = e.target.value
