@@ -128,6 +128,38 @@
     return i >= 0 && i + 1 < keys.length ? keys[i + 1] : null
   }
 
+  /* ---------- jak se počítá přesčas ----------
+     Když měření ukáže, že evidence je zůstatek konta, panel počítá jinak, než
+     co je doslova ve výkazu. To se nesmí stát potichu — kdo si čísla
+     překontroluje proti sestavě z mezd, musí vědět, proč nesedí. */
+  function renderMethodBanner() {
+    const box = $('#method-banner')
+    if (!box) return
+    const rec = currentMonth()
+    if (PP.data.method !== 'balance' || !rec) { box.hidden = true; box.innerHTML = ''; return }
+
+    box.hidden = false
+    box.className = 'method-banner'
+    const info = PP.data.methodInfo || {}
+    const chybi = rec.methodIncomplete
+
+    box.innerHTML = `<span aria-hidden="true">${chybi ? '⚠' : 'ⓘ'}</span><div>
+      <strong>Přesčas se počítá jako Do MEZD + přírůstek konta.</strong>
+      Sloupec <em>Přesčas evidence</em> ve výkazu není pohyb za měsíc, ale zůstatek
+      konta ke konci měsíce — ověřeno proti ročnímu součtu u
+      ${num(info.okBalance || 0)} z ${num(info.checked || 0)} lidí. Sečíst MEZD
+      a evidenci by přesčas nafouklo, protože by se zůstatek počítal každý měsíc znovu.
+      ${chybi
+        ? `<br><strong>${esc(monthName(ui.month))} je nejstarší naimportovaný měsíc</strong>,
+           takže se u něj přírůstek konta nemá od čeho odrazit a čísla jsou nadhodnocená
+           stejně jako dřív. Napraví to import o měsíc staršího výkazu${PUBLIC ? '' : ` v sekci
+           <button class="btn ghost sm" type="button" data-goto="import">Import výkazu</button>`}.`
+        : ''}
+    </div>`
+    $$('#method-banner [data-goto]').forEach((b) =>
+      b.addEventListener('click', () => go(b.dataset.goto)))
+  }
+
   /* ---------- ukázková data ---------- */
   function renderDemoBanner() {
     const rec = currentMonth()
@@ -1535,12 +1567,37 @@
   function renderMethod() {
     $('#panel-method').innerHTML = `<div class="card"><div class="prose">
       <h3>Co se počítá jako přesčas</h3>
-      <p><strong>Přesčas = Přesčas do MEZD + Přesčas evidence.</strong> První složka jsou hodiny
-      poslané do výplaty, druhá zůstatek na kontě pracovní doby. Obě čte panel přímo z mzdových
-      složek Součtového výkazu, nic se nedopočítává.</p>
-      <p>Evidence může být <strong>záporná</strong> — to je odečet konta po proplacení. Proto může
-      člověku vyjít součet 0 i v měsíci, kdy má ve výkazu desítky hodin: hodiny se proplatily
-      a stejná částka odešla z konta.</p>
+      <p>Výkaz dává dvě mzdové složky: <strong>Přesčas do MEZD</strong> (hodiny poslané do výplaty)
+      a <strong>Přesčas evidence</strong> (konto pracovní doby). Jak se z nich dostane měsíční
+      přesčas, závisí na tom, co druhá složka znamená — a to <strong>panel změří</strong>, místo
+      aby to předpokládal.</p>
+      <p>Rozsoudí to roční součet z mzdového systému: o kolik přibude mezi dvěma měsíci, tolik
+      ten měsíc přesčasu doopravdy bylo. Panel to porovná u každého, kdo je v obou měsících, a
+      vybere vzorec, který sedí. Výsledek měření je v sekci
+      <strong>Roční limit</strong>.</p>
+      <ul>
+        <li><strong>Přesčas = do MEZD + evidence</strong> — když je evidence pohyb za měsíc.</li>
+        <li><strong>Přesčas = do MEZD + (evidence teď − evidence minulý měsíc)</strong> — když je
+            evidence zůstatek konta ke konci měsíce. Sečíst obě složky by přesčas nafouklo,
+            protože by se zůstatek připočítal každý měsíc znovu.</li>
+      </ul>
+      <p>${PP.data.method === 'balance'
+        ? `Na načtených datech vyšlo, že <strong>evidence je zůstatek konta</strong>, a panel
+           tak počítá. Nejstarší naimportovaný měsíc je výjimka — nemá předchozí konto, od
+           kterého by se odrazil, takže u něj zůstává hodnota z výkazu a je označený. Spraví
+           to import o měsíc staršího výkazu.`
+        : PP.data.method === 'move'
+        ? `Na načtených datech vyšlo, že <strong>evidence je pohyb za měsíc</strong>, takže se
+           obě složky prostě sčítají.`
+        : PP.data.method === 'unclear'
+        ? `Na načtených datech nesedí ani jeden vzorec — mzdový systém počítá do ročního součtu
+           ještě něco dalšího. Panel zatím sčítá obě složky, ale ber měsíční čísla s rezervou.`
+        : `Dokud nejsou naimportované aspoň dva po sobě jdoucí měsíce, není co měřit a panel
+           obě složky sčítá.`}</p>
+      <p>Evidence může být <strong>záporná</strong> — to je odečet konta po proplacení. Když se
+      počítá přes přírůstek konta, může vyjít <strong>záporný i měsíční přesčas</strong>: konto
+      kleslo víc, než kolik se ten měsíc proplatilo, protože si člověk vybral náhradní volno.
+      Není to chyba, je to čerpání dřív naspořených hodin.</p>
 
       <h3>Prahové hodnoty</h3>
       <ul>
@@ -1629,6 +1686,7 @@
   /* ---------- překreslení ---------- */
   function render() {
     renderDemoBanner()
+    renderMethodBanner()
     switch (ui.section) {
       case 'overview': return renderOverview()
       case 'centers': return renderCenters()

@@ -119,16 +119,33 @@ async function zmer(rezim) {
   await page.setInputFiles('#file', soubory[rezim])
   await page.waitForFunction(() => document.querySelectorAll('#log .log-item.ok').length === 3, null, { timeout: 20000 })
   const out = await page.evaluate(() => {
-    const keys = window.PP.data.keys()
-    const cmp = window.PP.compare(window.PP.data.month(keys[0]), window.PP.data.month(keys[1]))
+    const d = window.PP.data
+    const keys = d.keys()
+    const cmp = window.PP.compare(d.month(keys[0]), d.month(keys[1]))
+    const zari = d.month('2026-09')
+    const cervenec = d.month('2026-07')
+    const kdo = (rec, o) => rec.rows.find((r) => String(r.o) === String(o))
     return {
       verdict: cmp.annual.verdict,
       checked: cmp.annual.checked,
       okMove: cmp.annual.okMove,
       okBalance: cmp.annual.okBalance,
       neither: cmp.annual.neither,
+      // co panel použije jako měsíční přesčas
+      method: d.method,
+      zariT: kdo(zari, 1001).t,
+      zariRaw: kdo(zari, 1001).tRaw,
+      zariDe: kdo(zari, 1001).de,
+      // nejstarší měsíc se nemá od čeho odrazit
+      cervenecNeuplny: !!cervenec.methodIncomplete,
+      zariNeuplny: !!zari.methodIncomplete,
+      cervenecT: kdo(cervenec, 1001).t,
+      // součet za závod musí jít z opravených hodnot
+      zariTotal: Math.round(window.PP.stats(zari).total * 100) / 100,
+      zariSoucetRadku: Math.round(zari.rows.reduce((a, r) => a + r.t, 0) * 100) / 100,
     }
   })
+  out.banner = await page.$$eval('#method-banner:not([hidden])', (e) => e.length)
   await page.goto('http://localhost:8141/#year', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.method-verdict')
   out.nadpis = (await page.textContent('.method-verdict strong')).trim()
@@ -146,6 +163,11 @@ check('sedí „MEZD + evidence“', a.okMove, LIDE.length)
 check('nesedí ani jedna u nikoho', a.neither, 0)
 check('karta ukazuje správný závěr', a.nadpis, 'Evidence je pohyb za měsíc — výpočet panelu sedí')
 check('zvýrazněný je správný vzorec', a.vyhrava, 'Do MEZD + Evidence')
+// 32:00 + 41:10 — nic se nepřepočítává
+check('přesčas zůstal MEZD + evidence', a.zariT, 73.17)
+check('shoduje se se syrovým součtem', a.zariT, a.zariRaw)
+check('žádný měsíc není označený jako neúplný', a.cervenecNeuplny || a.zariNeuplny ? 'je' : 'ne', 'ne')
+check('banner se nezobrazuje', a.banner, 0)
 
 console.log('\nVýkaz, kde evidence je ZŮSTATEK konta:')
 const b = await zmer('zustatek')
@@ -156,6 +178,19 @@ check('sedí „MEZD + přírůstek konta“', b.okBalance, LIDE.length)
 check('„MEZD + evidence“ nesedí nikomu', b.okMove, 0)
 check('karta ukazuje správný závěr', b.nadpis, 'Evidence je STAV konta, ne pohyb — panel přesčas nadhodnocuje')
 check('zvýrazněný je správný vzorec', b.vyhrava, 'Do MEZD + přírůstek konta')
+
+console.log('\n  …a panel podle toho přepočítá:')
+check('metodika v datové vrstvě', b.method, 'balance')
+// 32:00 + (41:10 − 22:39) = 50:31, ne 73:10
+check('září: přesčas je MEZD + přírůstek konta', b.zariT, 50.52)
+check('syrový součet zůstal k nahlédnutí', b.zariRaw, 73.17)
+check('uložil se i přírůstek konta', b.zariDe, 18.52)
+check('součet za závod jde z opravených hodnot', b.zariTotal, b.zariSoucetRadku)
+// nejstarší měsíc nemá předchozí konto, u něj se opravit nedá
+check('červenec je označený jako neúplný', b.cervenecNeuplny ? 'ano' : 'ne', 'ano')
+check('září neúplné není', b.zariNeuplny ? 'je' : 'ne', 'ne')
+check('červenec si nechal hodnotu z výkazu', b.cervenecT, 65.85)
+check('banner to říká nahlas', b.banner, 1)
 
 await browser.close()
 server.close()
