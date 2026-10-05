@@ -236,6 +236,16 @@ select:focus-visible, input:focus-visible, button:focus-visible, [tabindex]:focu
 }
 .demo-banner strong { font-weight: 700; }
 
+.method-banner {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 10px 32px 0; padding: 11px 14px;
+  border: 1px solid var(--accent); border-radius: var(--radius);
+  background: var(--accent-soft); color: var(--text);
+  font-size: 13px; line-height: 1.65;
+}
+.method-banner strong { font-weight: 700; }
+.method-banner .btn { margin-left: 2px; vertical-align: baseline; }
+
 /* ---------- karty ---------- */
 .card {
   background: var(--surface);

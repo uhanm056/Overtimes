@@ -7,6 +7,8 @@ window.PP = window.PP || {}
   const state = {
     months: {},        // 'YYYY-MM' → record
     imported: {},      // podmnožina, kterou lze smazat
+    method: null,      // 'move' | 'balance' | 'unclear' | null — co znamená sloupec evidence
+    methodInfo: null,  // čím se to rozhodlo
   }
 
   PP.data = {
@@ -21,8 +23,13 @@ window.PP = window.PP || {}
       for (const key in state.imported) {
         state.months[key] = Object.assign({ source: 'imported' }, state.imported[key])
       }
+      applyMethodology()
       return state.months
     },
+
+    /** Co vyšlo z měření: 'move', 'balance', 'unclear', nebo null když není co měřit. */
+    get method() { return state.method },
+    get methodInfo() { return state.methodInfo },
 
     /** Klíče měsíců od nejnovějšího. */
     keys() {
@@ -47,6 +54,7 @@ window.PP = window.PP || {}
       await PP.store.saveImported(key, record)
       state.imported[key] = record
       state.months[key] = Object.assign({ source: 'imported' }, record)
+      applyMethodology()
     },
 
     /** Položí přes vestavěná data to, co přišlo z webu (veřejné vydání). */
@@ -55,6 +63,7 @@ window.PP = window.PP || {}
       for (const key in months) {
         state.months[key] = Object.assign({ source: 'remote' }, months[key])
       }
+      applyMethodology()
       return true
     },
 
@@ -65,8 +74,107 @@ window.PP = window.PP || {}
       const builtin = window.PP_BUILTIN_MONTHS || {}
       if (builtin[key]) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
       else delete state.months[key]
+      applyMethodology()
     },
   }
+
+  /* ---------- co znamená sloupec „Přesčas evidence“ ----------
+     Mzdový systém tiskne dva údaje, které se dají sečíst dvěma způsoby:
+
+       A) evidence je POHYB za měsíc      → přesčas = MEZD + evidence
+       B) evidence je STAV konta na konci → přesčas = MEZD + (konto teď − konto minule)
+
+     Rozdíl není kosmetický: u člověka s velkým kontem je A klidně dvojnásobek
+     skutečnosti, protože se zůstatek připočte každý měsíc znovu. Hádat se to
+     nemusí — roční součet z mzdového systému říká, o kolik ten měsíc přesčasu
+     doopravdy přibylo, a podle něj se obě varianty změří na všech lidech
+     a všech dvojicích měsíců, které panel má. */
+
+  const PAIR_TOLERANCE = 0.02      // dvě minuty, kvůli zaokrouhlení h:mm
+  const CONFIDENCE = 0.95          // kolik lidí musí variantě odpovídat
+
+  /* Ukázkové měsíce se do měření nepočítají a nepřepočítávají. Je to
+     vygenerovaný vzorek a nemá rozhodovat, jak se čtou reálné výkazy —
+     ani se jím nechat přepsat. */
+  function realKeys() {
+    return Object.keys(state.months)
+      .filter((k) => state.months[k] && !state.months[k].demo && state.months[k].rows)
+      .sort()
+  }
+
+  function measureMethod(keys) {
+    let checked = 0
+    let okMove = 0
+    let okBalance = 0
+
+    for (let i = 1; i < keys.length; i++) {
+      const cur = state.months[keys[i]]
+      const prev = state.months[keys[i - 1]]
+      if (!cur || !prev || !cur.rows || !prev.rows) continue
+      const prevById = new Map(prev.rows.map((r) => [String(r.o), r]))
+      for (const row of cur.rows) {
+        const p = prevById.get(String(row.o))
+        if (!p || row.r == null || p.r == null) continue
+        checked++
+        const dr = round2(row.r - p.r)
+        if (Math.abs(dr - round2(row.m + row.e)) <= PAIR_TOLERANCE) okMove++
+        if (Math.abs(dr - round2(row.m + (row.e - p.e))) <= PAIR_TOLERANCE) okBalance++
+      }
+    }
+
+    const share = (n) => (checked ? n / checked : 0)
+    const verdict = !checked ? null
+      : share(okBalance) >= CONFIDENCE && okBalance > okMove ? 'balance'
+      : share(okMove) >= CONFIDENCE && okMove > okBalance ? 'move'
+      : 'unclear'
+    return { verdict, checked, okMove, okBalance }
+  }
+
+  /** Dosadí do každého řádku `t` podle toho, co měření ukázalo. */
+  function applyMethodology() {
+    const keys = realKeys()
+    const info = measureMethod(keys)
+    state.method = info.verdict
+    state.methodInfo = info
+
+    // ukázkové měsíce zůstávají, jak jsou
+    for (const k of Object.keys(state.months)) {
+      const rec = state.months[k]
+      if (!rec || !rec.rows || !rec.demo) continue
+      rec.methodIncomplete = false
+      for (const row of rec.rows) {
+        if (row.tRaw === undefined) row.tRaw = round2(row.m + row.e)
+        row.t = row.tRaw
+        row.de = null
+      }
+    }
+
+    for (let i = 0; i < keys.length; i++) {
+      const rec = state.months[keys[i]]
+      if (!rec || !rec.rows) continue
+      const prev = i > 0 ? state.months[keys[i - 1]] : null
+      const prevById = prev && prev.rows
+        ? new Map(prev.rows.map((r) => [String(r.o), r]))
+        : null
+
+      /* Nejstarší měsíc nemá s čím porovnat konto, takže se u něj skutečný
+         přesčas spočítat nedá. Zůstává v něm hodnota z výkazu a měsíc se
+         označí — stačí naimportovat o měsíc starší výkaz a dopočítá se. */
+      rec.methodIncomplete = state.method === 'balance' && !prevById
+
+      for (const row of rec.rows) {
+        if (row.tRaw === undefined) row.tRaw = round2(row.m + row.e)
+        if (state.method !== 'balance' || !prevById) { row.t = row.tRaw; row.de = null; continue }
+        const p = prevById.get(String(row.o))
+        // kdo minulý měsíc ve výkazu nebyl, nemá se od čeho odrazit
+        row.de = p ? round2(row.e - p.e) : null
+        row.t = p ? round2(row.m + row.de) : row.tRaw
+      }
+    }
+    cache = new WeakMap()
+  }
+
+  PP.measureMethod = measureMethod
 
   /* ---------- odvozené statistiky ---------- */
 
@@ -81,7 +189,7 @@ window.PP = window.PP || {}
     { from: 60, to: Infinity, label: '60+' },
   ]
 
-  const cache = new WeakMap()
+  let cache = new WeakMap()
 
   /**
    * Souhrn nad agregovaným měsícem — takový záznam žádné lidi neobsahuje,
@@ -294,7 +402,8 @@ window.PP = window.PP || {}
       if (m.r.r == null || m.prev.r == null || m.prev.e == null) continue
       out.checked++
       const dr = round2(m.r.r - m.prev.r)
-      const asMove = m.r.t
+      // pozor: m.r.t už může být opravené, porovnávat se musí syrový součet
+      const asMove = m.r.tRaw !== undefined ? m.r.tRaw : round2(m.r.m + m.r.e)
       const asBalance = round2(m.r.m + (m.r.e - m.prev.e))
       const fitsMove = Math.abs(dr - asMove) <= 0.02
       const fitsBalance = Math.abs(dr - asBalance) <= 0.02
