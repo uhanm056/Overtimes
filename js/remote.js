@@ -159,10 +159,13 @@ window.PP = window.PP || {}
       if (!Object.keys(months).length) throw new Error('Nejsou naimportované žádné měsíce.')
       const agg = PP.publicMonths(months, PP.CFG)
 
-      const payload = {
+      /* Projít JSONem: Firebase na hodnotě undefined zápis odmítne a agregáty
+         jich pár obsahují (třeba `demo` u neukázkových měsíců). Zároveň tím
+         je jisté, že se odešle přesně to, co projde kontrolou níž. */
+      const payload = JSON.parse(JSON.stringify({
         months: agg.months,
         updatedAt: new Date().toISOString(),
-      }
+      }))
       const leaked = PP.publicLeaks(JSON.stringify(payload), months)
       if (leaked.length) {
         throw new Error('V souhrnech se objevilo ' + leaked.length +

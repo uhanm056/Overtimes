@@ -342,7 +342,9 @@ touž kontrolou úniku jako stahovaný soubor; při jediném jménu se neodešle
    **europe-west1 (Belgium)**, režim *Locked mode* (pravidla se nahrají vzápětí).
 3. **Pravidla** — v záložce *Rules* přepiš obsah souborem
    [`database.rules.json`](database.rules.json) z tohohle repozitáře.
-   `__ADMIN_UID__` zatím nech být, doplní se v kroku 5.
+   `__ADMIN_UID__` zatím nech být, doplní se v kroku 5. Editor pravidel
+   nebere komentáře, proto je ten soubor holý JSON; co která řádka dělá,
+   je popsané níž.
 4. **Přihlašování** — *Build → Authentication → Get started*, zapni
    **Anonymous** (kvůli čtení) a **Email/Password** (kvůli tobě).
    V *Users → Add user* si založ účet, kterým budeš publikovat.
@@ -360,6 +362,30 @@ touž kontrolou úniku jako stahovaný soubor; při jediném jménu se neodešle
    ```
    a pushni. Veřejná stránka si od té chvíle bere čísla z databáze; to, co je
    v souboru zapečené, slouží už jen jako záloha, když je síť mimo.
+
+### Co pravidla dělají
+
+```json
+".read":  "auth != null"
+".write": "auth != null && auth.uid === '__ADMIN_UID__'"
+```
+
+Číst smí kdokoli přihlášený — panel se přihlašuje anonymně sám, takže
+kolegové nic nedělají. Zapisovat smí jediné UID. Dokud je tam placeholder,
+nezapíše nikdo, ani ty.
+
+```json
+"$month":     ".validate": "$month.matches(/^[0-9]{4}-[0-9]{2}$/) && newData.hasChild('summary')"
+"aggregate":  ".validate": "newData.isBoolean() && newData.val() === true"
+"rows":       ".validate": false
+"comps":      ".validate": false
+"otherComps": ".validate": false
+```
+
+Druhá půlka je pojistka proti chybě v kódu. Klíč musí vypadat jako měsíc a
+nést souhrn; záznam musí být označený jako agregát; a tři klíče, ve kterých
+jsou v panelu data o jednotlivcích, server odmítne vždycky. I kdyby panel
+někdy omylem poslal řádky s lidmi, databáze je nepřijme.
 
 ### Používání
 

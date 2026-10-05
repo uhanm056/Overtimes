@@ -59,6 +59,13 @@ window.PP_REMOTE_ADAPTER = {
   async watch(cb) { this.watchers.push(cb); return function () {} },
   async publish(payload) {
     if (!this.user) { const e = new Error('nepřihlášen'); e.code = 'auth/permission-denied'; throw e }
+    // Firebase na undefined zápis odmítne; ať to test pozná stejně.
+    var bad = []
+    ;(function walk(v, path) {
+      if (v === undefined) { bad.push(path); return }
+      if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { walk(v[k], path + '.' + k) })
+    })(payload, '')
+    if (bad.length) throw new Error('undefined v ' + bad.slice(0, 3).join(', '))
     this.store = payload
     this.watchers.forEach(function (cb) { cb(payload) })
   },
@@ -93,9 +100,19 @@ await page.fill('#pub-pass', 'tajne')
 await page.click('#pub-login button[type=submit]')
 await page.waitForSelector('#pub-live')
 await page.click('#pub-live')
-await page.waitForSelector('.pub-ok')
+// čekat na kterýkoli výsledek, ať se u chyby nečeká zbytečně do timeoutu
+await page.waitForSelector('.pub-ok, .pub-err', { timeout: 15000 })
+const chyba = await page.$('.pub-err')
+if (chyba) {
+  console.error(' FAIL  publikování selhalo: ' + (await chyba.textContent()).trim())
+  fails.push('publikování selhalo')
+}
 
 const odeslano = await page.evaluate(() => window.PP_REMOTE_ADAPTER.store)
+if (!odeslano) {
+  console.error('\nBez zapsaných dat nemá smysl pokračovat.')
+  await browser.close(); server.close(); process.exit(1)
+}
 const jmena = await page.evaluate(() => {
   const o = []
   for (const k of window.PP.data.keys()) for (const r of window.PP.data.month(k).rows || []) o.push(r.n, String(r.o))
@@ -112,6 +129,10 @@ check('žádný měsíc nemá řádky s lidmi',
 check('každý měsíc je označený jako agregát',
   Object.values(odeslano.months).every((m) => m.aggregate === true) ? 'ano' : 'ne', 'ano')
 check('nese čas zveřejnění', /^\d{4}-\d{2}-\d{2}T/.test(odeslano.updatedAt || '') ? 'ano' : 'ne', 'ano')
+// Adaptér napodobuje Firebase a na undefined zápis odmítne; kdyby se do
+// agregátů nějaké dostalo (třeba `demo` u neukázkových měsíců), spadlo by to
+// už výš a místo .pub-ok by tu byla chybová hláška.
+check('publikování neskončilo chybou', chyba ? 'skončilo' : 'ne', 'ne')
 check('odeslalo se tolik měsíců, kolik jich panel má',
   Object.keys(odeslano.months).length, await page.evaluate(() => window.PP.data.keys().length))
 check('souhrny sedí na to, co spočítá PP.publicMonths', await page.evaluate((sent) => {
