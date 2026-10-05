@@ -146,6 +146,13 @@ async function zmer(rezim) {
     }
   })
   out.banner = await page.$$eval('#method-banner:not([hidden])', (e) => e.length)
+  // souhrny tak, jak by odešly kolegům
+  out.souhrny = await page.evaluate(() => {
+    const m = {}
+    for (const k of window.PP.data.keys()) m[k] = window.PP.data.month(k)
+    const agg = window.PP.publicMonths(m, window.PP.CFG)
+    return { months: agg.months, updatedAt: new Date().toISOString() }
+  })
   await page.goto('http://localhost:8141/#year', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.method-verdict')
   out.nadpis = (await page.textContent('.method-verdict strong')).trim()
@@ -171,6 +178,7 @@ check('banner se nezobrazuje', a.banner, 0)
 
 console.log('\nVýkaz, kde evidence je ZŮSTATEK konta:')
 const b = await zmer('zustatek')
+const souhrny = b.souhrny
 check('rozsudek', b.verdict, 'balance')
 check('kontrolovaných lidí', b.checked, LIDE.length)
 check('sedí „MEZD + přírůstek konta“', b.okBalance, LIDE.length)
@@ -191,6 +199,35 @@ check('červenec je označený jako neúplný', b.cervenecNeuplny ? 'ano' : 'ne'
 check('září neúplné není', b.zariNeuplny ? 'je' : 'ne', 'ne')
 check('červenec si nechal hodnotu z výkazu', b.cervenecT, 65.85)
 check('banner to říká nahlas', b.banner, 1)
+
+/* ---------- co z toho uvidí kolegové ----------
+   Veřejná stránka dostává jen souhrny, řádky s lidmi v ní nejsou — takže si
+   metodiku nemá z čeho změřit a musí ji dostat s daty. Bez toho by popisovala
+   sloupce jinak než panel, ze kterého čísla vyšla. */
+const verejna = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+verejna.on('pageerror', (e) => fails.push('pageerror(veřejná): ' + e.message))
+await verejna.addInitScript(`window.PP_PUBLIC = true
+window.PP_REMOTE_ADAPTER = { name:'t', store: ${JSON.stringify(souhrny)}, watchers: [],
+  configured(){return true}, async connect(){return true},
+  async load(){return this.store}, async watch(cb){this.watchers.push(cb);return function(){}},
+  async signIn(){}, async signOut(){}, async currentUser(){return null}, async publish(){} }`)
+await verejna.goto('http://localhost:8141/', { waitUntil: 'domcontentloaded' })
+await verejna.waitForSelector('#remote-note:not([hidden])')
+await verejna.waitForSelector('#method-banner:not([hidden])', { timeout: 10000 })
+
+const kolega = await verejna.evaluate(() => ({
+  metoda: window.PP.data.method,
+  banner: document.querySelector('#method-banner').textContent.replace(/\s+/g, ' ').trim(),
+  zahlavi: [...document.querySelectorAll('#panel-overview th')].map((t) => t.textContent.trim()),
+}))
+
+console.log('\nVeřejná stránka ze souhrnů:')
+check('metodika dorazila s daty', kolega.metoda, 'balance')
+check('banner to říká', /Do MEZD \+ přírůstek konta/.test(kolega.banner) ? 'ano' : 'ne: ' + kolega.banner, 'ano')
+// bez naměřených lidí se nesmí chlubit kontrolou, kterou neudělala
+check('netvrdí, že to sama ověřila', /ověřeno proti ročnímu součtu/.test(kolega.banner) ? 'tvrdí' : 'ne', 'ne')
+check('sloupec se nejmenuje Evidence', kolega.zahlavi.includes('Evidence') ? 'jmenuje' : 'ne', 'ne')
+check('ale Přírůstek konta', kolega.zahlavi.includes('Přírůstek konta') ? 'ano' : 'ne: ' + kolega.zahlavi.join('|'), 'ano')
 
 await browser.close()
 server.close()

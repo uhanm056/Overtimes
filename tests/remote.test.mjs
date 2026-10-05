@@ -137,6 +137,14 @@ check('publikování neskončilo chybou', chyba ? 'skončilo' : 'ne', 'ne')
 check('odeslaly se jen skutečné měsíce', Object.keys(odeslano.months).join(','), '2026-09')
 check('ukázkové se vynechaly', await page.evaluate(
   () => window.PP.data.keys().filter((k) => window.PP.data.month(k).demo).length) > 0 ? 'ano' : 'ne', 'ano')
+// Do MEZD + druhá složka musí dávat Celkem, jinak si tabulka odporuje
+const nesedi = Object.entries(odeslano.months).filter(([, m]) =>
+  Math.abs(m.summary.mezdy + m.summary.evidence - m.summary.total) > 0.02)
+check('Do MEZD + zbytek dává Celkem', nesedi.length ? nesedi[0][0] : 0, 0)
+const stredNesedi = Object.values(odeslano.months).flatMap((m) =>
+  m.summary.centers.filter((c) => Math.abs(c.m + c.e - c.total) > 0.02).map((c) => c.name))
+check('a sedí to i po střediscích', stredNesedi.length ? stredNesedi[0] : 0, 0)
+
 check('souhrny sedí na to, co spočítá PP.publicMonths', await page.evaluate((sent) => {
   const months = {}
   for (const k of window.PP.data.keys()) {
