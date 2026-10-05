@@ -133,11 +133,16 @@ check('nese čas zveřejnění', /^\d{4}-\d{2}-\d{2}T/.test(odeslano.updatedAt |
 // agregátů nějaké dostalo (třeba `demo` u neukázkových měsíců), spadlo by to
 // už výš a místo .pub-ok by tu byla chybová hláška.
 check('publikování neskončilo chybou', chyba ? 'skončilo' : 'ne', 'ne')
-check('odeslalo se tolik měsíců, kolik jich panel má',
-  Object.keys(odeslano.months).length, await page.evaluate(() => window.PP.data.keys().length))
+// ukázkové měsíce se nepublikují, odejde jen naimportovaný výkaz
+check('odeslaly se jen skutečné měsíce', Object.keys(odeslano.months).join(','), '2026-09')
+check('ukázkové se vynechaly', await page.evaluate(
+  () => window.PP.data.keys().filter((k) => window.PP.data.month(k).demo).length) > 0 ? 'ano' : 'ne', 'ano')
 check('souhrny sedí na to, co spočítá PP.publicMonths', await page.evaluate((sent) => {
   const months = {}
-  for (const k of window.PP.data.keys()) months[k] = window.PP.data.month(k)
+  for (const k of window.PP.data.keys()) {
+    const r = window.PP.data.month(k)
+    if (!r.demo) months[k] = r
+  }
   return JSON.stringify(window.PP.publicMonths(months, window.PP.CFG).months) === JSON.stringify(sent)
 }, odeslano.months) ? 'ano' : 'ne', 'ano')
 
@@ -162,6 +167,8 @@ const stav = await verejna.evaluate(() => ({
   zdroje: [...new Set(window.PP.data.keys().map((k) => window.PP.data.month(k).source))].join(','),
   zari: window.PP.data.month('2026-09') ? window.PP.data.month('2026-09').summary.total : null,
   lidi: window.PP.data.keys().some((k) => (window.PP.data.month(k).rows || []).length > 0),
+  ukazka: window.PP.data.keys().filter((k) => window.PP.data.month(k).demo).join(','),
+  zapecenych: Object.keys(window.PP_BUILTIN_MONTHS || {}).length,
 }))
 console.log('\nVeřejná stránka:')
 check('hlásí, odkud jsou data', /^Aktuální data z \d+\. \d+\. \d{4} v \d\d:\d\d\.$/.test(stav.note) ? 'ano' : 'ne: ' + stav.note, 'ano')
@@ -169,6 +176,12 @@ check('září přišlo z webu', stav.mesice.includes('2026-09') ? 'ano' : 'ne',
 check('měsíc z webu přebil vestavěný', stav.zdroje.includes('remote') ? 'ano' : 'ne', 'ano')
 check('souhrn září sedí', stav.zari, odeslano.months['2026-09'].summary.total)
 check('řádky s lidmi tam nejsou', stav.lidi ? 'jsou' : 'ne', 'ne')
+/* Zapečený vzorek je jen záloha pro výpadek databáze. Kdyby se s živými daty
+   smíchal, viděli by kolegové vedle skutečných měsíců i vymyšlené. */
+check('v souboru vzorek opravdu je (kontrola dává smysl)', stav.zapecenych > 0 ? 'ano' : 'ne', 'ano')
+check('žádný ukázkový měsíc se nezobrazuje', stav.ukazka || 'žádný', 'žádný')
+check('zobrazují se jen měsíce z webu', stav.zdroje, 'remote')
+check('a jen ty, co v databázi jsou', stav.mesice, Object.keys(odeslano.months).join(','))
 
 /* živá změna bez reloadu */
 await verejna.evaluate(() => {

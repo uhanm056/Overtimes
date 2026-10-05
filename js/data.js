@@ -58,8 +58,13 @@ window.PP = window.PP || {}
     },
 
     /** Položí přes vestavěná data to, co přišlo z webu (veřejné vydání). */
+    /* Data z webu NAHRAZUJÍ všechno zapečené, nepřekládají se přes něj.
+       V souboru je vzorek jen pro případ, že by databáze byla nedostupná;
+       kdyby se s živými čísly smíchal, viděli by kolegové vedle skutečných
+       měsíců i vymyšlené a nepoznali by, které je které. */
     setRemote(months) {
       if (!months || !Object.keys(months).length) return false
+      state.months = {}
       for (const key in months) {
         state.months[key] = Object.assign({ source: 'remote' }, months[key])
       }
