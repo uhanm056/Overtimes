@@ -49,6 +49,7 @@
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
     personOpen: {},      // rozbalené měsíce v detailu člověka (rozpad složek)
+    personPick: false,   // detail člověka otevřený, ale zatím nikdo nevybraný
     personQuery: '',
     cmpA: null,          // starší z porovnávaných měsíců
     cmpB: null,          // novější
@@ -97,6 +98,8 @@
 
   function go(id) {
     if (!SECTIONS.some((s) => s.id === id)) return
+    // odchod jinam detail člověka zavírá, ať se po návratu nezjeví znovu
+    if (id !== 'compare') { ui.person = null; ui.personPick = false }
     ui.section = id
     if (location.hash.slice(1) !== id) location.hash = id
     $$('#nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.section === id)))
@@ -964,6 +967,11 @@
     return `<div class="card">
       <div class="card-head">
         <h2>Vývoj jednoho člověka</h2>
+      </div>
+      <div class="person-back">
+        ${ui.person || ui.personPick
+          ? `<button class="btn ghost sm" type="button" id="person-close">← Zpět na vývoj a srovnání</button>`
+          : ''}
         ${hist ? `<button class="btn ghost sm" type="button" id="person-clear">Vybrat jiného</button>` : ''}
       </div>
       ${hist ? '' : `<input type="search" id="person-search" placeholder="Hledat člověka…"
@@ -989,10 +997,27 @@
       ui.person = b.dataset.pick
       ui.personQuery = ''
       ui.personOpen = {}
+      ui.personPick = false
       renderCompare()
     }))
     const clear = $('#person-clear')
-    if (clear) clear.addEventListener('click', () => { ui.person = null; ui.personOpen = {}; renderCompare() })
+    if (clear) clear.addEventListener('click', () => {
+      ui.person = null
+      ui.personOpen = {}
+      ui.personPick = true
+      ui.personQuery = ''
+      renderCompare()
+      const input = $('#person-search')
+      if (input) input.focus()
+    })
+    const close = $('#person-close')
+    if (close) close.addEventListener('click', () => {
+      ui.person = null
+      ui.personOpen = {}
+      ui.personPick = false
+      ui.personQuery = ''
+      go('compare')
+    })
     $$('#panel-compare [data-pmetric]').forEach((b) => b.addEventListener('click', () => {
       ui.personMetric = b.dataset.pmetric
       renderCompare()
@@ -1116,6 +1141,21 @@
         </div>
       </div>
     </div>`
+
+    /* Vybraný člověk dostane stránku sám pro sebe. Dřív se jeho karta
+       schovávala mezi grafy závodu a srovnáním měsíců, takže se ten detail
+       musel hledat — a přitom je to to jediné, co v tu chvíli člověk chce. */
+    if (!PUBLIC && (ui.person || ui.personPick)) {
+      $('#section-title').textContent = ui.person
+        ? (PP.personHistory(ui.person) || {}).person.n
+        : 'Vývoj jednoho člověka'
+      $('#section-sub').textContent = 'Jak se přesčas vyvíjí u jednoho člověka.'
+      el.innerHTML = personCard()
+      if (ui.person) drawPerson(PP.personHistory(ui.person))
+      bindPersonCard()
+      PP.watchCharts(() => { if (ui.person) drawPerson(PP.personHistory(ui.person)) })
+      return
+    }
 
     el.innerHTML = PUBLIC
       ? trendCards() + picker + kpis + table
@@ -1783,6 +1823,8 @@
       if (PP.data.keys().length < 2) return
       ui.person = b.dataset.person
       ui.personQuery = ''
+      ui.personOpen = {}
+      ui.personPick = false
       go('compare')
     }))
   }

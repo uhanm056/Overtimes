@@ -517,6 +517,9 @@ h3.pub-sub + p { margin-top: 0; }
 }
 .pub-state.warn { background: var(--warn-soft); color: var(--text); }
 
+.person-back { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.person-back:empty { display: none; }
+
 .remote-note {
   margin: 0 0 18px; padding: 9px 14px; border-radius: var(--radius-sm);
   background: var(--surface-2); color: var(--text-3); font-size: 12.5px;
