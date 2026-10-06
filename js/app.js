@@ -57,6 +57,7 @@
     admin: null,      // přihlášený účet, který smí publikovat
     pubMsg: null,     // poslední hláška z publikování { kind, html }
     diag: null,       // výsledek kontroly spojení
+    pubState: null,   // co je právě na webu { updatedAt, months }
   }
 
   /* ---------- motiv ---------- */
@@ -1391,6 +1392,7 @@
       : ''
     const diag = `<button class="btn ghost sm" type="button" id="pub-diag">Zkontrolovat spojení</button>`
     const diagOut = ui.diag ? diagHtml(ui.diag) : ''
+    const stav = pubStateHtml()
 
     if (!who) {
       return `<h3 class="pub-sub">Publikovat na web</h3>
@@ -1404,7 +1406,7 @@
         ${diag}
         <span class="export-status" id="pub-live-status" role="status"></span>
       </form>
-      ${msg}${diagOut}`
+      ${stav}${msg}${diagOut}`
     }
 
     return `<h3 class="pub-sub">Publikovat na web</h3>
@@ -1419,7 +1421,50 @@
       ${diag}
       <span class="export-status" id="pub-live-status" role="status"></span>
     </div>
-    ${msg}${diagOut}`
+    ${stav}${msg}${diagOut}`
+  }
+
+  /* Co je právě na webu a jestli to kolegům nezestárlo. Tahle informace
+     v panelu chyběla, takže se dalo importovat, dívat se na opravená čísla
+     a vůbec netušit, že kolegové pořád vidí ta předchozí. */
+  function pubStateHtml() {
+    const st = ui.pubState
+    if (!st) return ''
+    if (st.error) {
+      return `<p class="pub-state warn">Nepodařilo se zjistit, co je na webu — ${esc(st.error)}</p>`
+    }
+    if (!st.updatedAt) {
+      return `<p class="pub-state warn">Na webu zatím není nic — kolegové vidí jen ukázku.</p>`
+    }
+
+    /* „Zastaralé“ znamená, že se od posledního zveřejnění něco naimportovalo.
+       Porovnává se čas importu, ne obsah — na to, že se mohl změnit i výpočet,
+       to stejně upozornit musí. */
+    const novejsi = PP.data.keys().some((k) => {
+      const rec = PP.data.month(k)
+      return rec && rec.importedAt && rec.importedAt > st.updatedAt
+    })
+    const kdy = stamp(st.updatedAt)
+    const kolik = st.months
+    return `<p class="pub-state${novejsi ? ' warn' : ''}">
+      Na webu je ${num(kolik)} ${kolik === 1 ? 'měsíc' : kolik < 5 ? 'měsíce' : 'měsíců'},
+      zveřejněno ${esc(kdy)}.${novejsi
+        ? ' <strong>Od té doby jste importoval — kolegové zatím vidí starší čísla.</strong>'
+        : ''}
+    </p>`
+  }
+
+  async function loadPubState() {
+    if (!PP.remote.configured()) return
+    try {
+      const data = await PP.remote.load()
+      ui.pubState = data
+        ? { updatedAt: data.updatedAt || null, months: data.months ? Object.keys(data.months).length : 0 }
+        : { updatedAt: null, months: 0 }
+    } catch (err) {
+      ui.pubState = { error: (err && err.message) || String(err) }
+    }
+    if (ui.section === 'import') renderImport()
   }
 
   function diagHtml(steps) {
@@ -1492,6 +1537,7 @@
         const months = {}
         for (const k of PP.data.keys()) months[k] = PP.data.month(k)
         const res = await PP.remote.publishMonths(months)
+        ui.pubState = { updatedAt: res.updatedAt, months: Object.keys(res.months).length }
         ui.pubMsg = {
           kind: 'ok',
           html: `<strong>Zveřejněno.</strong> Kolegové vidí nová čísla hned.
@@ -1751,7 +1797,12 @@
       case 'ranking': return renderRanking()
       case 'compare': return renderCompare()
       case 'year': return renderYear()
-      case 'import': return renderImport()
+      case 'import': {
+        renderImport()
+        // jen jednou za načtení panelu, ať se při každém překreslení nechodí na síť
+        if (ui.pubState === null) { ui.pubState = undefined; loadPubState() }
+        return
+      }
       case 'method': return renderMethod()
     }
   }

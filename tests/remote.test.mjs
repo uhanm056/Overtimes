@@ -179,6 +179,26 @@ check('souhrny sedí na to, co spočítá PP.publicMonths', await page.evaluate(
 
 await page.click('#pub-logout')
 await page.waitForSelector('#pub-login')
+/* Po publikování musí karta říct, co je na webu — a hlavně se ozvat, až to
+   kolegům zestárne. Právě tahle informace v panelu chyběla. */
+await page.waitForSelector('.pub-state')
+const stavPo = (await page.textContent('.pub-state')).replace(/\s+/g, ' ').trim()
+console.log('\nStav zveřejnění:')
+check('karta říká, co je na webu', /^Na webu je 1 měsíc, zveřejněno/.test(stavPo) ? 'ano' : 'ne: ' + stavPo, 'ano')
+check('a nehlásí zastarání hned po publikování',
+  /starší čísla/.test(stavPo) ? 'hlásí' : 'ne', 'ne')
+
+// nový import = kolegové vidí starší čísla
+await page.evaluate(() => {
+  const k = window.PP.data.keys()[0]
+  window.PP.data.month(k).importedAt = new Date(Date.now() + 60000).toISOString()
+})
+await page.click('#nav button[data-section="overview"]')
+await page.click('#nav button[data-section="import"]')
+await page.waitForSelector('.pub-state.warn')
+check('po novém importu upozorní',
+  /Od té doby jste importoval/.test(await page.textContent('.pub-state.warn')) ? 'ano' : 'ne', 'ano')
+
 console.log('\nPo odhlášení:')
 check('zase se nedá publikovat', await page.$$eval('#pub-live', (e) => e.length), 0)
 
