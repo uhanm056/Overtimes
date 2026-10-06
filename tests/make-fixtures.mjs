@@ -25,6 +25,11 @@ function htmlReport() {
     rows.push([p.n, p.o, p.s, 'Přesčas do MEZD', p.m])
     rows.push([p.n, p.o, p.s, 'Přesčas evidence', p.e])
     rows.push([p.n, p.o, p.s, 'Přesčas roční součet', p.r])
+    /* Výkaz tiskne i přesčasové složky, které se nesmí přičíst: „zaplatit“ je
+       tatáž hodnota jako do MEZD pod jiným názvem, „přenesený“ je zůstatek
+       z minulého měsíce. Jsou tu proto, aby se hlídalo, že je parser nesečte. */
+    rows.push([p.n, p.o, p.s, 'Přesčas zaplatit', p.m])
+    rows.push([p.n, p.o, p.s, 'Přesčas přenesený', '63:01'])
     rows.push([p.n, p.o, p.s, 'Základní mzda', '168:00'])
     // mezisoučet nadepsaný jménem, ale bez osobního čísla — nesmí se počítat
     // jako další osoba ani jako přesčasová složka

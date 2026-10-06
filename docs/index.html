@@ -1011,11 +1011,16 @@ window.PP = window.PP || {}
  * Výstupem je záznam měsíce v datovém modelu panelu:
  *   { period, rawPeriod, people, comps, rows: [{ n, o, s, m, e, t, r, c }], importedAt, file }
  *
- * `comps` je seznam názvů započítaných mzdových složek, `c` je rozpad člověka na ně
- * jako trojice [index do comps, hodiny, počet řádků výkazu]. Díky tomu jde u každého
- * ukázat, z čeho přesně jeho součet vznikl, aniž by se v každém řádku opakoval text.
- * `otherComps` je naopak soupis složek, které parser nezapočítal — kdyby mezi nimi
- * byla složka, která tam patřit má, je to na importu vidět.
+ * `comps` je slovník názvů mzdových složek, `c` je rozpad člověka na ně jako trojice
+ * [index do comps, hodiny, počet řádků výkazu]. Díky tomu jde u každého ukázat, z čeho
+ * přesně jeho součet vznikl, aniž by se v každém řádku opakoval text.
+ *
+ * Jsou mezi nimi i přesčasové složky, které se do součtu NEpočítají — „Přesčas
+ * zaplatit“ (tytéž hodiny jako do MEZD) nebo „Přesčas přenesený“ (zůstatek z minula).
+ * Zařazení říká PP.componentBucket; co vrátí null, je ve výkazu, ale nesčítá se.
+ *
+ * `otherComps` je soupis všech nezapočítaných složek za měsíc — kdyby mezi nimi byla
+ * složka, která do přesčasu patřit má, je to vidět hned na importu.
  */
 window.PP = window.PP || {}
 
@@ -1258,9 +1263,10 @@ window.PP = window.PP || {}
 
     const byPerson = new Map()      // osobní číslo|středisko → agregovaný řádek
     const everyone = new Set()      // všichni lidé ve výkazu, i bez přesčasu
-    const compNames = []            // započítané mzdové složky v pořadí prvního výskytu
+    const compNames = []            // mzdové složky v pořadí prvního výskytu
     const compIndex = new Map()
     const otherComps = new Map()    // nezapočítané složky → kolik jich ve výkazu bylo
+    const skippedByPerson = new Map() // přesčasové složky, které se nepočítají, po lidech
     let skipped = 0
 
     // Sestavy z mezd tisknou jméno, osobní číslo a středisko často jen na prvním
@@ -1303,6 +1309,20 @@ window.PP = window.PP || {}
         skipped++
         if (component && !SUMMARY.test(PP.fold(component))) {
           otherComps.set(component, (otherComps.get(component) || 0) + 1)
+          /* Složky, které mají v názvu „přesčas“, ale do výpočtu nepatří —
+             typicky „Přesčas zaplatit“ (tytéž hodiny jako do MEZD, jen jinak
+             pojmenované) a „Přesčas přenesený“ (zůstatek z minulého měsíce).
+             Sečíst je by hodiny zdvojilo, ale u konkrétního člověka musí být
+             vidět, že ve výkazu jsou a proč se ignorují. */
+          if (PP.fold(component).includes('prescas')) {
+            const key = (who.o || who.n) + '|' + who.s
+            let list = skippedByPerson.get(key)
+            if (!list) { list = new Map(); skippedByPerson.set(key, list) }
+            const cur = list.get(component) || { h: 0, rows: 0 }
+            cur.h += parseHours(row[cols.hours])
+            cur.rows++
+            list.set(component, cur)
+          }
         }
         continue
       }
@@ -1327,6 +1347,22 @@ window.PP = window.PP || {}
       cur.h += hours
       cur.rows++
       rec.c.set(ci, cur)
+    }
+
+    /* Nezapočítané složky se přidají jen lidem, kteří ve výkazu nějaký přesčas
+       mají. Kdo má pouze je, do přehledu nepatří — jinak by se změnil počet
+       lidí s přesčasem kvůli řádku, který se stejně nepočítá. */
+    for (const [key, list] of skippedByPerson) {
+      const rec = byPerson.get(key)
+      if (!rec) continue
+      for (const [name, v] of list) {
+        let ci = compIndex.get(name)
+        if (ci == null) { ci = compNames.length; compNames.push(name); compIndex.set(name, ci) }
+        const cur = rec.c.get(ci) || { h: 0, rows: 0 }
+        cur.h += v.h
+        cur.rows += v.rows
+        rec.c.set(ci, cur)
+      }
     }
 
     const round2 = (v) => Math.round(v * 100) / 100
@@ -3631,7 +3667,9 @@ window.PP = window.PP || {}
             <td>${esc(c.name)}</td>
             <td class="num">${hm(c.h)}</td>
             <td class="num">${num(c.rows)}</td>
-            <td>${where === 'r'
+            <td>${!where
+              ? '<span class="tag">nepočítá se</span>'
+              : where === 'r'
               ? '<span class="hint">jen roční součet</span>'
               : `<strong>přesčasu za měsíc</strong>`}</td>
           </tr>`
@@ -3641,6 +3679,12 @@ window.PP = window.PP || {}
           <td class="num"><strong>${hm(x.t)}</strong></td>
           <td class="num"></td><td></td>
         </tr></tfoot></table>
+        ${list.some((c) => !PP.componentBucket(c.name))
+          ? `<p class="hint" style="margin:8px 0 0">Složky označené <span class="tag">nepočítá se</span>
+               ve výkazu jsou, ale do měsíčního přesčasu nepatří — buď je to tatáž hodnota pod jiným
+               názvem (<em>Přesčas zaplatit</em> = <em>do MEZD</em>), nebo zůstatek z minulého měsíce
+               (<em>Přesčas přenesený</em>). Sečíst je by hodiny zdvojilo.</p>`
+          : ''}
         ${list.some((c) => c.rows > 1)
           ? `<p class="hint" style="margin:8px 0 0">Složka, u které je víc než jeden řádek,
                byla ve výkazu vícekrát a hodiny se sečetly.</p>`
@@ -4448,7 +4492,8 @@ window.PP = window.PP || {}
      se pozná, že se do přesčasu počítá něco, co tam nepatří — nebo naopak nepočítá
      složka, která tam patřit má. */
   function compSummary(record) {
-    const used = record.comps || []
+    // comps nese i složky, které se nepočítají — rozdělit je podle zařazení
+    const used = (record.comps || []).filter((c) => PP.componentBucket(c))
     const other = record.otherComps || []
     if (!used.length) return ''
     return `<span class="hint comp-summary">

@@ -856,7 +856,9 @@
             <td>${esc(c.name)}</td>
             <td class="num">${hm(c.h)}</td>
             <td class="num">${num(c.rows)}</td>
-            <td>${where === 'r'
+            <td>${!where
+              ? '<span class="tag">nepočítá se</span>'
+              : where === 'r'
               ? '<span class="hint">jen roční součet</span>'
               : `<strong>přesčasu za měsíc</strong>`}</td>
           </tr>`
@@ -866,6 +868,12 @@
           <td class="num"><strong>${hm(x.t)}</strong></td>
           <td class="num"></td><td></td>
         </tr></tfoot></table>
+        ${list.some((c) => !PP.componentBucket(c.name))
+          ? `<p class="hint" style="margin:8px 0 0">Složky označené <span class="tag">nepočítá se</span>
+               ve výkazu jsou, ale do měsíčního přesčasu nepatří — buď je to tatáž hodnota pod jiným
+               názvem (<em>Přesčas zaplatit</em> = <em>do MEZD</em>), nebo zůstatek z minulého měsíce
+               (<em>Přesčas přenesený</em>). Sečíst je by hodiny zdvojilo.</p>`
+          : ''}
         ${list.some((c) => c.rows > 1)
           ? `<p class="hint" style="margin:8px 0 0">Složka, u které je víc než jeden řádek,
                byla ve výkazu vícekrát a hodiny se sečetly.</p>`
@@ -1673,7 +1681,8 @@
      se pozná, že se do přesčasu počítá něco, co tam nepatří — nebo naopak nepočítá
      složka, která tam patřit má. */
   function compSummary(record) {
-    const used = record.comps || []
+    // comps nese i složky, které se nepočítají — rozdělit je podle zařazení
+    const used = (record.comps || []).filter((c) => PP.componentBucket(c))
     const other = record.otherComps || []
     if (!used.length) return ''
     return `<span class="hint comp-summary">
