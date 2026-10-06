@@ -58,6 +58,7 @@ const res = await page.evaluate(() => {
     // Nováková: 41:00 do MEZD, -6:30 evidence → 34:30
     novakovaT: byName('Nováková Petra, Ing.').t,
     novakovaR: byName('Nováková Petra, Ing.').r,
+    novakovaM: byName('Nováková Petra, Ing.').m,
     // Šimek: proplacené konto 30:00 / -30:00 → součet 0
     simekT: byName('Šimek Ivan').t,
     simekM: byName('Šimek Ivan').m,
@@ -103,19 +104,26 @@ check('Šimek do MEZD', res.simekM, 30)
 check('diakritika z windows-1250', res.diacritics, 'G463 Prefix')
 
 console.log('\nRozpad na mzdové složky:')
-check('započítané složky', res.comps.join(' | '),
-  'Přesčas do MEZD | Přesčas evidence | Přesčas roční součet')
 check('nezapočítané složky', res.otherComps.map((c) => `${c[0]}×${c[1]}`).join(' | '),
-  'Základní mzda×5 | Dovolená×1')
-// řazeno podle velikosti, ať je nahoře to, co součet tvoří nejvíc
-check('Nováková — složky', res.novakovaComps.map((c) => c.name).join(' | '),
-  'Přesčas roční součet | Přesčas do MEZD | Přesčas evidence')
-check('Nováková — hodiny', res.novakovaComps.map((c) => c.h).join(' | '), '188.33 | 41 | -6.5')
-check('Nováková — řádků na složku', res.novakovaComps.map((c) => c.rows).join(' | '), '1 | 1 | 1')
-// do měsíčního přesčasu patří jen MEZD + evidence, roční součet ne
-check('Nováková — zařazení složek', res.novakovaComps.map((c) => c.bucket).join(' | '), 'r | m | e')
-check('Nováková — do měsíce se počítá jen MEZD a evidence',
-  res.novakovaComps.filter((c) => c.bucket !== 'r').reduce((a, c) => a + c.h, 0), 34.5)
+  'Přesčas zaplatit×5 | Přesčas přenesený×5 | Základní mzda×5 | Dovolená×1')
+
+/* Rozpad ukazuje i přesčasové složky, které se nepočítají — jinak by se u
+   člověka nedalo zjistit, proč panel nesedí na sestavu z mezd. Zařazení říká,
+   co se do součtu bere; prázdné = ve výkazu je, ale nesčítá se. */
+check('Nováková — složky v rozpadu', res.novakovaComps.map((c) => c.name).join(' | '),
+  'Přesčas roční součet | Přesčas přenesený | Přesčas do MEZD | Přesčas zaplatit | Přesčas evidence')
+check('Nováková — hodiny', res.novakovaComps.map((c) => c.h).join(' | '),
+  '188.33 | 63.02 | 41 | 41 | -6.5')
+check('Nováková — zařazení složek', res.novakovaComps.map((c) => c.bucket || '—').join(' | '),
+  'r | — | m | — | e')
+
+// tohle je to podstatné: „zaplatit“ je tatáž hodnota jako do MEZD a nesmí se přičíst
+check('do měsíce se počítá jen MEZD a evidence',
+  res.novakovaComps.filter((c) => c.bucket === 'm' || c.bucket === 'e').reduce((a, c) => a + c.h, 0),
+  34.5)
+check('součet řádku to potvrzuje', res.novakovaT, 34.5)
+check('„Přesčas zaplatit“ se nepřičetlo k do MEZD', res.novakovaM, 41)
+check('„Přesčas přenesený“ se nepřičetlo k ročnímu součtu', res.novakovaR, 188.33)
 
 console.log('\nCSV (oddělovač ;, desetinné hodiny s čárkou):')
 check('lidí s přesčasem', res.csvRows, 5)
@@ -156,17 +164,23 @@ const rozpad = await page.evaluate(() => {
     hodiny: rows.map((r) => r.cells[1].textContent.trim()).join(' | '),
     kam: rows.map((r) => r.cells[3].textContent.trim()).join(' | '),
     soucet: document.querySelector('tr.breakdown-row table.mini tfoot td.num').textContent.trim(),
+    vysvetlivka: [...document.querySelectorAll('tr.breakdown-row .hint')]
+      .some((p) => /nepočítá se/.test(p.textContent)),
   }
 })
 
 console.log('\nRozpad v detailu člověka:')
 check('zavřený rozpad se nekreslí', zavreno, 0)
-check('rozbalí se tři složky', rozpad.pocet, 3)
-check('složky', rozpad.slozky, 'Přesčas roční součet | Přesčas do MEZD | Přesčas evidence')
+check('rozbalí se všech pět složek z výkazu', rozpad.pocet, 5)
+check('složky', rozpad.slozky,
+  'Přesčas roční součet | Přesčas přenesený | Přesčas do MEZD | Přesčas zaplatit | Přesčas evidence')
 // hm() sází typografické minus U+2212
-check('hodiny v h:mm', rozpad.hodiny, '188:20 | 41:00 | \u22126:30')
-check('roční součet je označený jako nepočítaný do měsíce', rozpad.kam,
-  'jen roční součet | přesčasu za měsíc | přesčasu za měsíc')
+check('hodiny v h:mm', rozpad.hodiny, '188:20 | 63:01 | 41:00 | 41:00 | \u22126:30')
+/* U každé složky musí být napsané, kam patří. Právě tahle tabulka odpovídá na
+   otázku „proč panel nesedí na sestavu z mezd“. */
+check('u každé složky je napsané, kam patří', rozpad.kam,
+  'jen roční součet | nepočítá se | přesčasu za měsíc | nepočítá se | přesčasu za měsíc')
+check('vysvětlivka k nepočítaným složkám je vidět', rozpad.vysvetlivka ? 'ano' : 'ne', 'ano')
 check('patička ukazuje měsíční přesčas', rozpad.soucet, '34:30')
 
 await page.click('[data-pbreak="2026-09"]')
