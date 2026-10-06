@@ -139,10 +139,44 @@ await page.waitForSelector('#chart-person svg')
 const po = await page.evaluate(() => ({
   sekce: document.querySelector('#section-title').textContent,
   kdo: document.querySelector('#panel-compare .card:has(#chart-person) .hint:last-child').textContent.trim(),
+  // detail jednoho člověka má stránku sám pro sebe
+  karet: document.querySelectorAll('#panel-compare > .card').length,
+  grafZavodu: !!document.querySelector('#chart-plant'),
+  vyberMesicu: !!document.querySelector('#cmp-a'),
+  zmeny: !!document.querySelector('.change-list'),
+  zpet: !!document.querySelector('#person-close'),
 }))
 console.log('\nProklik ze jména:')
-check('otevře se vývoj a srovnání', po.sekce, 'Vývoj a srovnání')
+check('nadpis stránky je jméno', po.sekce, jmeno)
 check('vybraný člověk sedí', po.kdo.startsWith(jmeno) ? 'ano' : 'ne: ' + po.kdo, 'ano')
+check('je vidět jen jeho karta', po.karet, 1)
+check('bez grafů závodu', po.grafZavodu ? 'jsou' : 'ne', 'ne')
+check('bez výběru měsíců k porovnání', po.vyberMesicu ? 'je' : 'ne', 'ne')
+check('bez seznamu změn', po.zmeny ? 'je' : 'ne', 'ne')
+check('nabízí návrat', po.zpet ? 'ano' : 'ne', 'ano')
+
+// návrat musí vrátit celou sekci i její nadpis
+await page.click('#person-close')
+await page.waitForSelector('#chart-plant svg')
+const zpet = await page.evaluate(() => ({
+  sekce: document.querySelector('#section-title').textContent,
+  grafZavodu: !!document.querySelector('#chart-plant'),
+  hledani: !!document.querySelector('#person-search'),
+}))
+check('zpět se vrátí vývoj a srovnání', zpet.sekce, 'Vývoj a srovnání')
+check('i s grafem závodu', zpet.grafZavodu ? 'ano' : 'ne', 'ano')
+check('a s hledáním člověka', zpet.hledani ? 'ano' : 'ne', 'ano')
+
+// odchod do jiné sekce detail zavírá
+await page.click('#nav button[data-section="ranking"]')
+await page.waitForSelector('.link-person')
+await page.click('.link-person')
+await page.waitForSelector('#person-close')
+await page.click('#nav button[data-section="overview"]')
+await page.click('#nav button[data-section="compare"]')
+await page.waitForSelector('#chart-plant svg')
+check('po odchodu jinam se detail nezjeví znovu',
+  await page.$$eval('#person-close', (e) => e.length), 0)
 
 /* ---------- proklik na středisko a shoda čísel ----------
    Karta TOP středisek a detail střediska musí ukazovat totéž. Kdyby se
