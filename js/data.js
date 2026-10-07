@@ -417,6 +417,13 @@ window.PP = window.PP || {}
       okBalance: 0,     // varianta B
       neither: 0,
       examples: [],
+      /* Klesl někomu roční součet? Na tom stojí, jestli je to počitadlo
+         odpracovaných hodin (pak klesat nesmí, proplacení je jen přesun peněz),
+         nebo zůstatek, ze kterého se proplacením ubírá. Panel to nerozhodne
+         za mzdový systém, ale musí to změřit a říct nahlas. */
+      dropped: 0,
+      droppedExamples: [],
+      biggestDrop: 0,
     }
     for (const m of movers) {
       if (m.r.r == null || m.prev.r == null || m.prev.e == null) continue
@@ -425,6 +432,11 @@ window.PP = window.PP || {}
       // pozor: m.r.t už může být opravené, porovnávat se musí syrový součet
       const asMove = m.r.tRaw !== undefined ? m.r.tRaw : round2(m.r.m + m.r.e)
       const asBalance = round2(m.r.m + (m.r.e - m.prev.e))
+      if (dr < -0.02) {
+        out.dropped++
+        if (dr < out.biggestDrop) out.biggestDrop = dr
+        if (out.droppedExamples.length < 10) out.droppedExamples.push({ row: m.r, dr, m: m.r.m })
+      }
       const fitsMove = Math.abs(dr - asMove) <= 0.02
       const fitsBalance = Math.abs(dr - asBalance) <= 0.02
       if (fitsMove) out.okMove++
@@ -437,6 +449,7 @@ window.PP = window.PP || {}
       }
     }
     out.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+    out.droppedExamples.sort((x, y) => x.dr - y.dr)
 
     /* Vyhrává ta varianta, která sedí aspoň u 95 % lidí a zároveň výrazně líp
        než ta druhá. Když ani jedna, měří mzdový systém něco dalšího a je lepší

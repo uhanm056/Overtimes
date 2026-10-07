@@ -79,6 +79,10 @@ function rocni(p, rezim) {
   return out
 }
 
+/* V režimu „zůstatek“ roční součet u některých lidí klesá — konto jim ubylo víc,
+   než se proplatilo. To je přesně ten případ, který musí panel pojmenovat:
+   takové číslo není počitadlo odpracovaných hodin a na zákonný strop nestačí. */
+
 function vykaz(rezim, i) {
   const m = MESICE[i]
   const radky = []
@@ -131,6 +135,7 @@ async function zmer(rezim) {
       okMove: cmp.annual.okMove,
       okBalance: cmp.annual.okBalance,
       neither: cmp.annual.neither,
+      dropped: cmp.annual.dropped,
       // co panel použije jako měsíční přesčas
       method: d.method,
       zariT: kdo(zari, 1001).t,
@@ -157,6 +162,10 @@ async function zmer(rezim) {
   await page.waitForSelector('.method-verdict')
   out.nadpis = (await page.textContent('.method-verdict strong')).trim()
   out.vyhrava = await page.$$eval('.method-row.win .method-formula', (e) => e.length ? e[0].childNodes[0].textContent.trim() : '—')
+  const verdikty = await page.$$eval('.method-verdict strong', (e) => e.map((x) => x.textContent.trim()))
+  out.pokles = verdikty.find((t) => /Roční součet/.test(t)) || '—'
+  out.poklesText = await page.evaluate(() =>
+    /nestačí/.test(document.querySelector('#panel-year').textContent))
   await page.close()
   return out
 }
@@ -199,6 +208,15 @@ check('červenec je označený jako neúplný', b.cervenecNeuplny ? 'ano' : 'ne'
 check('září neúplné není', b.zariNeuplny ? 'je' : 'ne', 'ne')
 check('červenec si nechal hodnotu z výkazu', b.cervenecT, 65.85)
 check('banner to říká nahlas', b.banner, 1)
+
+/* Klesající roční součet je zásadní zjištění: znamená, že se z něj proplacením
+   ubírá, a tedy že se na něm nedá hlídat zákonný strop. */
+console.log('\n  …a pozná klesající roční součet:')
+check('spočítá, kolika lidem klesl', b.dropped > 0 ? 'ano' : 'ne', 'ano')
+check('karta to pojmenuje', b.pokles, 'Roční součet klesl u ' + b.dropped + ' z ' + b.checked + ' lidí')
+check('a varuje, že na strop nestačí', b.poklesText ? 'ano' : 'ne', 'ano')
+check('u varianty „pohyb“ nikomu neklesl', a.dropped, 0)
+check('a karta to potvrdí', a.pokles, 'Roční součet nikomu neklesl')
 
 /* ---------- co z toho uvidí kolegové ----------
    Veřejná stránka dostává jen souhrny, řádky s lidmi v ní nejsou — takže si
