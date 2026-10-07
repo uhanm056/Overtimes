@@ -690,7 +690,7 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 }
 </style>
 <meta name="robots" content="noindex">
-<meta name="generator" content="build-public.mjs · 2026-10-06">
+<meta name="generator" content="build-public.mjs · 2026-10-07">
 </head>
 <body>
 
@@ -2247,6 +2247,13 @@ window.PP = window.PP || {}
       okBalance: 0,     // varianta B
       neither: 0,
       examples: [],
+      /* Klesl někomu roční součet? Na tom stojí, jestli je to počitadlo
+         odpracovaných hodin (pak klesat nesmí, proplacení je jen přesun peněz),
+         nebo zůstatek, ze kterého se proplacením ubírá. Panel to nerozhodne
+         za mzdový systém, ale musí to změřit a říct nahlas. */
+      dropped: 0,
+      droppedExamples: [],
+      biggestDrop: 0,
     }
     for (const m of movers) {
       if (m.r.r == null || m.prev.r == null || m.prev.e == null) continue
@@ -2255,6 +2262,11 @@ window.PP = window.PP || {}
       // pozor: m.r.t už může být opravené, porovnávat se musí syrový součet
       const asMove = m.r.tRaw !== undefined ? m.r.tRaw : round2(m.r.m + m.r.e)
       const asBalance = round2(m.r.m + (m.r.e - m.prev.e))
+      if (dr < -0.02) {
+        out.dropped++
+        if (dr < out.biggestDrop) out.biggestDrop = dr
+        if (out.droppedExamples.length < 10) out.droppedExamples.push({ row: m.r, dr, m: m.r.m })
+      }
       const fitsMove = Math.abs(dr - asMove) <= 0.02
       const fitsBalance = Math.abs(dr - asBalance) <= 0.02
       if (fitsMove) out.okMove++
@@ -2267,6 +2279,7 @@ window.PP = window.PP || {}
       }
     }
     out.examples.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff))
+    out.droppedExamples.sort((x, y) => x.dr - y.dr)
 
     /* Vyhrává ta varianta, která sedí aspoň u 95 % lidí a zároveň výrazně líp
        než ta druhá. Když ani jedna, měří mzdový systém něco dalšího a je lepší
@@ -4078,6 +4091,39 @@ window.PP = window.PP || {}
         <strong>${esc(v.title)}</strong>
         <p>${v.text}</p>
       </div>
+
+      <div class="method-verdict ${chk.dropped ? 'warn' : 'good'}" style="margin-top:14px">
+        <strong>${chk.dropped
+          ? `Roční součet klesl u ${num(chk.dropped)} z ${num(chk.checked)} lidí`
+          : 'Roční součet nikomu neklesl'}</strong>
+        <p>${chk.dropped
+          ? `Mzdový systém tedy roční součet <strong>nebere jako počitadlo odpracovaných
+             hodin</strong> — ubírá z něj, když se hodiny proplatí nebo vyberou jako volno.
+             Největší pokles ${hm(Math.abs(chk.biggestDrop))}. Na hlídání zákonného stropu
+             ${CFG.year.cap} h to pak <strong>nestačí</strong>: kdo si přesčasy nechá průběžně
+             proplácet, strop podle téhle hodnoty nikdy nepřekročí, i kdyby jich odpracoval
+             dvakrát tolik. Evidenci odpracovaných hodin je potřeba vzít odjinud.`
+          : `Roční součet se mezi těmihle měsíci nikomu nesnížil, ani u lidí, kterým se
+             přesčas proplácel. Chová se tedy jako <strong>počitadlo odpracovaných hodin</strong>
+             — proplacení z něj neubírá — a prahy ${CFG.year.warn} / ${CFG.year.crit} /
+             ${CFG.year.cap} h na něm stojí právem.`}</p>
+      </div>
+
+      ${chk.dropped ? `<div class="table-wrap" style="margin-top:12px"><table>
+        <thead><tr><th>Jméno</th><th>Středisko</th>
+          <th class="num">Pokles ročního součtu</th>
+          <th class="num">Proplaceno ten měsíc</th></tr></thead>
+        <tbody>${chk.droppedExamples.map((e) => `<tr>
+          <td class="name">${esc(e.row.n)}</td>
+          <td>${esc(e.row.s)}</td>
+          <td class="num"><span class="tag crit">${hm(e.dr)}</span></td>
+          <td class="num">${hm(e.m)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <p class="hint" style="margin:10px 0 0">
+        Když se pokles rovná proplacené částce, ubírá systém z ročního součtu přesně to,
+        co vyplatil.
+      </p>` : ''}
 
       ${chk.neither ? `<p class="hint" style="margin:14px 0 0">
         U ${num(chk.neither)} lidí nesedí ani jedna varianta. Největší rozdíly:

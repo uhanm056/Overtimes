@@ -1268,6 +1268,39 @@
         <p>${v.text}</p>
       </div>
 
+      <div class="method-verdict ${chk.dropped ? 'warn' : 'good'}" style="margin-top:14px">
+        <strong>${chk.dropped
+          ? `Roční součet klesl u ${num(chk.dropped)} z ${num(chk.checked)} lidí`
+          : 'Roční součet nikomu neklesl'}</strong>
+        <p>${chk.dropped
+          ? `Mzdový systém tedy roční součet <strong>nebere jako počitadlo odpracovaných
+             hodin</strong> — ubírá z něj, když se hodiny proplatí nebo vyberou jako volno.
+             Největší pokles ${hm(Math.abs(chk.biggestDrop))}. Na hlídání zákonného stropu
+             ${CFG.year.cap} h to pak <strong>nestačí</strong>: kdo si přesčasy nechá průběžně
+             proplácet, strop podle téhle hodnoty nikdy nepřekročí, i kdyby jich odpracoval
+             dvakrát tolik. Evidenci odpracovaných hodin je potřeba vzít odjinud.`
+          : `Roční součet se mezi těmihle měsíci nikomu nesnížil, ani u lidí, kterým se
+             přesčas proplácel. Chová se tedy jako <strong>počitadlo odpracovaných hodin</strong>
+             — proplacení z něj neubírá — a prahy ${CFG.year.warn} / ${CFG.year.crit} /
+             ${CFG.year.cap} h na něm stojí právem.`}</p>
+      </div>
+
+      ${chk.dropped ? `<div class="table-wrap" style="margin-top:12px"><table>
+        <thead><tr><th>Jméno</th><th>Středisko</th>
+          <th class="num">Pokles ročního součtu</th>
+          <th class="num">Proplaceno ten měsíc</th></tr></thead>
+        <tbody>${chk.droppedExamples.map((e) => `<tr>
+          <td class="name">${esc(e.row.n)}</td>
+          <td>${esc(e.row.s)}</td>
+          <td class="num"><span class="tag crit">${hm(e.dr)}</span></td>
+          <td class="num">${hm(e.m)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <p class="hint" style="margin:10px 0 0">
+        Když se pokles rovná proplacené částce, ubírá systém z ročního součtu přesně to,
+        co vyplatil.
+      </p>` : ''}
+
       ${chk.neither ? `<p class="hint" style="margin:14px 0 0">
         U ${num(chk.neither)} lidí nesedí ani jedna varianta. Největší rozdíly:
       </p>
