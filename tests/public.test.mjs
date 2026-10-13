@@ -119,7 +119,8 @@ check('žádná prokliknutelná jména', centers.jmena, 0)
 await page.click('#nav button[data-section="overview"]')
 await page.waitForSelector('.topc-item')
 const top = await page.evaluate(() => ({
-  nadpis: document.querySelector('.card:has(.topc) h2').textContent.trim(),
+  nadpis: document.querySelector('.card:has(.topc) h2').firstChild.textContent.trim(),
+  obdobi: (document.querySelector('.card:has(.topc) .period-chip') || {}).textContent || '',
   strediska: document.querySelectorAll('.topc-item').length,
   lide: document.querySelectorAll('.topc-people').length,
   jmena: document.querySelectorAll('.topc .link-person').length,
@@ -127,6 +128,8 @@ const top = await page.evaluate(() => ({
 }))
 console.log('\nTOP střediska ve veřejném vydání:')
 check('karta je vidět', top.nadpis, 'TOP střediska')
+// měsíc musí být v nadpisu, ne jen v drobném textu vedle
+check('v nadpisu je měsíc', /^[a-záčďéěíňóřšťúůýž]+ \d{4}$/.test(top.obdobi.trim()) ? 'ano' : 'ne: ' + top.obdobi, 'ano')
 check('nejmenuje se „a jejich lidé“', /jejich lidé/.test(top.nadpis) ? 'jmenuje' : 'ne', 'ne')
 check('střediska se vypsala', top.strediska > 1 ? 'ano' : 'ne', 'ano')
 check('seznamy lidí nejsou', top.lide, 0)
