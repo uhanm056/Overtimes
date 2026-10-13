@@ -255,6 +255,21 @@ const annual = await page.evaluate(() => {
   return { sedi, nesedi, rozbito: n }
 })
 
+/* Měsíc musí být vidět i v interním panelu — čísla v Přehledu platí jen pro
+   vybraný měsíc a záměna se souhrnem za období je snadná. */
+await page.click('#nav button[data-section="overview"]')
+await page.waitForSelector('.topc-item')
+const obdobi = await page.evaluate(() => ({
+  podnadpis: document.querySelector('#section-sub').textContent.trim(),
+  odznaky: [...document.querySelectorAll('#panel-overview .period-chip')].map((e) => e.textContent.trim()),
+  mesic: window.PP.monthName(window.PP.data.keys()[0]),
+}))
+console.log('\nObdobí v Přehledu:')
+check('podnadpis stránky nese měsíc', obdobi.podnadpis, `Celkový obrázek za ${obdobi.mesic}.`)
+check('měsíc je u TOP středisek i u obou grafů', obdobi.odznaky.length, 3)
+check('a všude je to tentýž měsíc',
+  obdobi.odznaky.every((t) => t === obdobi.mesic) ? 'ano' : 'ne: ' + obdobi.odznaky.join(' | '), 'ano')
+
 console.log('\nKontrola ročního součtu:')
 check('na správných datech nic nehlásí', annual.sedi.neither, 0)
 check('kontrola opravdu něco porovnávala', annual.sedi.checked > 100 ? 'ano' : 'ne', 'ano')

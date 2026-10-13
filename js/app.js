@@ -203,6 +203,14 @@
   }
 
   /* ---------- stavební kameny ---------- */
+  /* Období karty přímo v nadpisu. Drobný šedý text vpravo se dá přehlédnout
+     a u čísel, která platí jen pro jeden měsíc, je to ta nejdůležitější
+     informace na kartě. */
+  function periodChip(key) {
+    const k = key || ui.month
+    return k ? `<span class="period-chip">${esc(monthName(k))}</span>` : ''
+  }
+
   function kpi(label, value, foot, tone) {
     return `<div class="card kpi${tone ? ' ' + tone : ''}">
       <span class="label">${esc(label)}</span>
@@ -237,6 +245,9 @@
 
   /* ---------- Přehled ---------- */
   function renderOverview() {
+    const sub = $('#section-sub')
+    if (sub && ui.month) sub.textContent = `Celkový obrázek za ${monthName(ui.month)}.`
+
     const el = $('#panel-overview')
     const rec = currentMonth()
     if (!rec) { el.innerHTML = emptyState('Naimportujte Součtový výkaz a panel se naplní.'); return }
@@ -264,7 +275,7 @@
     const maxAvg = topAvg.length ? topAvg[0].avg : 0
     const avgChart = `<div class="card">
       <div class="card-head">
-        <h2>Ø hodin na osobu podle středisek</h2>
+        <h2>Ø hodin na osobu podle středisek ${periodChip()}</h2>
         <span class="hint">práh ${CFG.center.warn} h / ${CFG.center.crit} h · TOP 10</span>
       </div>
       <div class="bars">
@@ -276,7 +287,7 @@
     const maxHist = Math.max.apply(null, s.hist.map((b) => b.count).concat([1]))
     const histChart = `<div class="card">
       <div class="card-head">
-        <h2>Rozložení přesčasu</h2>
+        <h2>Rozložení přesčasu ${periodChip()}</h2>
         <span class="hint">počet lidí v pásmu hodin</span>
       </div>
       <div class="hist">
@@ -434,8 +445,9 @@
 
     return `<div class="card">
       <div class="card-head">
-        <h2>${PUBLIC ? 'TOP střediska' : 'TOP střediska a jejich lidé'}</h2>
-        <span class="hint">${esc(monthName(ui.month))} · ${PUBLIC
+        <h2>${PUBLIC ? 'TOP střediska' : 'TOP střediska a jejich lidé'}
+          ${periodChip()}</h2>
+        <span class="hint">${PUBLIC
           ? `${TOP_CENTERS} středisek s nejvyšším přesčasem`
           : `${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem`}</span>
       </div>
