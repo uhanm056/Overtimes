@@ -87,7 +87,7 @@ console.log('\nPanel:')
 const dnes = new Date()
 const ocekavano = `verze ${dnes.getDate()}. ${dnes.getMonth() + 1}. ${dnes.getFullYear()}`
 check('verze sestavení je vidět', await page.textContent('#rail-build'), ocekavano)
-check('jen neosobní sekce', ui.sekce, 'overview,centers,compare,method')
+check('jen neosobní sekce', ui.sekce, 'overview,period,centers,compare,method')
 check('sloupec Maximum (hodnota jednotlivce) chybí',
   ui.sloupce.includes('Maximum') ? 'je tam' : 'chybí', 'chybí')
 check('export do Excelu skrytý', ui.exportSkryty, 'true')
