@@ -83,7 +83,7 @@ const markup = html
   .replace(/<style[\s\S]*?<\/style>/gi, '')
 check('nezůstal vykreslený obsah panelů',
   /class="(card|kpi|tag)\b|data-pick=|link-person/.test(markup) ? 'zůstal' : 'ne', 'ne')
-check('prázdné panely', (markup.match(/<section class="panel"[^>]*><\/section>/g) || []).length, 7)
+check('prázdné panely', (markup.match(/<section class="panel"[^>]*><\/section>/g) || []).length, 8)
 
 /* ---------- výstup je funkční panel ---------- */
 const page2 = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
@@ -102,7 +102,7 @@ const verejny = await page2.evaluate(() => ({
 
 console.log('\nVygenerovaná stránka:')
 check('běží bez chyb', errs.length ? errs[0] : 'ano', 'ano')
-check('jen neosobní sekce', verejny.sekce, 'overview,centers,compare,method')
+check('jen neosobní sekce', verejny.sekce, 'overview,period,centers,compare,method')
 check('měsíce se načetly', verejny.mesice > 0 ? 'ano' : 'ne', 'ano')
 check('všechny měsíce jsou agregáty', verejny.agregat ? 'ano' : 'ne', 'ano')
 check('řádky s lidmi tam nejsou', verejny.lidi ? 'jsou' : 'ne', 'ne')

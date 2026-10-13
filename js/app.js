@@ -2,7 +2,7 @@
 ;(function (PP) {
   'use strict'
 
-  const { esc, hm, h1, num, pct, fold, mark, level, monthName, monthShort, centerName, $, $$ } = PP
+  const { esc, hm, h1, num, pct, czk, fold, mark, level, monthName, monthShort, centerName, $, $$ } = PP
   const CFG = PP.CFG
 
   const ICONS = {
@@ -10,6 +10,7 @@
     centers: '<path d="M4 20V8l6-4 6 4v12M4 20h16M14 20v-5h-4v5M20 20V11l-4-2.6"/>',
     ranking: '<path d="M6 20v-6M12 20V4M18 20v-9"/>',
     compare: '<path d="M4 7h10M4 7l3-3M4 7l3 3M20 17H10M20 17l-3-3M20 17l-3 3"/>',
+    period: '<path d="M3 20h18M7 20V9M12 20V4M17 20v-7"/>',
     year: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 7v5l3.2 2"/>',
     import: '<path d="M12 3v11M8 10.5l4 4 4-4M4 20h16"/>',
     method: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.6"/>',
@@ -17,6 +18,7 @@
 
   const SECTIONS = [
     { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
+    { id: 'period', label: 'Souhrn období', title: 'Souhrn za celé období', sub: 'Součet přes všechny načtené měsíce — hodiny, proplacení i náklady.' },
     { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska.' },
     { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
     { id: 'compare', label: 'Vývoj a srovnání', title: 'Vývoj a srovnání', sub: 'Jak se přesčas vyvíjí a co se změnilo mezi dvěma obdobími.' },
@@ -29,7 +31,7 @@
      tools/build-public.mjs; interní panel běží bez něj. */
   const PUBLIC = !!window.PP_PUBLIC
 
-  const PUBLIC_SECTIONS = ['overview', 'centers', 'compare', 'method']
+  const PUBLIC_SECTIONS = ['overview', 'period', 'centers', 'compare', 'method']
   if (PUBLIC) {
     for (let i = SECTIONS.length - 1; i >= 0; i--) {
       if (!PUBLIC_SECTIONS.includes(SECTIONS[i].id)) SECTIONS.splice(i, 1)
@@ -107,6 +109,10 @@
     $('#section-title').textContent = s.title
     $('#section-sub').textContent = s.sub
     SECTIONS.forEach((x) => { $('#panel-' + x.id).hidden = x.id !== id })
+    /* Souhrn za období sčítá všechny měsíce, takže by volič měsíce jen mátl —
+     a zrovna tahle záměna je důvod, proč sekce vznikla. */
+    const picker = document.querySelector('.month-picker')
+    if (picker) picker.hidden = id === 'period'
     render()
   }
 
@@ -429,7 +435,7 @@
     return `<div class="card">
       <div class="card-head">
         <h2>${PUBLIC ? 'TOP střediska' : 'TOP střediska a jejich lidé'}</h2>
-        <span class="hint">${PUBLIC
+        <span class="hint">${esc(monthName(ui.month))} · ${PUBLIC
           ? `${TOP_CENTERS} středisek s nejvyšším přesčasem`
           : `${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem`}</span>
       </div>
@@ -1198,6 +1204,168 @@
     }))
   }
 
+  /* ---------- Souhrn za období ----------
+     Přehled ukazuje jeden měsíc. Tahle sekce sčítá všechny načtené měsíce
+     dohromady a přidává to, co z hodin plyne v penězích. */
+
+  const RATE_KEY = 'prescasy.sazba.v1'
+
+  function loadRate() {
+    try {
+      const raw = window.localStorage.getItem(RATE_KEY)
+      if (!raw) return
+      const v = JSON.parse(raw)
+      if (v && isFinite(v.rate)) CFG.cost.rate = Number(v.rate) || null
+      if (v && isFinite(v.surcharge)) CFG.cost.surcharge = Number(v.surcharge)
+    } catch (err) { /* sazba je pohodlí, ne data — když nejde načíst, nevadí */ }
+  }
+
+  function saveRate() {
+    try {
+      window.localStorage.setItem(RATE_KEY, JSON.stringify(CFG.cost))
+    } catch (err) { /* privátní režim: sazba vydrží jen do zavření panelu */ }
+  }
+
+  function renderPeriod() {
+    const el = $('#panel-period')
+    const p = PP.periodTotals()
+    if (!p) {
+      el.innerHTML = emptyState(PUBLIC
+        ? 'Souhrn za období tu zatím není.'
+        : 'Naimportujte aspoň dva po sobě jdoucí měsíce a souhrn se spočítá.')
+      return
+    }
+
+    const od = monthShort(p.keys[0])
+    const doM = monthShort(p.keys[p.keys.length - 1])
+    const nakladProplacene = PP.cost(p.mezdy)
+    const zavazekKonto = PP.cost(p.konto)
+    const nakladCelkem = PP.cost(p.total)
+
+    const rozsah = `<p class="hint" style="margin:0 0 18px">
+      Sečteno přes <strong>${num(p.keys.length)} ${p.keys.length === 1 ? 'měsíc' : p.keys.length < 5 ? 'měsíce' : 'měsíců'}</strong>
+      (${esc(od)} – ${esc(doM)}) u ${num(p.people)} lidí.
+      ${p.skipped.length
+        ? `<br>Nezapočítán ${esc(p.skipped.map(monthShort).join(', '))} — je to nejstarší načtený měsíc
+           a bez toho předchozího se u něj přesčas spočítat nedá.`
+        : ''}
+    </p>`
+
+    const kpis = `<div class="grid kpis">
+      ${kpi('Přesčas celkem', h1(p.total) + ' h', `za ${num(p.keys.length)} ${p.keys.length < 5 ? 'měsíce' : 'měsíců'}`)}
+      ${kpi('Z toho proplaceno', h1(p.mezdy) + ' h', pct(p.total ? p.mezdy / p.total : 0) + ' přesčasu')}
+      ${kpi('Zůstalo na kontě', h1(p.konto) + ' h',
+        p.konto > 0 ? 'hodiny k pozdějšímu čerpání' : 'z konta se naopak ubralo',
+        p.konto > 0 ? 'warn' : '')}
+      ${kpi('Ø na osobu', hm(p.people ? p.total / p.people : 0), 'za celé období')}
+    </div>`
+
+    const sazba = PUBLIC ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Náklady na přesčas</h2>
+        <span class="hint">odhad z průměrné sazby</span>
+      </div>
+      <p class="hint" style="margin:0 0 14px">
+        Skutečné mzdy panel nezná a znát nemá. Zadejte <strong>průměrnou hodinovou sazbu</strong>
+        a spočítá se z ní odhad. Příplatek za práci přesčas je podle zákoníku práce
+        nejméně 25 % průměrného výdělku; náhradní volno místo příplatku se sem nepromítne.
+      </p>
+      <form class="rate-form" id="rate-form">
+        <label>Sazba <span class="unit">Kč/h</span>
+          <input type="number" id="rate-value" min="0" step="1" value="${CFG.cost.rate || ''}"
+            placeholder="např. 280"></label>
+        <label>Příplatek <span class="unit">%</span>
+          <input type="number" id="rate-surcharge" min="0" step="1" value="${num(CFG.cost.surcharge)}"></label>
+        <button class="btn" type="submit">Přepočítat</button>
+        ${CFG.cost.rate ? `<button class="btn ghost sm" type="button" id="rate-clear">Smazat sazbu</button>` : ''}
+      </form>
+
+      ${CFG.cost.rate ? `<div class="grid kpis" style="margin-top:18px">
+        ${kpi('Vyplaceno za přesčas', czk(nakladProplacene), `${h1(p.mezdy)} h × ${num(CFG.cost.rate)} Kč + ${num(CFG.cost.surcharge)} %`)}
+        ${kpi('Závazek na kontě', czk(zavazekKonto), 'hodiny, které se teprve proplatí nebo vyberou',
+          p.konto > 0 ? 'warn' : '')}
+        ${kpi('Celkem za odpracovaný přesčas', czk(nakladCelkem), 'vyplacené i nevyplacené dohromady')}
+      </div>
+      <p class="hint" style="margin:14px 0 0">
+        Je to <strong>odhad</strong>, ne účetní číslo: počítá se jednou sazbou pro všechny
+        a nezahrnuje odvody zaměstnavatele.
+      </p>` : ''}
+    </div>`
+
+    const maxC = p.centers.length ? p.centers[0].total : 0
+    const centers = `<div class="card">
+      <div class="card-head">
+        <h2>Střediska za celé období</h2>
+        <span class="hint">${num(p.centers.length)} středisek · ${esc(od)} – ${esc(doM)}</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Středisko</th><th class="num">Lidí</th><th class="num">Přesčas</th>
+          <th class="num">Ø / osoba</th><th class="num">Proplaceno</th><th class="num">Na konto</th>
+          ${CFG.cost.rate && !PUBLIC ? '<th class="num">Náklad</th>' : ''}
+        </tr></thead>
+        <tbody>${p.centers.map((c) => `<tr>
+          <td><button type="button" class="link-center" data-center="${esc(c.name)}"
+            title="Otevřít detail střediska">${esc(c.name)}</button></td>
+          <td class="num">${num(c.people)}</td>
+          <td class="num">${h1(c.total)}</td>
+          <td class="num">${hm(c.avg)}</td>
+          <td class="num">${h1(c.mezdy)}</td>
+          <td class="num">${h1(c.konto)}</td>
+          ${CFG.cost.rate && !PUBLIC ? `<td class="num">${czk(PP.cost(c.total))}</td>` : ''}
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    const lide = PUBLIC ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Nejvíc přesčasu za období</h2>
+        <span class="hint">25 lidí · součet přes ${esc(od)} – ${esc(doM)}</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="rank">#</th><th>Jméno</th><th>Středisko</th><th class="num">Měsíců</th>
+          <th class="num">Přesčas</th><th class="num">Ø / měsíc</th>
+          <th class="num">Proplaceno</th><th class="num">Na konto</th>
+          ${CFG.cost.rate ? '<th class="num">Náklad</th>' : ''}
+        </tr></thead>
+        <tbody>${p.ranking.slice(0, 25).map((r, i) => `<tr>
+          <td class="rank">${i + 1}</td>
+          <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+            title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button></td>
+          <td>${esc(r.s)}</td>
+          <td class="num">${num(r.months)}</td>
+          <td class="num">${hm(r.t)}</td>
+          <td class="num">${hm(r.months ? r.t / r.months : 0)}</td>
+          <td class="num">${hm(r.m)}</td>
+          <td class="num">${hm(r.konto)}</td>
+          ${CFG.cost.rate ? `<td class="num">${czk(PP.cost(r.t))}</td>` : ''}
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    el.innerHTML = rozsah + kpis + sazba + centers + lide
+
+    bindCenterLinks('#panel-period')
+    if (!PUBLIC) bindPersonLinks('#panel-period')
+    const form = $('#rate-form')
+    if (form) form.addEventListener('submit', (e) => {
+      e.preventDefault()
+      const v = Number($('#rate-value').value)
+      CFG.cost.rate = isFinite(v) && v > 0 ? v : null
+      const sur = Number($('#rate-surcharge').value)
+      CFG.cost.surcharge = isFinite(sur) && sur >= 0 ? sur : 0
+      saveRate()
+      renderPeriod()
+    })
+    const clear = $('#rate-clear')
+    if (clear) clear.addEventListener('click', () => {
+      CFG.cost.rate = null
+      saveRate()
+      renderPeriod()
+    })
+  }
+
   /* ---------- Roční limit ---------- */
   function renderYear() {
     const el = $('#panel-year')
@@ -1880,6 +2048,7 @@
       case 'centers': return renderCenters()
       case 'ranking': return renderRanking()
       case 'compare': return renderCompare()
+      case 'period': return renderPeriod()
       case 'year': return renderYear()
       case 'import': {
         renderImport()
@@ -1966,6 +2135,7 @@
   async function init() {
     initTheme()
     renderNav()
+    loadRate()
     await PP.data.init()
     renderMonthPicker()
     updateRailNote()

@@ -335,6 +335,82 @@ window.PP = window.PP || {}
    * Měsíc, ve kterém ve výkazu není, má hodnoty null — ne nulu: nulový přesčas
    * a „ve výkazu vůbec není“ jsou dvě různé věci.
    */
+  /**
+   * Součet za celé načtené období, ne za jeden měsíc.
+   *
+   * Nejstarší měsíc se v režimu konta nezapočítá — nemá předchozí zůstatek,
+   * od kterého by se odrazil, takže by do součtu vnesl nafouknuté číslo.
+   * Radši kratší období, o kterém se ví, než delší, kterému se nedá věřit.
+   *
+   * @returns {{keys, skipped, people, total, mezdy, konto, centers, ranking}|null}
+   */
+  PP.periodTotals = function () {
+    const all = PP.data.keys().slice().reverse()       // vzestupně
+    /* Ukázkové měsíce se nesčítají — je to vygenerovaný vzorek a v součtu za
+       období by vypadal jako skutečné hodiny závodu. */
+    const usable = all.filter((k) => {
+      const rec = state.months[k]
+      return rec && rec.rows && !rec.demo && !rec.methodIncomplete
+    })
+    if (!usable.length) return null
+
+    const byPerson = new Map()
+    const byCenter = new Map()
+    let total = 0
+    let mezdy = 0
+
+    for (const key of usable) {
+      for (const row of state.months[key].rows) {
+        total += row.t
+        mezdy += row.m
+
+        const pk = String(row.o)
+        let p = byPerson.get(pk)
+        if (!p) { p = { o: row.o, n: row.n, s: row.s, t: 0, m: 0, months: 0 }; byPerson.set(pk, p) }
+        p.t += row.t
+        p.m += row.m
+        p.months++
+        p.s = row.s                                     // středisko bereme podle posledního měsíce
+
+        let c = byCenter.get(row.s)
+        if (!c) { c = { name: row.s, t: 0, m: 0, people: new Set() }; byCenter.set(row.s, c) }
+        c.t += row.t
+        c.m += row.m
+        c.people.add(pk)
+      }
+    }
+
+    const r2 = (v) => Math.round(v * 100) / 100
+    const centers = Array.from(byCenter.values())
+      .map((c) => ({
+        name: c.name,
+        people: c.people.size,
+        total: r2(c.t),
+        mezdy: r2(c.m),
+        konto: r2(c.t - c.m),
+        avg: c.people.size ? r2(c.t / c.people.size) : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+
+    const ranking = Array.from(byPerson.values())
+      .map((p) => ({ ...p, t: r2(p.t), m: r2(p.m), konto: r2(p.t - p.m) }))
+      .sort((a, b) => b.t - a.t)
+
+    return {
+      keys: usable,
+      skipped: all.filter((k) => {
+        const rec = state.months[k]
+        return rec && rec.rows && !rec.demo && !usable.includes(k)
+      }),
+      people: byPerson.size,
+      total: r2(total),
+      mezdy: r2(mezdy),
+      konto: r2(total - mezdy),
+      centers,
+      ranking,
+    }
+  }
+
   PP.personHistory = function (id) {
     const wanted = String(id)
     const keys = PP.data.keys().slice().reverse()

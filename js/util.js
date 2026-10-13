@@ -13,6 +13,23 @@ window.PP = window.PP || {}
     center: { warn: 35, crit: 45 },
     // roční součet přesčasu
     year: { warn: 150, crit: 250, cap: 416 },
+    /* Náklady na přesčas. Skutečné mzdy panel nezná a znát nemá — počítá se
+       z průměrné hodinové sazby, kterou zadá uživatel. Příplatek za práci
+       přesčas je podle zákoníku práce nejméně 25 % průměrného výdělku. */
+    cost: { rate: null, surcharge: 25 },
+  }
+
+  /** Peníze v korunách: 123456.7 → "123 457 Kč". */
+  PP.czk = function (value) {
+    if (value == null || !isFinite(value)) return '—'
+    return new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(value) + ' Kč'
+  }
+
+  /** Náklad na hodiny při zadané sazbě a příplatku; bez sazby null. */
+  PP.cost = function (hours, cfg) {
+    const c = cfg || PP.CFG.cost
+    if (!c.rate || !isFinite(c.rate)) return null
+    return hours * c.rate * (1 + (Number(c.surcharge) || 0) / 100)
   }
 
   /** Stupeň závažnosti podle prahů: '' | 'warn' | 'crit'. */
