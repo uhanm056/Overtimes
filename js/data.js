@@ -344,8 +344,10 @@ window.PP = window.PP || {}
    *
    * @returns {{keys, skipped, people, total, mezdy, konto, centers, ranking}|null}
    */
-  PP.periodTotals = function () {
+  PP.periodTotals = function (only) {
+    const want = only && only.length ? new Set(only) : null
     const all = PP.data.keys().slice().reverse()       // vzestupně
+      .filter((k) => !want || want.has(k))
     /* Ukázkové měsíce se nesčítají — je to vygenerovaný vzorek a v součtu za
        období by vypadal jako skutečné hodiny závodu. */
     const usable = all.filter((k) => {
@@ -373,23 +375,34 @@ window.PP = window.PP || {}
         p.s = row.s                                     // středisko bereme podle posledního měsíce
 
         let c = byCenter.get(row.s)
-        if (!c) { c = { name: row.s, t: 0, m: 0, people: new Set() }; byCenter.set(row.s, c) }
+        if (!c) { c = { name: row.s, t: 0, m: 0, people: new Map() }; byCenter.set(row.s, c) }
         c.t += row.t
         c.m += row.m
-        c.people.add(pk)
+        // lidé po střediscích, ať se dá postavit TOP karta i přes víc měsíců
+        const cp = c.people.get(pk) || { o: row.o, n: row.n, s: row.s, t: 0, m: 0 }
+        cp.t += row.t
+        cp.m += row.m
+        c.people.set(pk, cp)
       }
     }
 
     const r2 = (v) => Math.round(v * 100) / 100
     const centers = Array.from(byCenter.values())
-      .map((c) => ({
-        name: c.name,
-        people: c.people.size,
-        total: r2(c.t),
-        mezdy: r2(c.m),
-        konto: r2(c.t - c.m),
-        avg: c.people.size ? r2(c.t / c.people.size) : 0,
-      }))
+      .map((c) => {
+        const avg = c.people.size ? c.t / c.people.size : 0
+        return {
+          name: c.name,
+          people: c.people.size,
+          total: r2(c.t),
+          mezdy: r2(c.m),
+          konto: r2(c.t - c.m),
+          avg: r2(avg),
+          level: PP.level(avg, PP.CFG.center),
+          rows: Array.from(c.people.values())
+            .map((x) => ({ ...x, t: r2(x.t), m: r2(x.m) }))
+            .sort((a, b) => b.t - a.t),
+        }
+      })
       .sort((a, b) => b.total - a.total)
 
     const ranking = Array.from(byPerson.values())

@@ -547,6 +547,10 @@ h3.pub-sub + p { margin-top: 0; }
 .rate-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* období karty — musí jít přečíst na první pohled, ne jako šedý doplněk */
+.month-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; }
+.month-pick-label { font-size: 12px; color: var(--text-3); margin-right: 2px; }
+.chip.sm { padding: 4px 10px; font-size: 12px; }
+
 .period-chip {
   display: inline-block; margin-left: 9px; padding: 2px 9px; border-radius: 999px;
   background: var(--accent-soft); color: var(--accent);
@@ -711,7 +715,7 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 }
 </style>
 <meta name="robots" content="noindex">
-<meta name="generator" content="build-public.mjs · 2026-10-13">
+<meta name="generator" content="build-public.mjs · 2026-10-15">
 </head>
 <body>
 
@@ -2213,8 +2217,10 @@ window.PP = window.PP || {}
    *
    * @returns {{keys, skipped, people, total, mezdy, konto, centers, ranking}|null}
    */
-  PP.periodTotals = function () {
+  PP.periodTotals = function (only) {
+    const want = only && only.length ? new Set(only) : null
     const all = PP.data.keys().slice().reverse()       // vzestupně
+      .filter((k) => !want || want.has(k))
     /* Ukázkové měsíce se nesčítají — je to vygenerovaný vzorek a v součtu za
        období by vypadal jako skutečné hodiny závodu. */
     const usable = all.filter((k) => {
@@ -2242,23 +2248,34 @@ window.PP = window.PP || {}
         p.s = row.s                                     // středisko bereme podle posledního měsíce
 
         let c = byCenter.get(row.s)
-        if (!c) { c = { name: row.s, t: 0, m: 0, people: new Set() }; byCenter.set(row.s, c) }
+        if (!c) { c = { name: row.s, t: 0, m: 0, people: new Map() }; byCenter.set(row.s, c) }
         c.t += row.t
         c.m += row.m
-        c.people.add(pk)
+        // lidé po střediscích, ať se dá postavit TOP karta i přes víc měsíců
+        const cp = c.people.get(pk) || { o: row.o, n: row.n, s: row.s, t: 0, m: 0 }
+        cp.t += row.t
+        cp.m += row.m
+        c.people.set(pk, cp)
       }
     }
 
     const r2 = (v) => Math.round(v * 100) / 100
     const centers = Array.from(byCenter.values())
-      .map((c) => ({
-        name: c.name,
-        people: c.people.size,
-        total: r2(c.t),
-        mezdy: r2(c.m),
-        konto: r2(c.t - c.m),
-        avg: c.people.size ? r2(c.t / c.people.size) : 0,
-      }))
+      .map((c) => {
+        const avg = c.people.size ? c.t / c.people.size : 0
+        return {
+          name: c.name,
+          people: c.people.size,
+          total: r2(c.t),
+          mezdy: r2(c.m),
+          konto: r2(c.t - c.m),
+          avg: r2(avg),
+          level: PP.level(avg, PP.CFG.center),
+          rows: Array.from(c.people.values())
+            .map((x) => ({ ...x, t: r2(x.t), m: r2(x.m) }))
+            .sort((a, b) => b.t - a.t),
+        }
+      })
       .sort((a, b) => b.total - a.total)
 
     const ranking = Array.from(byPerson.values())
@@ -2987,6 +3004,7 @@ window.PP = window.PP || {}
     metric: 'total',     // ukazatel v grafech vývoje
     topBy: 'total',      // TOP střediska: podle součtu, nebo Ø na osobu
     topOpen: {},         // rozbalená střediska v TOP přehledu
+    topMonths: null,     // měsíce v TOP kartě; null = jen ten vybraný nahoře
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
     personOpen: {},      // rozbalené měsíce v detailu člověka (rozpad složek)
@@ -3280,6 +3298,17 @@ window.PP = window.PP || {}
       ui.topBy = b.dataset.topby
       renderOverview()
     }))
+    $$('#panel-overview [data-topmonth]').forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.topmonth
+      const cur = new Set(ui.topMonths && ui.topMonths.length ? ui.topMonths : [ui.month])
+      if (cur.has(k)) cur.delete(k)
+      else cur.add(k)
+      // poslední odebraný měsíc by kartu vyprázdnil — pak zpátky na vybraný
+      ui.topMonths = cur.size ? Array.from(cur).sort() : null
+      renderOverview()
+    }))
+    const reset = $('#topmonth-reset')
+    if (reset) reset.addEventListener('click', () => { ui.topMonths = null; renderOverview() })
   }
 
   function buildFindings(s, cmp, prevK) {
@@ -3375,21 +3404,71 @@ window.PP = window.PP || {}
   /* Ve veřejném vydání je to nejpřehlednější karta celého panelu, takže se
      neruší — jen se z ní vypustí jmenné seznamy. Souhrn za středisko osobní
      údaj není, žebříček lidí ano. */
+  /* Které měsíce má TOP karta sčítat. Prázdný výběr znamená „ten, co je
+     nahoře“ — karta pak jede přesně jako dřív. */
+  function topMonthKeys() {
+    const keys = PP.data.keys()
+    const picked = (ui.topMonths || []).filter((k) => keys.includes(k))
+    return picked.length ? picked.slice().sort() : (ui.month ? [ui.month] : [])
+  }
+
+  /* Statistika pro TOP kartu. U jednoho měsíce se bere hotová měsíční
+     statistika, u víc měsíců se sčítá přes periodTotals — tam ale ukázkové
+     ani neúplné měsíce nejdou, takže se vypíše, co vypadlo. */
+  function topStats(s) {
+    const keys = topMonthKeys()
+    if (keys.length < 2) return { centers: s.centers, byTotal: s.byTotal, byAvg: s.byAvg, keys, dropped: [] }
+    const p = PP.periodTotals(keys)
+    if (!p) return { centers: [], byTotal: [], byAvg: [], keys, dropped: keys }
+    return {
+      centers: p.centers,
+      byTotal: p.centers.slice().sort((a, b) => b.total - a.total),
+      byAvg: p.centers.slice().sort((a, b) => b.avg - a.avg),
+      keys: p.keys,
+      dropped: keys.filter((k) => !p.keys.includes(k)),
+    }
+  }
+
   function topCentersCard(s) {
-    if (!s.centers.length) return ''
+    const t = topStats(s)
+    if (!t.centers.length) return ''
 
     const byTotal = ui.topBy === 'total'
-    const list = (byTotal ? s.byTotal : s.byAvg).slice(0, TOP_CENTERS)
+    const list = (byTotal ? t.byTotal : t.byAvg).slice(0, TOP_CENTERS)
     const max = byTotal ? list[0].total : list[0].avg
+    const vice = t.keys.length > 1
+
+    const stitek = vice
+      ? `<span class="period-chip">${esc(monthShort(t.keys[0]))} – ${esc(monthShort(t.keys[t.keys.length - 1]))}</span>`
+      : periodChip(t.keys[0])
+
+    /* Ve veřejném vydání jsou jen souhrny bez řádků, takže se přes víc měsíců
+       sčítat nedá a výběr se nenabízí. */
+    const vyber = PUBLIC || PP.data.keys().length < 2 ? '' : `
+      <div class="month-pick" role="group" aria-label="Měsíce v TOP střediscích">
+        <span class="month-pick-label">Měsíce:</span>
+        ${PP.data.keys().slice().reverse().map((k) => `<button type="button" class="chip sm"
+          data-topmonth="${esc(k)}" aria-pressed="${t.keys.includes(k)}">${esc(monthShort(k))}</button>`).join('')}
+        ${ui.topMonths && ui.topMonths.length
+          ? `<button type="button" class="btn ghost sm" id="topmonth-reset">Jen vybraný měsíc</button>`
+          : ''}
+      </div>`
 
     return `<div class="card">
       <div class="card-head">
         <h2>${PUBLIC ? 'TOP střediska' : 'TOP střediska a jejich lidé'}
-          ${periodChip()}</h2>
+          ${stitek}</h2>
         <span class="hint">${PUBLIC
           ? `${TOP_CENTERS} středisek s nejvyšším přesčasem`
           : `${TOP_CENTERS} středisek · u každého ${TOP_PEOPLE} lidí s nejvyšším přesčasem`}</span>
       </div>
+
+      ${vyber}
+      ${t.dropped.length
+        ? `<p class="hint" style="margin:0 0 12px">Nezapočítáno:
+             ${esc(t.dropped.map(monthShort).join(', '))} — ukázková data, nebo nejstarší
+             měsíc bez předchozího konta.</p>`
+        : ''}
 
       <div class="metric-switch" role="group" aria-label="Řazení středisek">
         <button type="button" class="chip" data-topby="total" aria-pressed="${byTotal}">Podle součtu hodin</button>

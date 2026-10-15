@@ -534,6 +534,10 @@ h3.pub-sub + p { margin-top: 0; }
 .rate-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* období karty — musí jít přečíst na první pohled, ne jako šedý doplněk */
+.month-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; }
+.month-pick-label { font-size: 12px; color: var(--text-3); margin-right: 2px; }
+.chip.sm { padding: 4px 10px; font-size: 12px; }
+
 .period-chip {
   display: inline-block; margin-left: 9px; padding: 2px 9px; border-radius: 999px;
   background: var(--accent-soft); color: var(--accent);
