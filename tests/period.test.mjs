@@ -137,6 +137,44 @@ const zari = await page.evaluate(() => Math.round(window.PP.stats(window.PP.data
 check('je to opravdu součet, ne poslední měsíc', p.total !== zari ? 'ano' : 'ne', 'ano')
 check('střediska sedí', p.centers.split(' | ').length, 2)
 
+/* ---------- výběr měsíců v TOP kartě ---------- */
+await page.click('#nav button[data-section="overview"]')
+await page.waitForSelector('.topc-item')
+
+const jeden = await page.evaluate(() => ({
+  stitek: document.querySelector('.card:has(.topc) .period-chip').textContent.trim(),
+  prvni: document.querySelector('.topc-item .topc-nums strong').textContent.trim(),
+  vybrano: [...document.querySelectorAll('[data-topmonth][aria-pressed=true]')].map((b) => b.dataset.topmonth).join(','),
+}))
+console.log('\nTOP střediska — jeden měsíc:')
+check('štítek nese vybraný měsíc', /2026/.test(jeden.stitek) ? 'ano' : 'ne: ' + jeden.stitek, 'ano')
+check('zvýrazněný je jen ten měsíc', jeden.vybrano, '2026-09')
+
+// přidat srpen → karta musí sčítat oba
+await page.click('[data-topmonth="2026-08"]')
+await page.waitForTimeout(150)
+const dva = await page.evaluate(() => {
+  const p = window.PP.periodTotals(['2026-08', '2026-09'])
+  return {
+    stitek: document.querySelector('.card:has(.topc) .period-chip').textContent.trim(),
+    vybrano: [...document.querySelectorAll('[data-topmonth][aria-pressed=true]')].map((b) => b.dataset.topmonth).sort().join(','),
+    prvni: document.querySelector('.topc-item .topc-nums strong').textContent.trim(),
+    cekano: window.PP.h1(p.centers[0].total) + ' h',
+    lidiVKarte: document.querySelectorAll('.topc-item:first-child .topc-people li:not(.more)').length,
+  }
+})
+console.log('\nTOP střediska — dva měsíce:')
+check('vybrané jsou oba', dva.vybrano, '2026-08,2026-09')
+check('štítek ukazuje rozsah', /–/.test(dva.stitek) ? 'ano' : 'ne: ' + dva.stitek, 'ano')
+check('čísla jsou součtem obou měsíců', dva.prvni, dva.cekano)
+check('a není to jen jeden měsíc', dva.prvni !== jeden.prvni ? 'ano' : 'ne', 'ano')
+check('lidé ve středisku se pořád vypisují', dva.lidiVKarte > 0 ? 'ano' : 'ne', 'ano')
+
+await page.click('#topmonth-reset')
+await page.waitForTimeout(150)
+check('návrat na vybraný měsíc', await page.evaluate(() =>
+  document.querySelector('.topc-item .topc-nums strong').textContent.trim()), jeden.prvni)
+
 /* ---------- náklady ---------- */
 await page.click('#nav button[data-section="period"]')
 await page.waitForSelector('#rate-form')
