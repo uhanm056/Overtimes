@@ -112,6 +112,83 @@ ${rows.map((r) => '<tr>' + r.map((c) => `<td>${c}</td>`).join('') + '</tr>').joi
 </table></body></html>`
 }
 
+/* ---------- Přehledový výkaz docházky ----------
+   Druhá sestava, druhá metodika. Formát je svérázný a právě ten se testuje:
+   hodnoty nejsou v textu buňky, ale v atributu x:num jako podíl dne
+   (1.5625 = 37,5 h), a kolik je to hodin, říká formát čísla ve stylopisu.
+   Hlavička má nad každou dvojicí sloupců colspan="2".
+
+   Lidé jsou vymyšlení, ale každý zachycuje jednu past: */
+const DOCHAZKA = [
+  // běžný přesčas — fond 37,5, odpracováno 44
+  { p: 'Dvořák', j: 'Michal', t: 'TL', o: 30201, s: 'Lisovna', w: 44, f: 37.5 },
+  // celý týden dovolené: holý rozdíl by ukázal −37,5 h „přesčasu“
+  { p: 'Marková', j: 'Lenka', t: '', o: 30202, s: 'Lisovna', w: 0, f: 37.5, dov: 37.5 },
+  // tři dny nemoc, dva dny odpracoval přes fond → přesčas mu vzniknout má
+  { p: 'Kříž', j: 'Ondřej', t: 'operátor', o: 30203, s: 'Montáž', w: 18, f: 37.5, nem: 15 },
+  // odešel dřív a nikde to není vykázané → není to přesčas, ale schází do fondu
+  { p: 'Horák', j: 'Pavel', t: '', o: 30204, s: 'Montáž', w: 31, f: 37.5 },
+  // služební cesta celý týden — je už uvnitř odpracováno, nesmí se přičíst
+  { p: 'Benešová', j: 'Klára', t: 'ME', o: 30205, s: 'Engineering', w: 40, f: 40, sc: 40 },
+  // zkrácený úvazek: fond 20 h, odpracoval 23
+  { p: 'Urban', j: 'Josef', t: '', o: 30206, s: 'Engineering', w: 23, f: 20 },
+]
+
+const DOCH_COLS = [
+  ['Celkem odpracováno', 'w'], ['Fond', 'f'], ['Rozdíl', null],
+  ['Služební cesta', 'sc'], ['Přestávka', 'pre'], ['Lékař', 'lek'],
+  ['Dovolená', 'dov'], ['Nemoc', 'nem'],
+]
+
+function dochazkaReport() {
+  // hodiny → podíl dne, jak to píše generátor sestavy
+  const tv = (h) => (h == null ? '' : String(h / 24))
+  const cell = (h) => `<td class="d5TV" x:num="${tv(h)}"/><td class="d6" x:num=""/>`
+  const body = []
+  let stred = null
+  const soucet = {}
+  const flush = () => {
+    if (!stred) return
+    body.push('<TR class="hsums"><TD colspan="4" class="d1">Součet za středisko:</TD>' +
+      `<TD class="d3">${stred}</TD><TD></TD>` +
+      DOCH_COLS.map(([, k]) => cell(k ? soucet[k] || 0 : 0)).join('') + '</TR>')
+    for (const k of Object.keys(soucet)) delete soucet[k]
+  }
+  for (const r of DOCHAZKA) {
+    if (r.s !== stred) { flush(); stred = r.s }
+    body.push('<tr>' +
+      `<td class="d1">${r.p}</td><td class="d1">${r.j}</td><td class="d1">${r.t}</td>` +
+      `<td class="d2">${r.o}</td><td class="d3">${r.s}</td><td class="d4" x:str=""/>` +
+      DOCH_COLS.map(([, k]) => cell(k ? r[k] : null)).join('') + '</tr>')
+    for (const [, k] of DOCH_COLS) if (k && r[k]) soucet[k] = (soucet[k] || 0) + r[k]
+  }
+  flush()
+
+  return `<html xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style><!--
+.d5, .d5TV { border-left:0.5pt solid black; }
+.d5TV, .s5TV { mso-number-format:"\\[h\\]\\:mm\\;\\[Red\\]\\\\-\\[h\\]\\:mm\\;\\;"; }
+--></style></head>
+<body>
+<table>
+<tr><td class="repname">07 Přehledový výkaz na šířku</td><td class="created">Vytvořeno: 20.10.2026 10:31:49</td></tr>
+<tr><td>Období: 12.10.2026 - 18.10.2026</td></tr>
+<tr class="z1"><td class="h1">Příjmení</td><td class="h1">Jméno</td><td class="h1">Titul</td>
+<td class="h2">Osobní číslo</td><td class="h3">Středisko</td><td class="h4">Poznámka2</td>
+${DOCH_COLS.map(([l]) => `<td colspan="2" class="h5">${l}</td>`).join('')}</tr>
+${body.join('\n')}
+</table></body></html>`
+}
+
+/* Tentýž formát, ale za celý měsíc — panel ho musí odmítnout a poslat
+   uživatele pro Součtový výkaz. */
+function dochazkaMesic() {
+  return dochazkaReport().replace('Období: 12.10.2026 - 18.10.2026', 'Období: 1.10.2026 - 31.10.2026')
+}
+
+writeFileSync(join(DIR, 'dochazka-2026-W42.xls'), Buffer.from(dochazkaReport(), 'utf8'))
+writeFileSync(join(DIR, 'dochazka-mesic.xls'), Buffer.from(dochazkaMesic(), 'utf8'))
 writeFileSync(join(DIR, 'souctovy-vykaz-2026-09.xls'), toCp1250(htmlReport()))
 writeFileSync(join(DIR, 'souctovy-vykaz-2026-11-slouceny.xls'), Buffer.from(mergedReport(), 'utf8'))
 writeFileSync(join(DIR, 'souctovy-vykaz-2026-10.csv'), toCp1250(csvReport()))

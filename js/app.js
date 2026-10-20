@@ -1398,11 +1398,18 @@
     if (!keys.length) {
       el.innerHTML = `<div class="card"><div class="prose">
         <h3>Zatím žádný týdenní výkaz</h3>
-        <p>Panel pozná týden sám: vytiskněte <strong>tentýž Součtový výkaz</strong>, jen
-        s obdobím za jeden týden (například <code>1.9.2026 - 7.9.2026</code>), a naimportujte
-        ho jako každý jiný. Měsíční výkazy tím nijak neutrpí — týdny se vedou zvlášť.</p>
-        <p class="hint">Období delší než osm dní, které není celý kalendářní měsíc, panel
-        odmítne; smíchat měsíce s půlměsíci by znamenalo sčítat nesrovnatelná období.</p>
+        <p>Týden umí panel vzít ze dvou sestav a u každé počítá jinak:</p>
+        <ul>
+          <li><strong>Přehledový výkaz docházky</strong> — přesčas je
+              <strong>Celkem odpracováno − Fond</strong>. Tohle je pro týdny ta správná
+              cesta: docházka ví, kdo kolik hodin doopravdy odstál.</li>
+          <li><strong>Součtový výkaz z mezd</strong> s obdobím za jeden týden (například
+              <code>12.10.2026 - 18.10.2026</code>) — počítá se stejně jako měsíce, tedy
+              z mzdových složek.</li>
+        </ul>
+        <p class="hint">Měsíční přehled zůstává na Součtovém výkazu. Období delší než osm
+        dní, které není celý kalendářní měsíc, panel odmítne; smíchat měsíce s půlměsíci
+        by znamenalo sčítat nesrovnatelná období.</p>
       </div></div>`
       return
     }
@@ -1426,9 +1433,20 @@
       ${kpi('Přesčas celkem', hrsU(s2.total), delta(s2.total, prev && prev.total, (v) => hrsU(v)), '', 'hero')}
       ${kpi('Lidí s přesčasem', num(s2.withOvertime), `z ${num(rec.people)} osob`)}
       ${kpi('Ø na osobu', hrs(s2.avg), delta(s2.avg, prev && prev.avg, hrs), level(s2.avg, CFG.week))}
+      ${s2.dochazka
+        ? kpi('Odpracováno vs. fond', hrsU(s2.worked),
+            `fond ${hrsU(s2.fund)}, z toho ${hrsU(s2.absence)} placené nepřítomnosti`)
+        : kpi('Proplaceno (MEZD)', pct(s2.total ? s2.mezdy / s2.total : 0), `${hrsU(s2.mezdy)} z ${hrsU(s2.total)}`)}
+    </div>
+    <div class="grid kpis alarms">
       ${kpi('Nad ' + CFG.week.crit + ' h za týden', num(s2.ranking.filter((r) => r.t >= CFG.week.crit).length),
         `nad ${CFG.week.warn} h: ${num(s2.ranking.filter((r) => r.t >= CFG.week.warn).length)}`,
-        s2.ranking.some((r) => r.t >= CFG.week.crit) ? 'crit' : '')}
+        s2.ranking.some((r) => r.t >= CFG.week.crit) ? 'crit' : 'good')}
+      ${s2.dochazka
+        ? kpi('Schází do fondu', hrsU(s2.under),
+            `${num(s2.underPeople)} ${s2.underPeople === 1 ? 'člověk' : s2.underPeople < 5 ? 'lidé' : 'lidí'} pod fondem`,
+            s2.under > 0 ? 'warn' : 'good')
+        : ''}
     </div>`
 
     const graf = keys.length < 2 ? '' : `<div class="card">
@@ -1446,9 +1464,13 @@
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>Středisko</th><th class="num">Lidí</th><th class="num">Přesčas</th>
-          <th class="num">Ø / osoba</th><th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th></tr></thead>
+          <th class="num">Ø / osoba</th>${s2.dochazka
+            ? '<th class="num">Schází</th><th class="num">Odpracováno</th>' +
+              '<th class="num">Fond</th><th class="num">Nepřítomnost</th>'
+            : `<th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>`}</tr></thead>
         <tbody>${s2.byTotal.map((c) => {
           const lvl = level(c.avg, CFG.week)
+          const sum = (f) => c.rows.reduce((a, r) => a + (Number(r[f]) || 0), 0)
           return `<tr>
             <td><button type="button" class="link-center" data-center="${esc(c.name)}"
               title="Otevřít detail střediska">${esc(c.name)}</button>
@@ -1456,11 +1478,21 @@
             <td class="num">${num(c.people)}</td>
             <td class="num">${hrs(c.total)}</td>
             <td class="num">${hrs(c.avg)}</td>
-            <td class="num">${hrs(c.m)}</td>
-            <td class="num">${hrs(c.e)}</td>
+            ${s2.dochazka
+              ? `<td class="num">${sum('u') ? hrs(sum('u')) : '—'}</td>
+                 <td class="num">${hrs(sum('w'))}</td><td class="num">${hrs(sum('fo'))}</td>
+                 <td class="num">${sum('ab') ? hrs(sum('ab')) : '—'}</td>`
+              : `<td class="num">${hrs(c.m)}</td><td class="num">${hrs(c.e)}</td>`}
           </tr>`
         }).join('')}</tbody>
       </table></div>
+      ${s2.dochazka ? `<p class="col-legend">
+        <span><strong>Přesčas</strong> sečtený po lidech, jen hodiny nad fond</span>
+        <span><strong>Schází</strong> kolik ostatním do fondu chybí</span>
+        <span><strong>Nepřítomnost</strong> o tolik fond klesá (dovolená, nemoc, lékař)</span>
+        <span>Přesčas − Schází = Odpracováno − (Fond − Nepřítomnost). Navzájem se
+          neodečítají: odpracovaná hodina navíc nezmizí tím, že jiný člověk odešel dřív</span>
+      </p>` : colLegend(['avg', 'm', 'e'])}
     </div>`
 
     const lide = PUBLIC ? '' : `<div class="card">
@@ -1470,7 +1502,9 @@
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th class="rank">#</th><th>Jméno</th><th>Středisko</th>
-          <th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>
+          ${s2.dochazka
+            ? '<th class="num">Odpracováno</th><th class="num">Fond</th><th class="num">Nepřítomnost</th>'
+            : `<th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>`}
           <th class="num">Přesčas</th></tr></thead>
         <tbody>${s2.ranking.slice(0, WEEK_TOP_PEOPLE).map((r, i) => {
           const lvl = level(r.t, CFG.week)
@@ -1479,18 +1513,30 @@
             <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
               title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button></td>
             <td>${esc(r.s)}</td>
-            <td class="num">${hrs(r.m)}</td>
-            <td class="num">${hrs(r.de != null ? r.de : r.e)}</td>
+            ${s2.dochazka
+              ? `<td class="num">${hrs(r.w)}</td><td class="num">${hrs(r.fo)}</td>
+                 <td class="num">${r.ab ? hrs(r.ab) : '—'}</td>`
+              : `<td class="num">${hrs(r.m)}</td>
+                 <td class="num">${hrs(r.de != null ? r.de : r.e)}</td>`}
             <td class="num">${lvl ? `<span class="tag ${lvl}">${hrs(r.t)}</span>` : hrs(r.t)}</td>
           </tr>`
         }).join('')}</tbody>
       </table></div>
+      ${s2.dochazka ? `<p class="col-legend">
+        <span><strong>Odpracováno</strong> čistý odpracovaný čas, bez přestávek</span>
+        <span><strong>Fond</strong> kolik měl za týden odpracovat</span>
+        <span><strong>Nepřítomnost</strong> dovolená, nemoc a další placené volno — o tolik se fond snižuje</span>
+        <span><strong>Přesčas</strong> odpracováno nad snížený fond</span>
+      </p>` : ''}
     </div>`
 
     /* Výkaz nemusí začínat pondělím. Klíč se bere podle ISO týdne, ve kterém
        období začíná, ale ukázat se musí to, co je ve výkazu doopravdy. */
     const rozsah = `<p class="hint" style="margin:0 0 18px">
-      ${esc(weekName(ui.week))} · ve výkazu období <strong>${esc(rec.period || '—')}</strong>${rec.methodIncomplete
+      ${esc(weekName(ui.week))} · ve výkazu období <strong>${esc(rec.period || '—')}</strong>
+      · ${s2.dochazka
+        ? 'z <strong>Přehledového výkazu docházky</strong>, přesčas = odpracováno nad fond'
+        : 'ze <strong>Součtového výkazu</strong> z mezd, přesčas z mzdových složek'}${rec.methodIncomplete
         ? ' · <strong>nejstarší načtený týden</strong>, přírůstek konta se u něj nemá od čeho odrazit'
         : ''}
     </p>`
@@ -2207,6 +2253,17 @@
      se pozná, že se do přesčasu počítá něco, co tam nepatří — nebo naopak nepočítá
      složka, která tam patřit má. */
   function compSummary(record) {
+    /* U docházky nejde o mzdové složky, ale o sloupce výkazu: které snižují
+       fond a které se do výpočtu nepletou. Kdyby přibyl sloupec, který fond
+       snižovat má, musí být na importu hned vidět, že ho panel ignoruje. */
+    if (record.src === 'dochazka') {
+      const abs = record.comps || []
+      const ign = (record.otherComps || []).map((c) => c[0])
+      return `<span class="hint comp-summary">
+        Fond snižuje: ${abs.length ? abs.map((c) => `<strong>${esc(c)}</strong>`).join(', ') : 'nic'}.
+        ${ign.length ? `Do výpočtu nevstupuje: ${ign.map(esc).join(', ')}.` : ''}
+      </span>`
+    }
     // comps nese i složky, které se nepočítají — rozdělit je podle zařazení
     const used = (record.comps || []).filter((c) => PP.componentBucket(c))
     const other = record.otherComps || []
@@ -2229,9 +2286,14 @@
         // týden i měsíc chodí stejnou cestou, jen se ukládají jinam
         const st = PP.stats(PP.data.record(key))
         busy.kind = 'ok'
+        const dochazka = record.src === 'dochazka'
         busy.html = `<strong>${esc(periodName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
           ${num(st.withOvertime)} lidí s přesčasem, ${hrsU(st.total)}, ${num(record.people)} osob ve výkazu.
-          <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>
+          ${dochazka ? `<span class="hint">Docházka: odpracováno ${hrsU(st.worked)},
+            fond ${hrsU(st.fund)}, placená nepřítomnost ${hrsU(st.absence)}${st.under
+            ? ` · ${num(st.underPeople)} lidem schází do fondu ${hrsU(st.under)}` : ''}.</span>` : ''}
+          <span class="hint">Formát: ${esc(kind)}${skipped
+            ? ` · přeskočeno ${num(skipped)} ${dochazka ? 'souhrnných' : 'nepřesčasových'} řádků` : ''}</span>
           ${compSummary(record)}`
         if (PP.isWeekKey(key)) ui.week = key
         else ui.month = key
@@ -2291,6 +2353,35 @@
         počítá přes přírůstek konta, může vyjít <strong>záporný i měsíční přesčas</strong>: konto
         kleslo víc, než kolik se ten měsíc proplatilo, protože si člověk vybral náhradní
         volno. Není to chyba, je to čerpání dřív naspořených hodin.</p>
+      </div>
+    </div>`
+
+    const dvePristupy = `<div class="card">
+      <div class="card-head"><h2>Dvě sestavy, dvě metodiky</h2>
+        <span class="hint">měsíce z mezd, týdny z docházky</span></div>
+      <div class="prose">
+        <p>Panel čte dvě různé sestavy a u každé počítá jinak, protože každá ví
+        o něčem jiném.</p>
+        <ul>
+          <li><strong>Součtový výkaz</strong> z mezd → <strong>měsíce</strong>. Mluví
+              mzdovými složkami a jako jediný zná konto a roční součet, takže na něm
+              stojí přehled, žebříčky i hlídání ročního stropu.</li>
+          <li><strong>Přehledový výkaz docházky</strong> → <strong>týdny</strong>.
+              O mzdových složkách neví nic, zato ví, kdo kolik hodin doopravdy odstál:
+              <strong>přesčas = Celkem odpracováno − Fond</strong>.</li>
+        </ul>
+        <p>Fond ale platí jen za dny, kdy měl člověk být v práci. Kdo si vybral týden
+        dovolené, má odpracováno 0 a fond 37,5 — holý rozdíl by u něj ukázal −37,5 h
+        přesčasu, což není přesčas, ale dovolená. <strong>Placená nepřítomnost proto
+        fond snižuje</strong> (dovolená, nemoc, lékař, placené překážky). Oprava umí
+        jen zrušit nesmyslné minus; komu přesčas opravdu vznikl, tomu se nesáhne.
+        Holý rozdíl zůstává vidět ve vlastním sloupci.</p>
+        <p><strong>Služební cesta</strong> se nepřičítá — je už uvnitř „Celkem
+        odpracováno“ (kdo byl na cestě celý týden, má odpracováno plný fond).
+        <strong>Přestávka</strong> se do odpracované doby nepočítá vůbec.</p>
+        <p>Za závod se přesčas <strong>sčítá po lidech a jen kladný</strong>. Kdo odešel
+        dřív, nikomu jinému odpracovanou hodinu neodečte — čas, který lidem do fondu
+        schází, se proto vede jako samostatné číslo.</p>
       </div>
     </div>`
 
@@ -2358,6 +2449,7 @@
     </div>`
 
     $('#panel-method').innerHTML = jak +
+      dvePristupy +
       `<div class="grid two">${prahy}${zakon}</div>` +
       `<div class="grid two">${prumer}${ulozeni}</div>` +
       cteni
@@ -2450,10 +2542,19 @@
 
   function updateRailNote() {
     const keys = PP.data.keys()
+    const weeks = PP.data.weekKeys()
     const note = $('#rail-note')
-    if (!keys.length) { note.textContent = 'Zatím bez dat.'; return }
-    note.textContent = `${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'} · ` +
-      `${monthShort(keys[keys.length - 1])} – ${monthShort(keys[0])}`
+    const parts = []
+    if (keys.length) {
+      parts.push(`${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'} · ` +
+        `${monthShort(keys[keys.length - 1])} – ${monthShort(keys[0])}`)
+    }
+    // týdny jsou vlastní řada, takže patří do přehledu zvlášť
+    if (weeks.length) {
+      parts.push(`${weeks.length} ${weeks.length === 1 ? 'týden' : weeks.length < 5 ? 'týdny' : 'týdnů'} · ` +
+        `${weekShort(weeks[weeks.length - 1])} – ${weekShort(weeks[0])}`)
+    }
+    note.textContent = parts.length ? parts.join('\n') : 'Zatím bez dat.'
   }
 
   /* Na veřejné stránce se čísla berou ze sdílené databáze, aby kolegové viděli

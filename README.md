@@ -29,8 +29,8 @@ Vzorek pro testy a pro `build-public.mjs --demo` se generuje do
 | **Žebříček závodu** | Fulltext přes jméno i středisko, žebříček po 25 |
 | **Vývoj a srovnání** | Graf vývoje závodu, středisek i jednoho člověka přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
 | **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h, kontrola ročního součtu |
-| **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
-| **Metodika** | Jak se počítá — naměřený vzorec nahoře, pak prahy, legislativa a čtení výkazu |
+| **Import výkazu** | Drag & drop Součtového výkazu i Přehledového výkazu docházky; sestavu pozná z hlavičky |
+| **Metodika** | Jak se počítá — naměřený vzorec, obě sestavy a jejich metodiky, prahy, legislativa |
 
 ### Jeden zápis hodin
 
@@ -361,9 +361,63 @@ poznat, které vydání má člověk otevřené.
 
 ## Týdny
 
+Týdny umí panel vzít ze **dvou různých sestav** a u každé počítá jinak,
+protože každá ví o něčem jiném. Kterou dostal, pozná z hlavičky sám.
+
+### Přehledový výkaz docházky — doporučená cesta
+
+Docházka o mzdových složkách neví nic, zato ví, kdo kolik hodin doopravdy
+odstál:
+
+```
+přesčas = Celkem odpracováno − Fond
+```
+
+Fond ale platí jen za dny, kdy měl člověk být v práci. Kdo si vybral týden
+dovolené, má odpracováno 0 a fond 37,5 — holý rozdíl by u něj ukázal
+**−37,5 h přesčasu**, což není přesčas, ale dovolená. Placená nepřítomnost
+(dovolená, nemoc, lékař, placené překážky) proto fond snižuje:
+
+```
+přesčas = Celkem odpracováno − (Fond − placená nepřítomnost)
+```
+
+Oprava umí jen zrušit nesmyslné minus; komu přesčas opravdu vznikl, ten má
+nepřítomnost nulovou a nic se mu nemění. Holý rozdíl zůstává ve vlastním
+sloupci. Na skutečném výkazu za 42. týden 2026 se tím opravilo 46 lidí
+s dohromady −624,63 h, které by jinak ujídaly z přesčasu ostatních.
+
+**Služební cesta se nepřičítá** — je už uvnitř „Celkem odpracováno“ (kdo byl
+na cestě celý týden, má odpracováno plný fond). **Přestávka** se do
+odpracované doby nepočítá vůbec.
+
+Za závod se přesčas **sčítá po lidech a jen kladný**. Kdo odešel dřív,
+nikomu jinému odpracovanou hodinu neodečte; čas, který lidem do fondu
+schází, se vede jako samostatné číslo. Tabulka středisek proto ukazuje obě
+strany a dá se dopočítat:
+
+```
+Přesčas − Schází = Odpracováno − (Fond − Nepřítomnost)
+```
+
+Formát sestavy je svérázný a parser na to spoléhá: hodnoty nejsou v textu
+buňky, ale v atributu `x:num` jako **podíl dne** (`1.5625` = 37,5 h), a že
+jde o čas, říká formát čísla ve stylopisu (`[h]:mm`). Mapa tříd se čte ze
+souboru, ne z jejich názvů, aby import nepadl, až generátor třídy
+přejmenuje. Hlavička má nad každou dvojicí sloupců `colspan="2"`.
+
+Sloupec, který by fond snižovat měl, ale panel ho nezná, je vidět hned na
+importu v řádku „Do výpočtu nevstupuje“.
+
+Docházku bere panel **jen za jeden týden**. Měsíc v tomhle formátu odmítne
+a pošle pro Součtový výkaz — měsíční přehled stojí na kontě a ročním součtu,
+o kterých docházka neví.
+
+### Součtový výkaz za jeden týden
+
 Mzdy umí Součtový výkaz vytisknout i za kratší období než měsíc. Stačí zadat
 období za jeden týden (`1.9.2026 - 7.9.2026`) a naimportovat ho jako každý
-jiný — panel pozná z hlavičky, že jde o týden, a uloží ho do sekce **Týdny**.
+jiný — počítá se pak stejně jako měsíce, tedy z mzdových složek.
 
 Týdny se vedou **odděleně od měsíců**. Sečíst týden s měsícem, který ho
 obsahuje, by hodiny zdvojilo, takže se nikde nemíchají: měsíční pohledy
