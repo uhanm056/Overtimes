@@ -153,7 +153,11 @@ h1, h2, h3, h4 {
 
 a { color: var(--accent); }
 
-.num, td.num, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Čísla se zarovnávají tabulkovými číslicemi, ne strojopisem. Mono písmo
+   v celých tabulkách vypadalo jako výpis z terminálu a špatně se v něm
+   hledalo jméno vedle hodnoty. */
+.num, td.num { font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -289,13 +293,42 @@ select:focus-visible, input:focus-visible, button:focus-visible, [tabindex]:focu
 .kpi { display: flex; flex-direction: column; gap: 5px; }
 .kpi .label { color: var(--text-2); font-size: 12.5px; letter-spacing: .01em; }
 .kpi .value {
-  font-family: var(--font-mono); font-size: 23px; font-weight: 600;
-  letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums;
+  font-family: var(--font-display); font-size: 25px; font-weight: 600;
+  letter-spacing: -.02em; line-height: 1.12; font-variant-numeric: tabular-nums;
 }
-.kpi .foot { color: var(--text-3); font-size: 11.5px; line-height: 1.4; }
+.kpi .foot { color: var(--text-3); font-size: 11.5px; line-height: 1.5; }
 .kpi.warn .value { color: var(--warn); }
 .kpi.crit .value { color: var(--crit); }
 .kpi.good .value { color: var(--good); }
+
+/* Hlavní číslo sekce. Když mají všechny dlaždice stejnou váhu, oko nemá
+   kde začít — tahle jedna je proto zřetelně větší. */
+.kpi.hero { grid-column: span 2; }
+.kpi.hero .label { font-size: 13px; color: var(--text); font-weight: 600; }
+.kpi.hero .value { font-size: 40px; letter-spacing: -.035em; }
+.kpi.hero .foot { font-size: 12.5px; }
+@media (max-width: 760px) { .kpi.hero { grid-column: span 1; } }
+
+/* Druhá řada: ne ukazatele, ale upozornění. Drží se při zemi a barvu
+   dostane jen ta, kde opravdu někdo práh překročil. */
+.grid.kpis.alarms {
+  margin-top: 14px; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 250px));
+  justify-content: start;
+}
+.alarms .kpi {
+  padding: 11px 14px; box-shadow: none;
+  border-left: 3px solid var(--line);
+}
+.alarms .kpi .label { font-size: 12px; }
+.alarms .kpi .value { font-size: 20px; }
+.alarms .kpi.good { border-left-color: var(--line); }
+.alarms .kpi.good .value { color: var(--text-3); font-weight: 500; }
+.alarms .kpi.warn { border-left-color: var(--warn); }
+.alarms .kpi.crit { border-left-color: var(--crit); }
+
+/* „beze změny“ nemá být barevná krabička jako skutečná změna */
+.nochg { color: var(--text-3); font-size: 11.5px; }
 
 /* ---------- pruhové grafy ---------- */
 .bars { display: flex; flex-direction: column; gap: 9px; }
@@ -305,7 +338,7 @@ select:focus-visible, input:focus-visible, button:focus-visible, [tabindex]:focu
 .bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width .35s ease; }
 .bar-fill.warn { background: var(--warn); }
 .bar-fill.crit { background: var(--crit); }
-.bar-row .val { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 74px; text-align: right; }
+.bar-row .val { font-size: 13.5px; font-weight: 500; font-variant-numeric: tabular-nums; min-width: 74px; text-align: right; }
 .bar-row .val small { color: var(--text-3); }
 
 /* histogram */
@@ -314,7 +347,7 @@ select:focus-visible, input:focus-visible, button:focus-visible, [tabindex]:focu
 .hist-bar { background: var(--accent); border-radius: 6px 6px 2px 2px; min-height: 3px; transition: height .35s ease; }
 .hist-bar.warn { background: var(--warn); }
 .hist-bar.crit { background: var(--crit); }
-.hist-col .n { font-family: var(--font-mono); font-size: 12.5px; }
+.hist-col .n { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .hist-col .lbl { color: var(--text-3); font-size: 11.5px; }
 
 /* rozpad MEZD / evidence */
@@ -337,10 +370,12 @@ th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--text); }
 th[aria-sort='ascending']::after { content: ' ▲'; font-size: 9px; }
 th[aria-sort='descending']::after { content: ' ▼'; font-size: 9px; }
-td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* číselné sloupce drží o chlup větší váhu, ať se čtou jako hodnoty */
+td.num { font-weight: 500; }
 tbody tr:hover { background: var(--surface-2); }
 td.name { white-space: normal; min-width: 190px; }
-.rank { color: var(--text-3); font-family: var(--font-mono); width: 34px; }
+.rank { color: var(--text-3); font-variant-numeric: tabular-nums; width: 34px; }
 mark { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 2px; }
 
 /* ---------- odznaky ---------- */
@@ -365,7 +400,7 @@ mark { background: var(--accent-soft); color: inherit; border-radius: 3px; paddi
 }
 .chip:hover { border-color: var(--accent); }
 .chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.chip .c-avg { font-family: var(--font-mono); font-size: 12px; opacity: .8; }
+.chip .c-avg { font-size: 12px; font-variant-numeric: tabular-nums; opacity: .75; }
 .chip.warn:not([aria-pressed='true']) { border-color: var(--warn); }
 .chip.crit:not([aria-pressed='true']) { border-color: var(--crit); }
 
@@ -383,7 +418,7 @@ mark { background: var(--accent-soft); color: inherit; border-radius: 3px; paddi
 
 .chart-grid { stroke: var(--line-soft); stroke-width: 1; }
 .chart-axis { stroke: var(--line); stroke-width: 1; }
-.chart-tick { fill: var(--text-3); font-size: 11.5px; font-family: var(--font-mono); }
+.chart-tick { fill: var(--text-3); font-size: 11.5px; font-family: var(--font-text); }
 .chart-line { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* prstenec v barvě povrchu odděluje body tam, kde se čáry kříží */
 .chart-dot { stroke: var(--surface); stroke-width: 2; }
@@ -410,16 +445,16 @@ mark { background: var(--accent-soft); color: inherit; border-radius: 3px; paddi
 .chart-tip .nm { color: var(--text-2); }
 .chart-legend { margin-top: 14px; }
 
-.chart-tip .vl { margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.chart-tip .vl { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ---------- TOP střediska a jejich lidé ---------- */
 .topc { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px 26px; }
 .topc-item { min-width: 0; }
 .topc-head { display: flex; align-items: baseline; gap: 9px; }
-.topc-rank { color: var(--text-3); font-family: var(--font-mono); font-size: 13px; }
+.topc-rank { color: var(--text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
 .topc-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topc-nums { margin-left: auto; text-align: right; flex: none; }
-.topc-nums strong { display: block; font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.topc-nums strong { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
 .topc-nums small { color: var(--text-3); font-size: 11.5px; }
 
 .topc-bar { height: 6px; border-radius: 999px; background: var(--surface-2); margin: 7px 0 10px; overflow: hidden; }
@@ -431,7 +466,7 @@ mark { background: var(--accent-soft); color: inherit; border-radius: 3px; paddi
   padding: 5px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
 }
 .topc-people li.more { color: var(--text-3); font-size: 12.5px; border-bottom: 0; padding-top: 7px; }
-.topc-people .amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; flex: none; }
+.topc-people .amt { font-variant-numeric: tabular-nums; font-weight: 500; flex: none; }
 
 /* ---------- vývoj jednoho člověka ---------- */
 .person-metric { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 16px; }
@@ -540,7 +575,7 @@ h3.pub-sub + p { margin-top: 0; }
 }
 .rate-form .unit { color: var(--text-3); }
 .rate-form input {
-  font: inherit; font-family: var(--font-mono); font-size: 13px; padding: 7px 10px; width: 130px;
+  font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; padding: 7px 10px; width: 130px;
   color: var(--text); background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius-sm);
 }
@@ -554,7 +589,7 @@ h3.pub-sub + p { margin-top: 0; }
 .period-chip {
   display: inline-block; margin-left: 9px; padding: 2px 9px; border-radius: 999px;
   background: var(--accent-soft); color: var(--accent);
-  font-family: var(--font-mono); font-size: 12.5px; font-weight: 600;
+  font-size: 12.5px; font-weight: 600;
   letter-spacing: .01em; vertical-align: 2px; white-space: nowrap;
 }
 
@@ -574,7 +609,7 @@ h3.pub-sub + p { margin-top: 0; }
 .method-row.win { background: var(--accent-soft); border-color: var(--accent); }
 .method-formula { font-size: 13.5px; font-weight: 600; color: var(--text); }
 .method-formula small { display: block; font-weight: 400; color: var(--text-3); font-size: 12px; }
-.method-score { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.method-score { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-2); white-space: nowrap; }
 .method-row.win .method-score strong { color: var(--accent); }
 
 .method-verdict {
@@ -608,16 +643,16 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 .change-list .who small { color: var(--text-3); font-size: 11.5px; }
 .change-list .amt {
   display: flex; flex-direction: column; align-items: flex-end; flex: none;
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-weight: 500;
 }
-.change-list .amt small { color: var(--text-3); font-size: 11px; font-family: var(--font-text); }
+.change-list .amt small { color: var(--text-3); font-size: 11px; font-weight: 400; }
 
 /* ---------- roční limit ---------- */
 .limit-row { display: grid; grid-template-columns: 1fr; gap: 5px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
 .limit-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .limit-head .who { font-size: 13.5px; }
 .limit-head .who small { color: var(--text-3); }
-.limit-head .amt { font-family: var(--font-mono); font-size: 13.5px; }
+.limit-head .amt { font-size: 13.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .limit-track { position: relative; height: 9px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .limit-fill { display: block; height: 100%; border-radius: 999px; background: var(--good); }
 .limit-fill.warn { background: var(--warn); }
@@ -713,6 +748,33 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
   .rail, .drop, .btn { display: none !important; }
   .card { box-shadow: none; break-inside: avoid; }
 }
+
+/* ---------- vysvětlivka sloupců ----------
+   Zkratky z výkazu („Do MEZD“, „Ročně“) si nikdo neodvodí. Legenda stojí
+   hned pod tabulkou, kde se čte, ne až v sekci Metodika. */
+.col-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 20px;
+  margin: 12px 0 0; padding-top: 11px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-3); font-size: 12px; line-height: 1.5;
+}
+.col-legend strong { color: var(--text-2); font-weight: 600; }
+
+/* ---------- metodika ----------
+   Shrnutí nahoře: co většina lidí hledá, než začne číst zbytek. */
+.method-headline {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 12px 16px; margin-bottom: 16px;
+}
+.method-headline strong {
+  display: block; font-family: var(--font-display);
+  font-size: 15px; margin-bottom: 5px;
+}
+.method-headline p { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--text-2); }
+.method-headline.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.method-headline.muted { border-left-color: var(--line); background: var(--surface-2); }
 </style>
 <meta name="robots" content="noindex">
 <meta name="generator" content="build-public.mjs · 2026-10-20">
@@ -735,6 +797,11 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
     <div class="rail-foot">
       <p class="rail-note" id="rail-note"></p>
       <p class="rail-build" id="rail-build"></p>
+      <button class="theme-toggle" id="fmt-toggle" type="button"
+              title="Jak panel píše hodiny: 61:05, nebo 61,1 h">
+        <span id="fmt-label">Hodiny: 61:05</span>
+        <span aria-hidden="true">⇄</span>
+      </button>
       <button class="theme-toggle" id="theme-toggle" type="button">
         <span id="theme-label">Motiv: systém</span>
         <span aria-hidden="true">◐</span>
@@ -870,6 +937,34 @@ window.PP = window.PP || {}
     if (hours == null || !isFinite(hours)) return '—'
     return NF1.format(hours)
   }
+
+  /* ---------- jeden zápis hodin pro celý panel ----------
+     Výkaz i mzdový systém mluví v h:mm, Excel a výpočty v desetinných
+     hodinách. Dokud panel obojí míchal, stálo v jedné tabulce „61,1“
+     i „61:05“ — tatáž hodnota dvakrát jinak a člověk to musel v hlavě
+     převádět. Zápis se proto volí jednou pro celý panel. */
+  PP.FMT = 'hm'
+
+  /** Přepne zápis hodin: 'hm' (61:05) nebo 'dec' (61,1 h). */
+  PP.setFormat = function (f) {
+    PP.FMT = f === 'dec' ? 'dec' : 'hm'
+    return PP.FMT
+  }
+
+  /** Hodiny v nastaveném zápisu, holé číslo do sloupce s hlavičkou. */
+  PP.hrs = function (hours) {
+    return PP.FMT === 'dec' ? PP.h1(hours) : PP.hm(hours)
+  }
+
+  /** Hodiny i s jednotkou — tam, kde u čísla žádná hlavička nestojí.
+      V h:mm je dvojtečka sama o sobě jednotkou, „61:05 h“ by bylo navíc. */
+  PP.hrsU = function (hours) {
+    if (hours == null || !isFinite(hours)) return '—'
+    return PP.FMT === 'dec' ? PP.h1(hours) + ' h' : PP.hm(hours)
+  }
+
+  /** Jak se hodiny právě píšou, do hlavičky sloupce: „h:mm“ / „h“. */
+  PP.hrsUnit = function () { return PP.FMT === 'dec' ? 'h' : 'h:mm' }
 
   /** Celé číslo v českém formátu. */
   PP.num = function (n) {
@@ -3088,7 +3183,7 @@ window.PP = window.PP || {}
 ;(function (PP) {
   'use strict'
 
-  const { esc, hm, h1, num, pct, czk, fold, mark, level, monthName, monthShort,
+  const { esc, hrs, hrsU, hrsUnit, num, pct, czk, fold, mark, level, monthName, monthShort,
     weekName, weekShort, periodName, centerName, $, $$ } = PP
   const CFG = PP.CFG
 
@@ -3183,6 +3278,26 @@ window.PP = window.PP || {}
     })
   }
 
+  /* ---------- zápis hodin ----------
+     Kdo čte výkaz, chce h:mm jako v mzdovém systému; kdo s čísly dál počítá,
+     chce desetinné hodiny. Jedno nastavení pro celý panel, ať se oba zápisy
+     nepotkají v jedné tabulce. */
+  const FMT_KEY = 'prescasy.format.v1'
+  function applyFormat(value, redraw) {
+    const f = PP.setFormat(value)
+    const el = $('#fmt-label')
+    if (el) el.textContent = f === 'dec' ? 'Hodiny: 61,1 h' : 'Hodiny: 61:05'
+    try { window.localStorage.setItem(FMT_KEY, f) } catch (err) { /* jen preference */ }
+    if (redraw) render()
+  }
+  function initFormat() {
+    let saved = ''
+    try { saved = window.localStorage.getItem(FMT_KEY) || '' } catch (err) { saved = '' }
+    applyFormat(saved, false)
+    const btn = $('#fmt-toggle')
+    if (btn) btn.addEventListener('click', () => applyFormat(PP.FMT === 'dec' ? 'hm' : 'dec', true))
+  }
+
   /* ---------- navigace ---------- */
   function renderNav() {
     $('#nav').innerHTML = SECTIONS.map((s) => `
@@ -3205,10 +3320,14 @@ window.PP = window.PP || {}
     $('#section-title').textContent = s.title
     $('#section-sub').textContent = s.sub
     SECTIONS.forEach((x) => { $('#panel-' + x.id).hidden = x.id !== id })
-    /* Souhrn za období sčítá všechny měsíce, takže by volič měsíce jen mátl —
-     a zrovna tahle záměna je důvod, proč sekce vznikla. */
+    /* Volič měsíce i export patří jen tam, kde se opravdu kouká na jeden
+       měsíc. Souhrn za období sčítá všechny — a zrovna tahle záměna je důvod,
+       proč sekce vznikla. V Metodice a Importu nemá co ovlivňovat. */
+    const monthly = MONTH_SECTIONS.includes(id)
     const picker = document.querySelector('.month-picker')
-    if (picker) picker.hidden = id === 'period' || id === 'weeks'
+    if (picker) picker.hidden = !monthly
+    const exp = $('#export-btn')
+    if (exp && !PUBLIC) exp.hidden = !monthly
     render()
   }
 
@@ -3239,6 +3358,31 @@ window.PP = window.PP || {}
      zůstatek konta, je tím, co se k proplaceným hodinám přičítá, její přírůstek
      — a „Evidence“ by v záhlaví sloupce lhalo. */
   const evidenceLabel = () => (PP.data.method === 'balance' ? 'Přírůstek konta' : 'Evidence')
+
+  /* Co který sloupec znamená. Zkratky z výkazu si nikdo neodvodí, a hádat
+     se nemá — vysvětlivka proto stojí přímo pod tabulkou, ne až v Metodice.
+     `cols` vybírá, které z nich tabulka opravdu má. */
+  const COL_HELP = {
+    m: ['Do MEZD', 'hodiny poslané do výplaty'],
+    e: ['%EVID%', '%EVID_HELP%'],
+    t: ['Přesčas', 'kolik hodin člověk doopravdy odpracoval navíc'],
+    r: ['Ročně', 'součet od ledna, jak ho vede mzdový systém'],
+    avg: ['Ø / osoba', 'průměr na jednoho člověka s přesčasem'],
+    max: ['Nejvíc u jednoho', 'přesčas toho nejvytíženějšího člověka ve středisku'],
+  }
+  function colLegend(cols) {
+    const balance = PP.data.method === 'balance'
+    const items = cols.map((k) => {
+      const h = COL_HELP[k]
+      if (!h) return ''
+      const label = h[0] === '%EVID%' ? evidenceLabel() : h[0]
+      const help = h[1] !== '%EVID_HELP%' ? h[1]
+        : balance ? 'o kolik za měsíc narostlo konto přesčasů'
+          : 'hodiny, které zůstaly na kontě místo výplaty'
+      return `<span><strong>${esc(label)}</strong> ${esc(help)}</span>`
+    }).filter(Boolean)
+    return items.length ? `<p class="col-legend">${items.join('')}</p>` : ''
+  }
 
   /* ---------- jak se počítá přesčas ----------
      Když měření ukáže, že evidence je zůstatek konta, panel počítá jinak, než
@@ -3311,8 +3455,11 @@ window.PP = window.PP || {}
     return k ? `<span class="period-chip">${esc(monthName(k))}</span>` : ''
   }
 
-  function kpi(label, value, foot, tone) {
-    return `<div class="card kpi${tone ? ' ' + tone : ''}">
+  /* Dlaždice s číslem. `extra` je 'hero' u hlavního čísla sekce — to má být
+     na první pohled větší než ostatní, jinak se šest stejných krabiček
+     přetlouká a oko nemá kde přistát. */
+  function kpi(label, value, foot, tone, extra) {
+    return `<div class="card kpi${tone ? ' ' + tone : ''}${extra ? ' ' + extra : ''}">
       <span class="label">${esc(label)}</span>
       <span class="value">${value}</span>
       ${foot ? `<span class="foot">${foot}</span>` : ''}
@@ -3328,13 +3475,23 @@ window.PP = window.PP || {}
     </div>`
   }
 
-  /** Delta jako odznak: +3:20 / −1:05. */
+  /** Delta jako odznak: +3:20 / −1:05. Barevný odznak dostane jen skutečná
+      změna; „beze změny“ je šedý text, aby se dlaždice a tabulky nezaplnily
+      výraznými krabičkami, které nic neříkají. */
   function delta(value, formatter) {
     if (value == null || !isFinite(value)) return ''
-    const f = formatter || hm
-    if (Math.abs(value) < 0.005) return '<span class="tag">beze změny</span>'
+    const f = formatter || hrs
+    if (Math.abs(value) < 0.005) return '<span class="nochg">beze změny</span>'
     const up = value > 0
     return `<span class="tag ${up ? 'crit' : 'good'}">${up ? '+' : '−'}${f(Math.abs(value))}</span>`
+  }
+
+  /** Patička dlaždice se srovnáním s minulým obdobím. */
+  function vsPrev(key, value, formatter) {
+    const label = esc(monthShort(key))
+    if (value == null || !isFinite(value)) return 'proti ' + label
+    if (Math.abs(value) < 0.005) return 'stejně jako ' + label
+    return 'proti ' + label + ' ' + delta(value, formatter)
   }
 
   function emptyState(text) {
@@ -3355,20 +3512,27 @@ window.PP = window.PP || {}
     const prevK = previousKey()
     const cmp = prevK ? PP.compare(rec, PP.data.month(prevK)) : null
 
+    /* Dlaždice ve dvou skupinách: nahoře co se stalo, dole koho to pálí.
+       Dřív jich bylo šest stejně velkých vedle sebe a „Přesčas celkem“
+       vypadal úplně stejně jako „Nad 150 h ročně“. */
     const kpis = `<div class="grid kpis">
-      ${kpi('Přesčas celkem', h1(s.total) + ' h',
-        cmp ? `proti ${esc(monthShort(prevK))} ${delta(cmp.dTotal, h1)}` : esc(rec.period))}
+      ${kpi('Přesčas celkem', hrsU(s.total),
+        cmp ? vsPrev(prevK, cmp.dTotal, hrs) : esc(rec.period), '', 'hero')}
       ${kpi('Lidí s přesčasem', num(s.withOvertime),
         `z ${num(s.people)} osob · ${pct(s.withOvertime / s.people)}`)}
-      ${kpi('Ø na osobu', hm(s.avg),
-        cmp ? `proti ${esc(monthShort(prevK))} ${delta(cmp.dAvg)}` : 'z lidí s přesčasem',
+      ${kpi('Ø na osobu', hrs(s.avg),
+        cmp ? vsPrev(prevK, cmp.dAvg, hrs) : 'z lidí s přesčasem',
         level(s.avg, CFG.person))}
       ${kpi('Proplaceno (MEZD)', pct(s.paidShare),
-        cmp ? `zbytek do konta ${delta(-cmp.dPaidShare, (v) => Math.round(v * 100) + ' p. b.')}` : 'zbytek roste v evidenci')}
+        `${hrsU(s.mezdy)} z ${hrsU(s.total)} jde do výplaty`)}
+    </div>
+    <div class="grid kpis alarms">
       ${kpi('Nad ' + CFG.person.crit + ' h za měsíc', num(s.overCrit),
         `nad ${CFG.person.warn} h: ${num(s.overWarn)}`, s.overCrit ? 'crit' : 'good')}
       ${kpi('Nad ' + CFG.year.warn + ' h ročně', num(s.year150),
         `nad ${CFG.year.crit} h: ${num(s.year250)}`, s.year150 ? 'warn' : 'good')}
+      ${kpi('Na stropu ' + CFG.year.cap + ' h', num(s.yearCap != null ? s.yearCap : 0),
+        'další přesčas už nelze nařídit', (s.yearCap || 0) ? 'crit' : 'good')}
     </div>`
 
     const topAvg = s.byAvg.slice(0, 10)
@@ -3380,7 +3544,7 @@ window.PP = window.PP || {}
       </div>
       <div class="bars">
         ${topAvg.map((c) => barRow(c.name, c.avg, maxAvg,
-          `${hm(c.avg)} <small>· ${c.people} os.</small>`, c.level)).join('')}
+          `${hrs(c.avg)} <small>· ${c.people} os.</small>`, c.level)).join('')}
       </div>
     </div>`
 
@@ -3414,8 +3578,8 @@ window.PP = window.PP || {}
         <span class="konto" style="width:${(absE / (absM + absE) * 100).toFixed(1)}%"></span>
       </div>
       <div class="legend">
-        <span><i class="dot" style="background:var(--accent)"></i>Do MEZD ${h1(s.mezdy)} h · ${pct(s.paidShare)}</span>
-        <span><i class="dot" style="background:var(--accent-2);opacity:.5"></i>${esc(evidenceLabel())} ${h1(s.evidence)} h · ${pct(1 - s.paidShare)}</span>
+        <span><i class="dot" style="background:var(--accent)"></i>Do MEZD ${hrsU(s.mezdy)} · ${pct(s.paidShare)}</span>
+        <span><i class="dot" style="background:var(--accent-2);opacity:.5"></i>${esc(evidenceLabel())} ${hrsU(s.evidence)} · ${pct(1 - s.paidShare)}</span>
       </div>
       <p class="hint" style="margin:12px 0 0">
         Záporná evidence znamená odečet konta po proplacení — proto může někomu vyjít součet 0
@@ -3459,17 +3623,22 @@ window.PP = window.PP || {}
     const top = s.byAvg[0]
     if (top) {
       const d = cmp && cmp.centers.find((c) => c.name === top.name)
-      out.push(`<strong>${esc(top.name)}</strong> má nejvyšší průměr na osobu: <strong>${hm(top.avg)}</strong>
+      out.push(`<strong>${esc(top.name)}</strong> má nejvyšší průměr na osobu: <strong>${hrs(top.avg)}</strong>
         na ${top.people} ${top.people === 1 ? 'člověka' : top.people < 5 ? 'lidi' : 'lidí'}` +
-        (d && d.dAvg != null ? ` — proti ${esc(monthShort(prevK))} ${d.dAvg > 0 ? 'roste' : 'klesá'} o ${hm(Math.abs(d.dAvg))}.` : '.'))
+        (d && d.dAvg != null
+          /* „klesá o 0:00“ nedává smysl — beze změny se říká slovem */
+          ? Math.abs(d.dAvg) < 0.005
+            ? ` — stejně jako ${esc(monthShort(prevK))}.`
+            : ` — proti ${esc(monthShort(prevK))} ${d.dAvg > 0 ? 'roste' : 'klesá'} o ${hrs(Math.abs(d.dAvg))}.`
+          : '.'))
     }
     const abs = s.byTotal[0]
     if (abs) {
       const d = cmp && cmp.centers.find((c) => c.name === abs.name)
       const jumped = d && d.prevTotal != null && cmp.centers.some((c) => c.name !== abs.name && c.prevTotal > d.prevTotal && c.total < abs.total)
-      out.push(`Objemově je největší <strong>${esc(abs.name)}</strong> s <strong>${h1(abs.total)} h</strong>
+      out.push(`Objemově je největší <strong>${esc(abs.name)}</strong> s <strong>${hrsU(abs.total)}</strong>
         na ${abs.people} lidí` + (jumped ? ' — v tomto měsíci přeskočil dosud nejvytíženější středisko.' : '.') +
-        ' Průměr ' + hm(abs.avg) + ' na osobu.')
+        ' Průměr ' + hrs(abs.avg) + ' na osobu.')
     }
     if (s.year150) {
       out.push(`<strong>${num(s.year150)} ${s.year150 === 1 ? 'člověk je' : 'lidí je'}</strong> nad ${CFG.year.warn} h ročního přesčasu` +
@@ -3485,7 +3654,7 @@ window.PP = window.PP || {}
     }
     if (s.overCrit) {
       out.push(`${num(s.overCrit)} ${s.overCrit === 1 ? 'člověk překročil' : 'lidí překročilo'}
-        ${CFG.person.crit} h v jednom měsíci` + (PUBLIC ? '.' : `; maximum je ${hm(s.max)}.`))
+        ${CFG.person.crit} h v jednom měsíci` + (PUBLIC ? '.' : `; maximum je ${hrs(s.max)}.`))
     }
     return out.length ? out : ['Za tento měsíc nejsou vykázané žádné přesčasové hodiny.']
   }
@@ -3499,7 +3668,7 @@ window.PP = window.PP || {}
     return `<ul class="change-list">${shown.map((r) => `
       <li>
         <span class="who">${esc(r.n)}<small>${esc(r.s)}</small></span>
-        <span class="amt">${hm(r.t)}<small>${esc(hoursLabel)}</small></span>
+        <span class="amt">${hrs(r.t)}<small>${esc(hoursLabel)}</small></span>
       </li>`).join('')}
       ${rows.length > shown.length
         ? `<li class="more">a další ${num(rows.length - shown.length)}</li>`
@@ -3630,8 +3799,8 @@ window.PP = window.PP || {}
                 title="Otevřít detail střediska">${esc(c.name)}</button>${c.level
               ? ` <span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</span>
             <span class="topc-nums">
-              <strong>${byTotal ? h1(c.total) + ' h' : hm(c.avg)}</strong>
-              <small>${byTotal ? `Ø ${hm(c.avg)} · ${c.people} lidí` : `${h1(c.total)} h · ${c.people} lidí`}</small>
+              <strong>${byTotal ? hrsU(c.total) : hrs(c.avg)}</strong>
+              <small>${byTotal ? `Ø ${hrs(c.avg)} · ${c.people} lidí` : `${hrsU(c.total)} · ${c.people} lidí`}</small>
             </span>
           </header>
           <div class="topc-bar"><span style="width:${sirka.toFixed(1)}%"></span></div>
@@ -3640,7 +3809,7 @@ window.PP = window.PP || {}
             return `<li>
               <button type="button" class="link-person" data-person="${esc(String(r.o))}"
                 title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button>
-              <span class="amt">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</span>
+              <span class="amt">${lvl ? `<span class="tag ${lvl}">${hrs(r.t)}</span>` : hrs(r.t)}</span>
             </li>`
           }).join('')}
           ${zbytek > 0 ? `<li class="more">a dalších ${num(zbytek)} ve středisku</li>` : ''}
@@ -3660,7 +3829,7 @@ window.PP = window.PP || {}
     { key: 'm', label: 'Do MEZD', num: true },
     { key: 'e', label: evidenceLabel(), num: true },
     // Maximum je přesčas jednoho konkrétního člověka — ve veřejném vydání odpadá
-    { key: 'max', label: 'Maximum', num: true, internal: true },
+    { key: 'max', label: 'Nejvíc u jednoho', num: true, internal: true },
   ].filter((c) => !(c.internal && PUBLIC))
 
   function centerTable(s, cmp) {
@@ -3680,7 +3849,7 @@ window.PP = window.PP || {}
           ${centerCols().map((c) => `<th class="sortable${c.num ? ' num' : ''}" data-key="${c.key}"
             aria-sort="${key === c.key ? (ui.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"
             >${esc(c.label)}</th>`).join('')}
-          ${cmp ? '<th class="num">Δ Ø</th>' : ''}
+          ${cmp ? '<th class="num" title="Změna průměru na osobu proti minulému měsíci">Změna Ø</th>' : ''}
         </tr></thead>
         <tbody>${rows.map((c) => {
           const d = dmap.get(c.name)
@@ -3688,15 +3857,16 @@ window.PP = window.PP || {}
             <td><button type="button" class="link-center" data-center="${esc(c.name)}"
               title="Otevřít detail střediska">${esc(c.name)}</button> ${c.level ? `<span class="tag ${c.level}">${c.level === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
             <td class="num">${num(c.people)}</td>
-            <td class="num">${h1(c.total)}</td>
-            <td class="num">${hm(c.avg)}</td>
-            <td class="num">${h1(c.m)}</td>
-            <td class="num">${h1(c.e)}</td>
-            ${PUBLIC ? '' : `<td class="num">${hm(c.max)}</td>`}
+            <td class="num">${hrs(c.total)}</td>
+            <td class="num">${hrs(c.avg)}</td>
+            <td class="num">${hrs(c.m)}</td>
+            <td class="num">${hrs(c.e)}</td>
+            ${PUBLIC ? '' : `<td class="num">${hrs(c.max)}</td>`}
             ${cmp ? `<td class="num">${d && d.dAvg != null ? delta(d.dAvg) : '<span class="tag">nové</span>'}</td>` : ''}
           </tr>`
         }).join('')}</tbody>
       </table></div>
+      ${colLegend(['avg','m','e','max'])}
     </div>`
   }
 
@@ -3727,18 +3897,18 @@ window.PP = window.PP || {}
       <div class="card-head"><h2>Výběr střediska</h2><span class="hint">řazeno podle Ø na osobu</span></div>
       <div class="chips">${s.byAvg.map((x) => `
         <button class="chip ${x.level}" type="button" data-center="${esc(x.name)}" aria-pressed="${x.name === ui.center}">
-          <span>${esc(x.name)}</span><span class="c-avg">${hm(x.avg)}</span>
+          <span>${esc(x.name)}</span><span class="c-avg">${hrs(x.avg)}</span>
         </button>`).join('')}</div>
     </div>`
 
     const share = s.total ? c.total / s.total : 0
     const kpis = `<div class="grid kpis">
-      ${kpi('Přesčas celkem', h1(c.total) + ' h', `${pct(share)} přesčasu závodu`)}
-      ${kpi('Lidí s přesčasem', num(c.people), PUBLIC ? 'v tomto měsíci' : `maximum ${hm(c.max)}`)}
-      ${kpi('Ø na osobu', hm(c.avg),
-        d && d.dAvg != null ? `proti ${esc(monthShort(prevK))} ${delta(d.dAvg)}` : 'práh ' + CFG.center.warn + ' / ' + CFG.center.crit + ' h',
+      ${kpi('Přesčas celkem', hrsU(c.total), `${pct(share)} přesčasu závodu`, '', 'hero')}
+      ${kpi('Lidí s přesčasem', num(c.people), PUBLIC ? 'v tomto měsíci' : `nejvíc u jednoho ${hrs(c.max)}`)}
+      ${kpi('Ø na osobu', hrs(c.avg),
+        d && d.dAvg != null ? vsPrev(prevK, d.dAvg) : 'práh ' + CFG.center.warn + ' / ' + CFG.center.crit + ' h',
         c.level)}
-      ${kpi('Proplaceno (MEZD)', pct(c.total ? c.m / c.total : 0), `${h1(c.m)} h z ${h1(c.total)} h`)}
+      ${kpi('Proplaceno (MEZD)', pct(c.total ? c.m / c.total : 0), `${hrsU(c.m)} z ${hrsU(c.total)}`)}
     </div>`
 
     const top5 = c.rows.slice(0, 5)
@@ -3746,7 +3916,7 @@ window.PP = window.PP || {}
     const topCard = `<div class="card">
       <div class="card-head"><h3>TOP 5 lidí</h3><span class="hint">${esc(c.name)}</span></div>
       <div class="bars">${top5.map((r) =>
-        barRow(r.n, r.t, maxTop, hm(r.t), level(r.t, CFG.person))).join('')}</div>
+        barRow(r.n, r.t, maxTop, hrs(r.t), level(r.t, CFG.person))).join('')}</div>
     </div>`
 
     const listCard = `<div class="card">
@@ -3759,6 +3929,7 @@ window.PP = window.PP || {}
         </tr></thead>
         <tbody>${c.rows.map((r, i) => personRow(r, i + 1)).join('')}</tbody>
       </table></div>
+      ${colLegend(['m','e','t','r'])}
     </div>`
 
     // Ve veřejném vydání odpadá všechno jmenné — zůstanou jen čísla za středisko.
@@ -3778,10 +3949,10 @@ window.PP = window.PP || {}
       <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
         title="Zobrazit vývoj přes měsíce">${query ? mark(r.n, query) : esc(r.n)}</button></td>
       <td class="num">${esc(String(r.o))}</td>
-      <td class="num">${hm(r.m)}</td>
-      <td class="num">${hm(r.e)}</td>
-      <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
-      <td class="num">${ylvl ? `<span class="tag ${ylvl}">${hm(r.r)}</span>` : hm(r.r)}</td>
+      <td class="num">${hrs(r.m)}</td>
+      <td class="num">${hrs(r.e)}</td>
+      <td class="num">${lvl ? `<span class="tag ${lvl}">${hrs(r.t)}</span>` : hrs(r.t)}</td>
+      <td class="num">${ylvl ? `<span class="tag ${ylvl}">${hrs(r.r)}</span>` : hrs(r.r)}</td>
     </tr>`
   }
 
@@ -3821,15 +3992,16 @@ window.PP = window.PP || {}
                 <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
                   title="Zobrazit vývoj přes měsíce">${mark(r.n, ui.query)}</button></td>
                 <td>${mark(r.s, ui.query)}</td>
-                <td class="num">${hm(r.m)}</td>
-                <td class="num">${hm(r.e)}</td>
-                <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
-                <td class="num">${ylvl ? `<span class="tag ${ylvl}">${hm(r.r)}</span>` : hm(r.r)}</td>
+                <td class="num">${hrs(r.m)}</td>
+                <td class="num">${hrs(r.e)}</td>
+                <td class="num">${lvl ? `<span class="tag ${lvl}">${hrs(r.t)}</span>` : hrs(r.t)}</td>
+                <td class="num">${ylvl ? `<span class="tag ${ylvl}">${hrs(r.r)}</span>` : hrs(r.r)}</td>
               </tr>`
             }).join('')
           : `<tr><td colspan="7" class="empty">Nikdo neodpovídá hledání „${esc(ui.query)}“.</td></tr>`}
         </tbody>
       </table></div>
+      ${colLegend(['m','e','t','r'])}
       ${hits.length > shown.length
         ? `<p style="margin:14px 0 0"><button class="btn ghost sm" type="button" id="ranking-more">
              Zobrazit dalších ${Math.min(25, hits.length - shown.length)} (celkem ${num(hits.length)})
@@ -3857,14 +4029,14 @@ window.PP = window.PP || {}
       label: 'Přesčas celkem',
       plant: (s) => s.total,
       center: (c) => c.total,
-      format: (v) => h1(v) + ' h',
+      format: (v) => hrsU(v),
       tick: (v) => num(v) + ' h',
     },
     avg: {
       label: 'Ø na osobu',
       plant: (s) => s.avg,
       center: (c) => c.avg,
-      format: hm,
+      format: hrs,
     },
     people: {
       label: 'Lidí s přesčasem',
@@ -4005,7 +4177,7 @@ window.PP = window.PP || {}
     const M = PERSON_METRICS[ui.personMetric] || PERSON_METRICS.month
     PP.lineChart(host, {
       labels: hist.points.map((p) => monthShort(p.key)),
-      format: hm,
+      format: hrs,
       area: ui.personMetric === 'month',
       height: 250,
       refs: M.refs,
@@ -4033,7 +4205,7 @@ window.PP = window.PP || {}
           const where = PP.componentBucket(c.name)
           return `<tr>
             <td>${esc(c.name)}</td>
-            <td class="num">${hm(c.h)}</td>
+            <td class="num">${hrs(c.h)}</td>
             <td class="num">${num(c.rows)}</td>
             <td>${!where
               ? '<span class="tag">nepočítá se</span>'
@@ -4044,7 +4216,7 @@ window.PP = window.PP || {}
         }).join('')}
         </tbody><tfoot><tr>
           <td>Přesčas za měsíc = do MEZD + evidence</td>
-          <td class="num"><strong>${hm(x.t)}</strong></td>
+          <td class="num"><strong>${hrs(x.t)}</strong></td>
           <td class="num"></td><td></td>
         </tr></tfoot></table>
         ${list.some((c) => !PP.componentBucket(c.name))
@@ -4071,11 +4243,11 @@ window.PP = window.PP || {}
       const gaps = hist.points.filter((x) => x.t == null).length
       const last = hist.points[hist.points.length - 1]
       body = `<div class="grid kpis">
-        ${kpi('Přesčas za rok', hm(hist.year),
-          `zbývá ${hm(Math.max(0, CFG.year.cap - hist.year))} do stropu`,
+        ${kpi('Přesčas za rok', hrs(hist.year),
+          `zbývá ${hrs(Math.max(0, CFG.year.cap - hist.year))} do stropu`,
           level(hist.year, { warn: CFG.year.warn, crit: CFG.year.crit }))}
-        ${kpi('Ø na měsíc', hm(hist.avg), `z ${hist.months} ${hist.months === 1 ? 'měsíce' : hist.months < 5 ? 'měsíců' : 'měsíců'} s přesčasem`, level(hist.avg, CFG.person))}
-        ${kpi('Nejvyšší měsíc', hm(hist.max), '', level(hist.max, CFG.person))}
+        ${kpi('Ø na měsíc', hrs(hist.avg), `z ${hist.months} ${hist.months === 1 ? 'měsíce' : hist.months < 5 ? 'měsíců' : 'měsíců'} s přesčasem`, level(hist.avg, CFG.person))}
+        ${kpi('Nejvyšší měsíc', hrs(hist.max), '', level(hist.max, CFG.person))}
         ${kpi('Měsíců bez přesčasu', num(gaps), gaps ? 've výkazu vůbec nebyl' : 'přesčas měl každý měsíc', gaps ? '' : 'warn')}
       </div>
 
@@ -4095,8 +4267,8 @@ window.PP = window.PP || {}
           if (x.t == null) {
             return `<tr class="muted-row"><td>${esc(monthName(x.key))}</td>
               <td colspan="4" class="hint">ve výkazu není — přesčas neměl</td>
-              <td class="num">${x.r == null ? '—' : hm(x.r)}</td>
-              <td class="num">${x.dr == null ? '—' : hm(x.dr)}</td></tr>`
+              <td class="num">${x.r == null ? '—' : hrs(x.r)}</td>
+              <td class="num">${x.dr == null ? '—' : hrs(x.dr)}</td></tr>`
           }
           const lvl = level(x.t, CFG.person)
           const open = !!ui.personOpen[x.key]
@@ -4107,18 +4279,18 @@ window.PP = window.PP || {}
             : esc(monthName(x.key))
           return `<tr>
             <td>${label}</td>
-            <td class="num">${hm(x.m)}</td>
+            <td class="num">${hrs(x.m)}</td>
             <td class="num">${PP.data.method === 'balance'
               ? (x.de == null
                   ? `<span class="hint" title="Chybí předchozí měsíc, přírůstek se nemá od čeho odrazit">—</span>`
-                  : hm(x.de))
-              : hm(x.e)}</td>
-            <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(x.t)}</span>` : hm(x.t)}</td>
+                  : hrs(x.de))
+              : hrs(x.e)}</td>
+            <td class="num">${lvl ? `<span class="tag ${lvl}">${hrs(x.t)}</span>` : hrs(x.t)}</td>
             <td class="num">${x.rank}. z ${x.of}</td>
-            <td class="num">${hm(x.r)}</td>
+            <td class="num">${hrs(x.r)}</td>
             <td class="num">${x.dr == null ? '—'
-              : x.drMatches ? hm(x.dr)
-              : `<span class="tag crit" title="Roční součet přibyl o jinou hodnotu, než je měsíční přesčas">${hm(x.dr)}</span>`}</td>
+              : x.drMatches ? hrs(x.dr)
+              : `<span class="tag crit" title="Roční součet přibyl o jinou hodnotu, než je měsíční přesčas">${hrs(x.dr)}</span>`}</td>
           </tr>${open ? breakdownRow(x) : ''}`
         }).join('')}</tbody>
       </table></div>
@@ -4217,6 +4389,18 @@ window.PP = window.PP || {}
     }))
   }
 
+  /** Hodnota se znaménkem; nula je prostě nula — „−0:00“ je nesmysl. */
+  function signed(value, formatter) {
+    const f = formatter || hrs
+    if (Math.abs(value) < 0.005) return f(0)
+    return (value > 0 ? '+' : '−') + f(Math.abs(value))
+  }
+  /** Tón podle směru změny; beze změny žádná barva. */
+  function trendTone(value, upIsBad) {
+    if (Math.abs(value) < 0.005) return ''
+    return (value > 0) === (upIsBad !== false) ? 'crit' : 'good'
+  }
+
   /* ---------- Srovnání měsíců ---------- */
   const CMP_COLS = [
     { key: 'name', label: 'Středisko', num: false },
@@ -4225,7 +4409,7 @@ window.PP = window.PP || {}
     { key: 'dTotal', label: 'Δ celkem', num: true },
     { key: 'prevAvg', label: 'Ø A', num: true },
     { key: 'avg', label: 'Ø B', num: true },
-    { key: 'dAvg', label: 'Δ Ø', num: true },
+    { key: 'dAvg', label: 'Změna Ø', num: true },
   ]
 
   function renderCompare() {
@@ -4264,17 +4448,21 @@ window.PP = window.PP || {}
       </div>
     </div>`
 
+    const pb = (v) => Math.round(Math.abs(v) * 100) + ' p. b.'
     const kpis = `<div class="grid kpis">
-      ${kpi('Δ přesčas celkem', (cmp.dTotal > 0 ? '+' : '−') + h1(Math.abs(cmp.dTotal)) + ' h',
-        `${h1(sA.total)} → ${h1(sB.total)} h`, cmp.dTotal > 0 ? 'crit' : 'good')}
-      ${kpi('Δ Ø na osobu', (cmp.dAvg > 0 ? '+' : '−') + hm(Math.abs(cmp.dAvg)),
-        `${hm(sA.avg)} → ${hm(sB.avg)}`, cmp.dAvg > 0 ? 'crit' : 'good')}
-      ${kpi('Δ lidí s přesčasem', (cmp.dPeople > 0 ? '+' : '') + num(cmp.dPeople),
+      ${kpi(`Změna přesčasu ${esc(A)} → ${esc(B)}`, signed(cmp.dTotal, hrsU),
+        `${hrs(sA.total)} → ${hrsU(sB.total)}`, trendTone(cmp.dTotal), 'hero')}
+      ${kpi('Ø na osobu', signed(cmp.dAvg),
+        `${hrs(sA.avg)} → ${hrs(sB.avg)}`, trendTone(cmp.dAvg))}
+      ${kpi('Lidí s přesčasem', signed(cmp.dPeople, num),
         `${num(sA.withOvertime)} → ${num(sB.withOvertime)}`)}
-      ${kpi('Δ proplaceno', (cmp.dPaidShare > 0 ? '+' : '−') + Math.abs(Math.round(cmp.dPaidShare * 100)) + ' p. b.',
+      ${kpi('Podíl proplacených', signed(cmp.dPaidShare, pb),
         `${pct(sA.paidShare)} → ${pct(sB.paidShare)}`)}
-      ${kpi('Vypadli', num(cmp.dropped.length), `byli v ${esc(A)}, v ${esc(B)} ne`, 'good')}
-      ${kpi('Přibyli', num(cmp.added.length), `v ${esc(A)} nebyli`, cmp.added.length ? 'warn' : '')}
+    </div>
+    <div class="grid kpis alarms">
+      ${kpi('Přibyli', num(cmp.added.length), `v ${esc(A)} nebyli, v ${esc(B)} ano`,
+        cmp.added.length ? 'warn' : 'good')}
+      ${kpi('Vypadli', num(cmp.dropped.length), `byli v ${esc(A)}, v ${esc(B)} už ne`, 'good')}
     </div>`
 
     const dir = ui.cmpSort.dir === 'asc' ? 1 : -1
@@ -4293,11 +4481,11 @@ window.PP = window.PP || {}
           >${esc(c.label)}</th>`).join('')}</tr></thead>
         <tbody>${rows.map((c) => `<tr>
           <td>${esc(c.name)}</td>
-          <td class="num">${c.prevTotal == null ? '—' : h1(c.prevTotal)}</td>
-          <td class="num">${h1(c.total)}</td>
-          <td class="num">${c.dTotal == null ? '<span class="tag">nové</span>' : delta(c.dTotal, h1)}</td>
-          <td class="num">${c.prevAvg == null ? '—' : hm(c.prevAvg)}</td>
-          <td class="num">${hm(c.avg)}</td>
+          <td class="num">${c.prevTotal == null ? '—' : hrs(c.prevTotal)}</td>
+          <td class="num">${hrs(c.total)}</td>
+          <td class="num">${c.dTotal == null ? '<span class="tag">nové</span>' : delta(c.dTotal, hrs)}</td>
+          <td class="num">${c.prevAvg == null ? '—' : hrs(c.prevAvg)}</td>
+          <td class="num">${hrs(c.avg)}</td>
           <td class="num">${c.dAvg == null ? '<span class="tag">nové</span>' : delta(c.dAvg)}</td>
         </tr>`).join('')}</tbody>
       </table></div>
@@ -4308,7 +4496,7 @@ window.PP = window.PP || {}
     const moverList = (list, tone) => list.length
       ? `<ul class="change-list">${list.map((m) => `<li>
           <span class="who">${esc(m.r.n)}<small>${esc(m.r.s)}</small></span>
-          <span class="amt">${delta(m.d)}<small>${hm(m.prev.t)} → ${hm(m.r.t)}</small></span>
+          <span class="amt">${delta(m.d)}<small>${hrs(m.prev.t)} → ${hrs(m.r.t)}</small></span>
         </li>`).join('')}</ul>`
       : '<p class="hint" style="margin:0">Nikdo.</p>'
 
@@ -4416,9 +4604,9 @@ window.PP = window.PP || {}
       : `proti ${weekShort(prevKey)} ${now - before >= 0 ? '+' : '−'}${fmt(Math.abs(now - before))}`
 
     const kpis = `<div class="grid kpis">
-      ${kpi('Přesčas celkem', h1(s2.total) + ' h', delta(s2.total, prev && prev.total, (v) => h1(v) + ' h'))}
+      ${kpi('Přesčas celkem', hrsU(s2.total), delta(s2.total, prev && prev.total, (v) => hrsU(v)), '', 'hero')}
       ${kpi('Lidí s přesčasem', num(s2.withOvertime), `z ${num(rec.people)} osob`)}
-      ${kpi('Ø na osobu', hm(s2.avg), delta(s2.avg, prev && prev.avg, hm), level(s2.avg, CFG.week))}
+      ${kpi('Ø na osobu', hrs(s2.avg), delta(s2.avg, prev && prev.avg, hrs), level(s2.avg, CFG.week))}
       ${kpi('Nad ' + CFG.week.crit + ' h za týden', num(s2.ranking.filter((r) => r.t >= CFG.week.crit).length),
         `nad ${CFG.week.warn} h: ${num(s2.ranking.filter((r) => r.t >= CFG.week.warn).length)}`,
         s2.ranking.some((r) => r.t >= CFG.week.crit) ? 'crit' : '')}
@@ -4447,10 +4635,10 @@ window.PP = window.PP || {}
               title="Otevřít detail střediska">${esc(c.name)}</button>
               ${lvl ? ` <span class="tag ${lvl}">${lvl === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
             <td class="num">${num(c.people)}</td>
-            <td class="num">${h1(c.total)}</td>
-            <td class="num">${hm(c.avg)}</td>
-            <td class="num">${h1(c.m)}</td>
-            <td class="num">${h1(c.e)}</td>
+            <td class="num">${hrs(c.total)}</td>
+            <td class="num">${hrs(c.avg)}</td>
+            <td class="num">${hrs(c.m)}</td>
+            <td class="num">${hrs(c.e)}</td>
           </tr>`
         }).join('')}</tbody>
       </table></div>
@@ -4472,9 +4660,9 @@ window.PP = window.PP || {}
             <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
               title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button></td>
             <td>${esc(r.s)}</td>
-            <td class="num">${hm(r.m)}</td>
-            <td class="num">${hm(r.de != null ? r.de : r.e)}</td>
-            <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
+            <td class="num">${hrs(r.m)}</td>
+            <td class="num">${hrs(r.de != null ? r.de : r.e)}</td>
+            <td class="num">${lvl ? `<span class="tag ${lvl}">${hrs(r.t)}</span>` : hrs(r.t)}</td>
           </tr>`
         }).join('')}</tbody>
       </table></div>
@@ -4506,8 +4694,8 @@ window.PP = window.PP || {}
     const rada = keys.slice().reverse()          // od nejstaršího
     PP.lineChart(host, {
       labels: rada.map(weekShort),
-      format: (v) => h1(v) + ' h',
-      tickFormat: (v) => h1(v),
+      format: (v) => hrsU(v),
+      tickFormat: (v) => hrs(v),
       area: true,
       height: 250,
       ariaLabel: 'Přesčas závodu po týdnech',
@@ -4567,12 +4755,12 @@ window.PP = window.PP || {}
     </p>`
 
     const kpis = `<div class="grid kpis">
-      ${kpi('Přesčas celkem', h1(p.total) + ' h', `za ${num(p.keys.length)} ${p.keys.length < 5 ? 'měsíce' : 'měsíců'}`)}
-      ${kpi('Z toho proplaceno', h1(p.mezdy) + ' h', pct(p.total ? p.mezdy / p.total : 0) + ' přesčasu')}
-      ${kpi('Zůstalo na kontě', h1(p.konto) + ' h',
+      ${kpi('Přesčas celkem', hrsU(p.total), `za ${num(p.keys.length)} ${p.keys.length < 5 ? 'měsíce' : 'měsíců'}`, '', 'hero')}
+      ${kpi('Z toho proplaceno', hrsU(p.mezdy), pct(p.total ? p.mezdy / p.total : 0) + ' přesčasu')}
+      ${kpi('Zůstalo na kontě', hrsU(p.konto),
         p.konto > 0 ? 'hodiny k pozdějšímu čerpání' : 'z konta se naopak ubralo',
         p.konto > 0 ? 'warn' : '')}
-      ${kpi('Ø na osobu', hm(p.people ? p.total / p.people : 0), 'za celé období')}
+      ${kpi('Ø na osobu', hrs(p.people ? p.total / p.people : 0), 'za celé období')}
     </div>`
 
     const sazba = PUBLIC ? '' : `<div class="card">
@@ -4596,7 +4784,7 @@ window.PP = window.PP || {}
       </form>
 
       ${CFG.cost.rate ? `<div class="grid kpis" style="margin-top:18px">
-        ${kpi('Vyplaceno za přesčas', czk(nakladProplacene), `${h1(p.mezdy)} h × ${num(CFG.cost.rate)} Kč + ${num(CFG.cost.surcharge)} %`)}
+        ${kpi('Vyplaceno za přesčas', czk(nakladProplacene), `${hrsU(p.mezdy)} × ${num(CFG.cost.rate)} Kč + ${num(CFG.cost.surcharge)} %`)}
         ${kpi('Závazek na kontě', czk(zavazekKonto), 'hodiny, které se teprve proplatí nebo vyberou',
           p.konto > 0 ? 'warn' : '')}
         ${kpi('Celkem za odpracovaný přesčas', czk(nakladCelkem), 'vyplacené i nevyplacené dohromady')}
@@ -4623,10 +4811,10 @@ window.PP = window.PP || {}
           <td><button type="button" class="link-center" data-center="${esc(c.name)}"
             title="Otevřít detail střediska">${esc(c.name)}</button></td>
           <td class="num">${num(c.people)}</td>
-          <td class="num">${h1(c.total)}</td>
-          <td class="num">${hm(c.avg)}</td>
-          <td class="num">${h1(c.mezdy)}</td>
-          <td class="num">${h1(c.konto)}</td>
+          <td class="num">${hrs(c.total)}</td>
+          <td class="num">${hrs(c.avg)}</td>
+          <td class="num">${hrs(c.mezdy)}</td>
+          <td class="num">${hrs(c.konto)}</td>
           ${CFG.cost.rate && !PUBLIC ? `<td class="num">${czk(PP.cost(c.total))}</td>` : ''}
         </tr>`).join('')}</tbody>
       </table></div>
@@ -4650,10 +4838,10 @@ window.PP = window.PP || {}
             title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button></td>
           <td>${esc(r.s)}</td>
           <td class="num">${num(r.months)}</td>
-          <td class="num">${hm(r.t)}</td>
-          <td class="num">${hm(r.months ? r.t / r.months : 0)}</td>
-          <td class="num">${hm(r.m)}</td>
-          <td class="num">${hm(r.konto)}</td>
+          <td class="num">${hrs(r.t)}</td>
+          <td class="num">${hrs(r.months ? r.t / r.months : 0)}</td>
+          <td class="num">${hrs(r.m)}</td>
+          <td class="num">${hrs(r.konto)}</td>
           ${CFG.cost.rate ? `<td class="num">${czk(PP.cost(r.t))}</td>` : ''}
         </tr>`).join('')}</tbody>
       </table></div>
@@ -4758,7 +4946,7 @@ window.PP = window.PP || {}
         <p>${chk.dropped
           ? `Mzdový systém tedy roční součet <strong>nebere jako počitadlo odpracovaných
              hodin</strong> — ubírá z něj, když se hodiny proplatí nebo vyberou jako volno.
-             Největší pokles ${hm(Math.abs(chk.biggestDrop))}. Na hlídání zákonného stropu
+             Největší pokles ${hrs(Math.abs(chk.biggestDrop))}. Na hlídání zákonného stropu
              ${CFG.year.cap} h to pak <strong>nestačí</strong>: kdo si přesčasy nechá průběžně
              proplácet, strop podle téhle hodnoty nikdy nepřekročí, i kdyby jich odpracoval
              dvakrát tolik. Evidenci odpracovaných hodin je potřeba vzít odjinud.`
@@ -4775,8 +4963,8 @@ window.PP = window.PP || {}
         <tbody>${chk.droppedExamples.map((e) => `<tr>
           <td class="name">${esc(e.row.n)}</td>
           <td>${esc(e.row.s)}</td>
-          <td class="num"><span class="tag crit">${hm(e.dr)}</span></td>
-          <td class="num">${hm(e.m)}</td>
+          <td class="num"><span class="tag crit">${hrs(e.dr)}</span></td>
+          <td class="num">${hrs(e.m)}</td>
         </tr>`).join('')}</tbody>
       </table></div>
       <p class="hint" style="margin:10px 0 0">
@@ -4795,20 +4983,23 @@ window.PP = window.PP || {}
         <tbody>${chk.examples.map((e) => `<tr>
           <td class="name">${esc(e.row.n)}</td>
           <td>${esc(e.row.s)}</td>
-          <td class="num">${hm(e.dr)}</td>
-          <td class="num">${hm(e.asMove)}</td>
-          <td class="num">${hm(e.asBalance)}</td>
+          <td class="num">${hrs(e.dr)}</td>
+          <td class="num">${hrs(e.asMove)}</td>
+          <td class="num">${hrs(e.asBalance)}</td>
         </tr>`).join('')}</tbody>
       </table></div>` : ''}
     </div>`
 
     el.innerHTML = `<div class="grid kpis">
+      ${kpi('Nejvyšší roční součet', hrs(s.yearly.length ? s.yearly[0].r : 0),
+        s.yearly.length ? `zbývá ${hrs(Math.max(0, CFG.year.cap - s.yearly[0].r))} do stropu ${CFG.year.cap} h` : '',
+        s.yearly.length ? level(s.yearly[0].r, { warn: CFG.year.warn, crit: CFG.year.crit }) : '', 'hero')}
+      ${kpi('Lidí v evidenci', num(s.yearly.length), 's ročním součtem ve výkazu')}
+    </div>
+    <div class="grid kpis alarms">
       ${kpi('Nad ' + CFG.year.warn + ' h', num(s.year150), 'nutná dohoda o práci přesčas', s.year150 ? 'warn' : 'good')}
       ${kpi('Nad ' + CFG.year.crit + ' h', num(s.year250), 'zbývá do stropu méně než ' + (CFG.year.cap - CFG.year.crit) + ' h', s.year250 ? 'crit' : 'good')}
       ${kpi('Na stropu ' + CFG.year.cap + ' h', num(s.yearCap), 'další přesčas už nelze nařídit', s.yearCap ? 'crit' : 'good')}
-      ${kpi('Nejvyšší roční součet', hm(s.yearly.length ? s.yearly[0].r : 0),
-        s.yearly.length ? `zbývá ${hm(Math.max(0, CFG.year.cap - s.yearly[0].r))}` : '',
-        s.yearly.length ? level(s.yearly[0].r, { warn: CFG.year.warn, crit: CFG.year.crit }) : '')}
     </div>
     ${check}
     <div class="card">
@@ -4822,7 +5013,7 @@ window.PP = window.PP || {}
         return `<div class="limit-row">
           <div class="limit-head">
             <span class="who">${esc(r.n)} <small>· ${esc(r.s)}</small></span>
-            <span class="amt">${hm(r.r)} <span class="hint">/ ${CFG.year.cap} h · zbývá ${hm(Math.max(0, CFG.year.cap - r.r))}</span></span>
+            <span class="amt">${hrs(r.r)} <span class="hint">/ ${CFG.year.cap} h · zbývá ${hrs(Math.max(0, CFG.year.cap - r.r))}</span></span>
           </div>
           <div class="limit-track"><span class="limit-fill ${lvl}" style="width:${w.toFixed(1)}%"></span></div>
         </div>`
@@ -4873,7 +5064,7 @@ window.PP = window.PP || {}
             <td>${esc(periodName(k))}</td>
             <td>${esc(rec.period || '—')}</td>
             <td class="num">${num(st.withOvertime)}</td>
-            <td class="num">${h1(st.total)} h</td>
+            <td class="num">${hrsU(st.total)}</td>
             <td>${rec.demo ? '<span class="tag warn">ukázka</span>' : imported ? '<span class="tag accent">import</span>' : '<span class="tag">vestavěné</span>'}</td>
             <td>${esc(rec.file || '—')}</td>
             <td>${imported ? `<button class="btn danger sm" type="button" data-remove="${esc(k)}">Smazat</button>` : ''}</td>
@@ -5220,7 +5411,7 @@ window.PP = window.PP || {}
         const st = PP.stats(PP.data.record(key))
         busy.kind = 'ok'
         busy.html = `<strong>${esc(periodName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
-          ${num(st.withOvertime)} lidí s přesčasem, ${h1(st.total)} h, ${num(record.people)} osob ve výkazu.
+          ${num(st.withOvertime)} lidí s přesčasem, ${hrsU(st.total)}, ${num(record.people)} osob ve výkazu.
           <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>
           ${compSummary(record)}`
         if (PP.isWeekKey(key)) ui.week = key
@@ -5235,82 +5426,122 @@ window.PP = window.PP || {}
   }
 
   /* ---------- Metodika ---------- */
+  /* Metodika bývala jedna dlouhá karta textu, ve které se nedalo nic najít.
+     Teď je rozdělená po tématech a nahoře stojí jednou větou to, co většina
+     lidí potřebuje vědět: podle čeho se číslo „Přesčas“ počítá. */
   function renderMethod() {
-    $('#panel-method').innerHTML = `<div class="card"><div class="prose">
-      <h3>Co se počítá jako přesčas</h3>
-      <p>Výkaz dává dvě mzdové složky: <strong>Přesčas do MEZD</strong> (hodiny poslané do výplaty)
-      a <strong>Přesčas evidence</strong> (konto pracovní doby). Jak se z nich dostane měsíční
-      přesčas, závisí na tom, co druhá složka znamená — a to <strong>panel změří</strong>, místo
-      aby to předpokládal.</p>
-      <p>Rozsoudí to roční součet z mzdového systému: o kolik přibude mezi dvěma měsíci, tolik
-      ten měsíc přesčasu doopravdy bylo. Panel to porovná u každého, kdo je v obou měsících, a
-      vybere vzorec, který sedí. Výsledek měření je v sekci
-      <strong>Roční limit</strong>.</p>
-      <ul>
-        <li><strong>Přesčas = do MEZD + evidence</strong> — když je evidence pohyb za měsíc.</li>
-        <li><strong>Přesčas = do MEZD + (evidence teď − evidence minulý měsíc)</strong> — když je
-            evidence zůstatek konta ke konci měsíce. Sečíst obě složky by přesčas nafouklo,
-            protože by se zůstatek připočítal každý měsíc znovu.</li>
-      </ul>
-      <p>${PP.data.method === 'balance'
-        ? `Na načtených datech vyšlo, že <strong>evidence je zůstatek konta</strong>, a panel
-           tak počítá. Nejstarší naimportovaný měsíc je výjimka — nemá předchozí konto, od
-           kterého by se odrazil, takže u něj zůstává hodnota z výkazu a je označený. Spraví
-           to import o měsíc staršího výkazu.`
-        : PP.data.method === 'move'
-        ? `Na načtených datech vyšlo, že <strong>evidence je pohyb za měsíc</strong>, takže se
-           obě složky prostě sčítají.`
-        : PP.data.method === 'unclear'
-        ? `Na načtených datech nesedí ani jeden vzorec — mzdový systém počítá do ročního součtu
-           ještě něco dalšího. Panel zatím sčítá obě složky, ale ber měsíční čísla s rezervou.`
-        : `Dokud nejsou naimportované aspoň dva po sobě jdoucí měsíce, není co měřit a panel
-           obě složky sčítá.`}</p>
-      <p>Evidence může být <strong>záporná</strong> — to je odečet konta po proplacení. Když se
-      počítá přes přírůstek konta, může vyjít <strong>záporný i měsíční přesčas</strong>: konto
-      kleslo víc, než kolik se ten měsíc proplatilo, protože si člověk vybral náhradní volno.
-      Není to chyba, je to čerpání dřív naspořených hodin.</p>
+    const verdikt = PP.data.method === 'balance'
+      ? ['Přesčas = do MEZD + (konto teď − konto minulý měsíc)',
+         `Na načtených datech vyšlo, že <strong>evidence je zůstatek konta</strong>, a panel
+          tak počítá. Nejstarší naimportovaný měsíc je výjimka — nemá předchozí konto, od
+          kterého by se odrazil, takže u něj zůstává hodnota z výkazu a je označený. Spraví
+          to import o měsíc staršího výkazu.`]
+      : PP.data.method === 'move'
+      ? ['Přesčas = do MEZD + evidence',
+         `Na načtených datech vyšlo, že <strong>evidence je pohyb za měsíc</strong>, takže se
+          obě složky prostě sčítají.`]
+      : PP.data.method === 'unclear'
+      ? ['Ani jeden vzorec nesedí',
+         `Na načtených datech nesedí ani jeden vzorec — mzdový systém počítá do ročního součtu
+          ještě něco dalšího. Panel zatím sčítá obě složky, ale ber měsíční čísla s rezervou.`]
+      : ['Zatím není co měřit',
+         `Dokud nejsou naimportované aspoň dva po sobě jdoucí měsíce, není co měřit a panel
+          obě složky sčítá.`]
 
-      <h3>Prahové hodnoty</h3>
-      <ul>
-        <li><strong>Jednotlivec za měsíc:</strong> ${CFG.person.warn} h oranžová, ${CFG.person.crit} h červená.</li>
-        <li><strong>Středisko, Ø na osobu:</strong> ${CFG.center.warn} h oranžová, ${CFG.center.crit} h červená.</li>
-        <li><strong>Roční součet:</strong> ${CFG.year.warn} h oranžová, ${CFG.year.crit} h červená,
-            <strong>${CFG.year.cap} h</strong> zákonný strop.</li>
-      </ul>
-      <p>Prahy jsou provozní, ne zákonné — slouží k tomu, aby se v tabulce dalo rychle najít,
-      kde se hromadí zátěž. Jediné tvrdé číslo je roční strop.</p>
+    const jak = `<div class="card">
+      <div class="card-head"><h2>Co se počítá jako přesčas</h2>
+        <span class="hint">panel vzorec měří, nehádá ho</span></div>
+      <div class="method-headline${PP.data.method === 'unclear' ? ' warn' : PP.data.method ? '' : ' muted'}">
+        <strong>${esc(verdikt[0])}</strong>
+        <p>${verdikt[1]}</p>
+      </div>
+      <div class="prose">
+        <p>Výkaz dává dvě mzdové složky: <strong>Přesčas do MEZD</strong> (hodiny poslané do výplaty)
+        a <strong>Přesčas evidence</strong> (konto pracovní doby). Jak se z nich dostane měsíční
+        přesčas, závisí na tom, co druhá složka znamená.</p>
+        <p>Rozsoudí to roční součet z mzdového systému: o kolik přibude mezi dvěma měsíci, tolik
+        ten měsíc přesčasu doopravdy bylo. Panel to porovná u každého, kdo je v obou měsících, a
+        vybere vzorec, který sedí. Celé měření je vidět v sekci <strong>Roční limit</strong>.</p>
+        <ul>
+          <li><strong>Přesčas = do MEZD + evidence</strong> — když je evidence pohyb za měsíc.</li>
+          <li><strong>Přesčas = do MEZD + (evidence teď − evidence minulý měsíc)</strong> — když je
+              evidence zůstatek konta ke konci měsíce. Sečíst obě složky by přesčas nafouklo,
+              protože by se zůstatek připočítal každý měsíc znovu.</li>
+        </ul>
+        <p>Evidence může být <strong>záporná</strong> — to je odečet konta po proplacení. Když se
+        počítá přes přírůstek konta, může vyjít <strong>záporný i měsíční přesčas</strong>: konto
+        kleslo víc, než kolik se ten měsíc proplatilo, protože si člověk vybral náhradní
+        volno. Není to chyba, je to čerpání dřív naspořených hodin.</p>
+      </div>
+    </div>`
 
-      <h3>Legislativní kontext</h3>
-      <p>Zákoník práce omezuje <em>nařízený</em> přesčas na 150 h za kalendářní rok a v průměru
-      8 h týdně za vyrovnávací období. Nad rámec nařízeného přesčasu lze pracovat jen po
-      <strong>dohodě se zaměstnancem</strong>, celkem však nejvýše v průměru 8 h týdně, tedy
-      zhruba <strong>${CFG.year.cap} h ročně</strong>. Proto panel odděluje pásmo nad ${CFG.year.warn} h
-      (od kdy je potřeba dohoda) od pásma nad ${CFG.year.crit} h (kde už zbývá malá rezerva).</p>
+    const prahy = `<div class="card">
+      <div class="card-head"><h2>Prahové hodnoty</h2>
+        <span class="hint">provozní, ne zákonné</span></div>
+      <div class="prose">
+        <ul>
+          <li><strong>Jednotlivec za měsíc:</strong> ${CFG.person.warn} h oranžová, ${CFG.person.crit} h červená.</li>
+          <li><strong>Středisko, Ø na osobu:</strong> ${CFG.center.warn} h oranžová, ${CFG.center.crit} h červená.</li>
+          <li><strong>Roční součet:</strong> ${CFG.year.warn} h oranžová, ${CFG.year.crit} h červená,
+              <strong>${CFG.year.cap} h</strong> zákonný strop.</li>
+        </ul>
+        <p>Prahy slouží k tomu, aby se v tabulce dalo rychle najít, kde se hromadí zátěž.
+        Jediné tvrdé číslo je roční strop.</p>
+      </div>
+    </div>`
 
-      <h3>Ø na osobu</h3>
-      <p>Průměr se počítá <strong>jen z lidí, kteří v daném měsíci přesčas vykázali</strong>, ne
-      z celého stavu střediska. Malé středisko se třemi lidmi tak vyjde vysoko, i když je v objemu
-      hodin zanedbatelné — proto je vedle žebříčku průměrů i tabulka s absolutními součty.</p>
+    const zakon = `<div class="card">
+      <div class="card-head"><h2>Co na to zákoník práce</h2></div>
+      <div class="prose">
+        <p>Zákoník práce omezuje <em>nařízený</em> přesčas na 150 h za kalendářní rok a v průměru
+        8 h týdně za vyrovnávací období. Nad rámec nařízeného přesčasu lze pracovat jen po
+        <strong>dohodě se zaměstnancem</strong>, celkem však nejvýše v průměru 8 h týdně, tedy
+        zhruba <strong>${CFG.year.cap} h ročně</strong>. Proto panel odděluje pásmo nad ${CFG.year.warn} h
+        (od kdy je potřeba dohoda) od pásma nad ${CFG.year.crit} h (kde už zbývá malá rezerva).</p>
+      </div>
+    </div>`
 
-      <h3>Jak se čte Součtový výkaz</h3>
-      <ul>
-        <li>Formát se pozná z prvních bajtů: <code>PK</code> → <code>.xlsx</code>,
-            <code>D0CF</code> → starší binární <code>.xls</code>, jinak text.</li>
-        <li>Výkaz z mezd má sice příponu <code>.xls</code>, ale je to <strong>HTML tabulka</strong> —
-            parsuje se přes DOMParser a bere se <code>&lt;table&gt;</code> s nejvíc řádky.</li>
-        <li>Hlavička se hledá do 40. řádku podle sloupců <em>Příjmení a jméno</em>,
-            <em>Osobní číslo</em>, <em>Středisko</em>, <em>Mzdová složka</em> a <em>Hodiny</em>.</li>
-        <li>Období se bere z řádku nad hlavičkou začínajícího <em>Období:</em>, jinak z prvního
-            výskytu <code>d.m.rrrr - d.m.rrrr</code>.</li>
-        <li>Hodiny se čtou ve formátu <code>h:mm</code> i jako desetinné číslo, včetně znaménka.</li>
-        <li>Řádky se agregují na klíč <code>osobní číslo | středisko</code>.</li>
-      </ul>
+    const prumer = `<div class="card">
+      <div class="card-head"><h2>Jak se počítá Ø na osobu</h2></div>
+      <div class="prose">
+        <p>Průměr se počítá <strong>jen z lidí, kteří v daném měsíci přesčas vykázali</strong>, ne
+        z celého stavu střediska. Malé středisko se třemi lidmi tak vyjde vysoko, i když je v objemu
+        hodin zanedbatelné — proto je vedle žebříčku průměrů i tabulka s absolutními součty.</p>
+      </div>
+    </div>`
 
-      <h3>Kde data leží</h3>
-      <p>Importované měsíce se ukládají do: <strong>${esc(PP.store.backendName)}</strong>.
-      Vestavěná data jsou součástí souboru <code>data/months.js</code> a importem se
-      pro daný měsíc přebijí; po smazání importu se zase objeví.</p>
-    </div></div>`
+    const ulozeni = `<div class="card">
+      <div class="card-head"><h2>Kde data leží</h2></div>
+      <div class="prose">
+        <p>Importované měsíce se ukládají do: <strong>${esc(PP.store.backendName)}</strong>.
+        Vestavěná data jsou součástí souboru <code>data/months.js</code> a importem se
+        pro daný měsíc přebijí; po smazání importu se zase objeví.</p>
+      </div>
+    </div>`
+
+    const cteni = `<div class="card">
+      <div class="card-head"><h2>Jak panel čte Součtový výkaz</h2>
+        <span class="hint">pro případ, že by import něco nepobral</span></div>
+      <div class="prose">
+        <ul>
+          <li>Formát se pozná z prvních bajtů: <code>PK</code> → <code>.xlsx</code>,
+              <code>D0CF</code> → starší binární <code>.xls</code>, jinak text.</li>
+          <li>Výkaz z mezd má sice příponu <code>.xls</code>, ale je to <strong>HTML tabulka</strong> —
+              parsuje se přes DOMParser a bere se <code>&lt;table&gt;</code> s nejvíc řádky.</li>
+          <li>Hlavička se hledá do 40. řádku podle sloupců <em>Příjmení a jméno</em>,
+              <em>Osobní číslo</em>, <em>Středisko</em>, <em>Mzdová složka</em> a <em>Hodiny</em>.</li>
+          <li>Období se bere z řádku nad hlavičkou začínajícího <em>Období:</em>, jinak z prvního
+              výskytu <code>d.m.rrrr - d.m.rrrr</code>.</li>
+          <li>Hodiny se čtou ve formátu <code>h:mm</code> i jako desetinné číslo, včetně znaménka.</li>
+          <li>Řádky se agregují na klíč <code>osobní číslo | středisko</code>.</li>
+        </ul>
+      </div>
+    </div>`
+
+    $('#panel-method').innerHTML = jak +
+      `<div class="grid two">${prahy}${zakon}</div>` +
+      `<div class="grid two">${prumer}${ulozeni}</div>` +
+      cteni
   }
 
   /* ---------- export do Excelu ---------- */
@@ -5452,6 +5683,7 @@ window.PP = window.PP || {}
   /* ---------- start ---------- */
   async function init() {
     initTheme()
+    initFormat()
     renderNav()
     loadRate()
     await PP.data.init()

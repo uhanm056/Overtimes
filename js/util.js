@@ -61,6 +61,34 @@ window.PP = window.PP || {}
     return NF1.format(hours)
   }
 
+  /* ---------- jeden zápis hodin pro celý panel ----------
+     Výkaz i mzdový systém mluví v h:mm, Excel a výpočty v desetinných
+     hodinách. Dokud panel obojí míchal, stálo v jedné tabulce „61,1“
+     i „61:05“ — tatáž hodnota dvakrát jinak a člověk to musel v hlavě
+     převádět. Zápis se proto volí jednou pro celý panel. */
+  PP.FMT = 'hm'
+
+  /** Přepne zápis hodin: 'hm' (61:05) nebo 'dec' (61,1 h). */
+  PP.setFormat = function (f) {
+    PP.FMT = f === 'dec' ? 'dec' : 'hm'
+    return PP.FMT
+  }
+
+  /** Hodiny v nastaveném zápisu, holé číslo do sloupce s hlavičkou. */
+  PP.hrs = function (hours) {
+    return PP.FMT === 'dec' ? PP.h1(hours) : PP.hm(hours)
+  }
+
+  /** Hodiny i s jednotkou — tam, kde u čísla žádná hlavička nestojí.
+      V h:mm je dvojtečka sama o sobě jednotkou, „61:05 h“ by bylo navíc. */
+  PP.hrsU = function (hours) {
+    if (hours == null || !isFinite(hours)) return '—'
+    return PP.FMT === 'dec' ? PP.h1(hours) + ' h' : PP.hm(hours)
+  }
+
+  /** Jak se hodiny právě píšou, do hlavičky sloupce: „h:mm“ / „h“. */
+  PP.hrsUnit = function () { return PP.FMT === 'dec' ? 'h' : 'h:mm' }
+
   /** Celé číslo v českém formátu. */
   PP.num = function (n) {
     if (n == null || !isFinite(n)) return '—'
