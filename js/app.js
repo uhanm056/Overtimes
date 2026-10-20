@@ -34,6 +34,11 @@
      tools/build-public.mjs; interní panel běží bez něj. */
   const PUBLIC = !!window.PP_PUBLIC
 
+  /* Vydání k rozeslání kolegům: plný panel na vlastní výkaz, ale bez karty
+     pro zveřejňování. Kolega nemá do repozitáře ani do databáze co psát a
+     tlačítka, která mu stejně nepatří, jen matou. */
+  const ANALYZER = !!window.PP_ANALYZER
+
   const PUBLIC_SECTIONS = ['overview', 'period', 'centers', 'compare', 'method']
   if (PUBLIC) {
     for (let i = SECTIONS.length - 1; i >= 0; i--) {
@@ -1792,7 +1797,7 @@
       </table></div>
     </div>
 
-    <div class="card">
+    ${ANALYZER ? '' : `<div class="card">
       <div class="card-head">
         <h2>Veřejná verze pro kolegy</h2>
         <span class="hint">jen souhrny za střediska</span>
@@ -1817,7 +1822,7 @@
         <span class="export-status" id="pub-status" role="status"></span>
       </div>
       <div id="pub-detail"></div>
-    </div>`
+    </div>`}`
 
     const fileInput = $('#file')
     const drop = $('#drop')
@@ -2304,7 +2309,7 @@
     if (!stamp) { el.hidden = true; return }
     const [y, m, d] = stamp.split('-')
     el.hidden = false
-    el.textContent = `verze ${Number(d)}. ${Number(m)}. ${y}`
+    el.textContent = `verze ${Number(d)}. ${Number(m)}. ${y}` + (ANALYZER ? ' · analyzér' : '')
   }
 
   function updateRailNote() {

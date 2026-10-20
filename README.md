@@ -316,6 +316,35 @@ serializací vyprázdní, takže se do výstupu nemůže dostat tabulka, která 
 zrovna na obrazovce. Hlídají to `tests/pubgen.test.mjs` a
 `tests/public.test.mjs` při každém běhu testů.
 
+## Dvě vydání k rozeslání
+
+```bash
+node tools/build-single-file.mjs              # → dist/prescasovy-panel-plana.html
+node tools/build-single-file.mjs --analyzer   # → dist/prescasovy-analyzer.html
+npm run analyzer                              # totéž
+```
+
+**Panel** je správcovské vydání: všechno včetně karty *Veřejná verze pro
+kolegy*, odkud se publikuje na web.
+
+**Analyzér** je vydání k rozeslání. Plný panel na vlastní výkaz, ale bez
+karty pro zveřejňování a bez připojení k databázi. Kolega si ho otevře,
+nahraje výkaz a vidí svoje čísla.
+
+Z analyzéru se navíc vyhazují písma z Google Fonts. Soubor koluje po závodě
+a každé otevření by poslalo IP adresu toho člověka Googlu; stacky v
+`styles.css` mají systémové náhrady, takže se jen trochu změní písmo.
+**Analyzér při otevření i při importu `.xls` nevolá ven vůbec nic** a
+`tests/analyzer.test.mjs` to hlídá. (Pro `.xlsx` se pořád dotahuje SheetJS
+z cdnjs — ten se bez sítě neobejde.)
+
+Patička vlevo dole píše `verze … · analyzér`, aby šlo i ze screenshotu
+poznat, které vydání má člověk otevřené.
+
+> Pozor na rozsah dat: kdo dostane Součtový výkaz za celý závod, uvidí
+> v analyzéru všechna jména. Má-li vedoucí vidět jen svoje lidi, musí mu
+> někdo předfiltrovat výkaz — panel zpracuje, co dostane.
+
 ## Týdny
 
 Mzdy umí Součtový výkaz vytisknout i za kratší období než měsíc. Stačí zadat

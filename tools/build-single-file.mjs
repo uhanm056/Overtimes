@@ -12,21 +12,38 @@
  *
  * Pořadí skriptů se bere přímo z index.html, takže se nemůže rozejít.
  *
- * Spuštění:  node tools/build-single-file.mjs [výstup.html]
+ * S přepínačem --analyzer vznikne vydání k rozeslání kolegům: bez karty
+ * „Veřejná verze pro kolegy“ a bez připojení k databázi. Kolega si otevře
+ * soubor, nahraje výkaz a vidí svoje čísla — nic víc nepotřebuje a nic
+ * neodchází ven.
+ *
+ * Spuštění:  node tools/build-single-file.mjs [výstup.html] [--analyzer]
  * Výchozí:   dist/prescasovy-panel-plana.html
+ *            dist/prescasovy-analyzer.html  (s --analyzer)
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = resolve(process.argv[2] || join(ROOT, 'dist', 'prescasovy-panel-plana.html'))
+const args = process.argv.slice(2)
+const ANALYZER = args.includes('--analyzer')
+const cesta = args.find((a) => !a.startsWith('--'))
+const out = resolve(cesta || join(ROOT, 'dist',
+  ANALYZER ? 'prescasovy-analyzer.html' : 'prescasovy-panel-plana.html'))
 
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8')
 
 /* Uvnitř <script> nesmí zůstat literál "</script>" — rozsekl by tag.
    V kódu i v datech se může objevit (parser pracuje s HTML výkazy). */
 const safe = (code) => code.replace(/<\/(script)/gi, '<\\/$1')
+
+/* Analyzér nesmí při otevření nic stáhnout. Písma z Google Fonts by poslala
+   IP adresu každého, kdo soubor otevře, a bez sítě by se stejně nenačetla —
+   stacky v styles.css mají systémové náhrady. */
+if (ANALYZER) {
+  html = html.replace(/[ \t]*<link rel="(?:preconnect|stylesheet)" href="https:\/\/fonts\.[^"]*"[^>]*>\n?/g, '')
+}
 
 // styly
 html = html.replace(
@@ -43,6 +60,13 @@ const hasLocal = existsSync(join(ROOT, LOCAL_DATA))
 const scripts = []
 html = html.replace(/[ \t]*<script(?: id="([\w-]+)")? src="([^"]+)"><\/script>\n?/g, (_, id, src) => {
   const from = src === 'data/months.js' && hasLocal ? LOCAL_DATA : src
+  /* Analyzér se k databázi nepřipojuje. Konfigurace by jen vedla k pokusu o
+     spojení, které kolega stejně nepotřebuje — a soubor tak neposílá nikam nic. */
+  if (ANALYZER && from === 'data/firebase.js') {
+    scripts.push(from)
+    return '\n<!-- analyzér: bez připojení k databázi -->\n<script>\n' +
+      'window.PP_ANALYZER = true\nwindow.PP_FIREBASE = null\n</script>\n'
+  }
   scripts.push(from)
   // id zůstává — generátor veřejné verze podle něj najde skript s daty
   return `\n<!-- ${from} -->\n<script${id ? ` id="${id}"` : ''}>\n` +
@@ -63,3 +87,6 @@ console.log(`   vloženo: styles.css + ${scripts.length} skriptů`)
 console.log(hasLocal
   ? '   data: ' + LOCAL_DATA + ' — REÁLNÁ, s osobními údaji. Soubor nikam nenahrávejte.'
   : '   data: žádná — panel startuje prázdný a naplní se importem')
+if (ANALYZER) {
+  console.log('   vydání: analyzér — bez publikování a bez připojení k databázi')
+}
