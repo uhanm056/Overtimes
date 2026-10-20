@@ -30,7 +30,21 @@ Vzorek pro testy a pro `build-public.mjs --demo` se generuje do
 | **Vývoj a srovnání** | Graf vývoje závodu, středisek i jednoho člověka přes všechny měsíce, volitelná dvojice období, Δ na KPI i střediska, největší změny u lidí, kdo přibyl a kdo vypadl |
 | **Roční limit** | Kdo je nejblíž stropu 416 h/rok, počty nad 150 h a 250 h, kontrola ročního součtu |
 | **Import výkazu** | Drag & drop Součtového výkazu, přidá nebo přepíše měsíc |
-| **Metodika** | Jak se počítá, legislativní kontext |
+| **Metodika** | Jak se počítá — naměřený vzorec nahoře, pak prahy, legislativa a čtení výkazu |
+
+### Jeden zápis hodin
+
+Výkaz i mzdový systém mluví v `h:mm`, Excel a výpočty v desetinných hodinách.
+Panel dlouho používal obojí a stávalo se, že v jedné tabulce stálo `61,1`
+i `61:05` — tatáž hodnota dvakrát jinak. Zápis se proto volí jednou pro celý
+panel, přepínačem **Hodiny** vlevo dole, a volba se pamatuje. Výchozí je
+`h:mm`, protože v něm přijdou čísla z mezd. Export do Excelu je výjimka —
+tam jdou obě podoby vedle sebe ve vlastních sloupcích, aby se s nimi dalo
+dál počítat.
+
+Pod hustými tabulkami stojí **vysvětlivka sloupců** — co je „Do MEZD“,
+„Evidence“, „Přesčas“ a „Ročně“ se z hlavičky odvodit nedá a hádat se to
+nemá.
 
 Jsou-li načtené aspoň dva měsíce, přibude u KPI a u tabulky středisek
 srovnání s předchozím měsícem (Δ na osobu i v součtu) a karta **Kdo přibyl

@@ -159,7 +159,7 @@ const dva = await page.evaluate(() => {
     stitek: document.querySelector('.card:has(.topc) .period-chip').textContent.trim(),
     vybrano: [...document.querySelectorAll('[data-topmonth][aria-pressed=true]')].map((b) => b.dataset.topmonth).sort().join(','),
     prvni: document.querySelector('.topc-item .topc-nums strong').textContent.trim(),
-    cekano: window.PP.h1(p.centers[0].total) + ' h',
+    cekano: window.PP.hrsU(p.centers[0].total),
     lidiVKarte: document.querySelectorAll('.topc-item:first-child .topc-people li:not(.more)').length,
   }
 })
