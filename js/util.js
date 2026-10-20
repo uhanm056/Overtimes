@@ -11,6 +11,8 @@ window.PP = window.PP || {}
     person: { warn: 40, crit: 60 },
     // průměr na osobu za středisko
     center: { warn: 35, crit: 45 },
+    // přesčas jednotlivce za týden; zákoník práce počítá 8 h/týden v průměru
+    week: { warn: 8, crit: 12 },
     // roční součet přesčasu
     year: { warn: 150, crit: 250, cap: 416 },
     /* Náklady na přesčas. Skutečné mzdy panel nezná a znát nemá — počítá se
@@ -86,6 +88,73 @@ window.PP = window.PP || {}
     const m = /^(\d{4})-(\d{2})$/.exec(key || '')
     if (!m) return key || '—'
     return Number(m[2]) + '/' + m[1]
+  }
+
+  /* ---------- týdny ----------
+     Součtový výkaz jde z mezd vytisknout i za kratší období než měsíc. Týden
+     se klíčuje podle ISO 8601 (týden začíná pondělím a patří do roku, do
+     kterého spadá jeho čtvrtek), ať se panel shoduje s tím, co lidem ukazuje
+     docházka i kalendář v Outlooku. */
+
+  const DAY = 86400000
+
+  /** Datum → { year, week } podle ISO 8601. */
+  PP.isoWeek = function (date) {
+    // posun na čtvrtek téhož týdne: ten určuje, do kterého roku týden patří
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const den = (d.getUTCDay() + 6) % 7            // pondělí = 0
+    d.setUTCDate(d.getUTCDate() - den + 3)
+    const ctvrtek = d.getTime()
+    const prvni = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+    const prvniDen = (prvni.getUTCDay() + 6) % 7
+    prvni.setUTCDate(prvni.getUTCDate() - prvniDen + 3)
+    return {
+      year: d.getUTCFullYear(),
+      week: 1 + Math.round((ctvrtek - prvni.getTime()) / (7 * DAY)),
+    }
+  }
+
+  /** Datum → klíč týdne "2026-W36". */
+  PP.weekKey = function (date) {
+    const w = PP.isoWeek(date)
+    return w.year + '-W' + String(w.week).padStart(2, '0')
+  }
+
+  PP.isWeekKey = function (key) { return /^\d{4}-W\d{2}$/.test(key || '') }
+
+  /** Pondělí daného ISO týdne. */
+  PP.weekStart = function (key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key || '')
+    if (!m) return null
+    const ctvrtek = new Date(Date.UTC(Number(m[1]), 0, 4))
+    const den = (ctvrtek.getUTCDay() + 6) % 7
+    ctvrtek.setUTCDate(ctvrtek.getUTCDate() - den + (Number(m[2]) - 1) * 7)
+    return ctvrtek
+  }
+
+  /** Klíč týdne → "36. týden 2026 (31. 8. – 6. 9.)". */
+  PP.weekName = function (key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key || '')
+    if (!m) return key || '—'
+    const od = PP.weekStart(key)
+    if (!od) return key
+    const doD = new Date(od.getTime() + 6 * DAY)
+    const d = (x) => x.getUTCDate() + '. ' + (x.getUTCMonth() + 1) + '.'
+    return Number(m[2]) + '. týden ' + m[1] + ' (' + d(od) + ' – ' + d(doD) + ')'
+  }
+
+  /** Klíč týdne → "36/2026". */
+  PP.weekShort = function (key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key || '')
+    return m ? Number(m[2]) + '/' + m[1] : (key || '—')
+  }
+
+  /** Název období podle toho, jestli je klíč měsíc nebo týden. */
+  PP.periodName = function (key) {
+    return PP.isWeekKey(key) ? PP.weekName(key) : PP.monthName(key)
+  }
+  PP.periodShort = function (key) {
+    return PP.isWeekKey(key) ? 'týden ' + PP.weekShort(key) : PP.monthShort(key)
   }
 
   /* ---------- text ---------- */

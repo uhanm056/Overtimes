@@ -316,6 +316,34 @@ serializací vyprázdní, takže se do výstupu nemůže dostat tabulka, která 
 zrovna na obrazovce. Hlídají to `tests/pubgen.test.mjs` a
 `tests/public.test.mjs` při každém běhu testů.
 
+## Týdny
+
+Mzdy umí Součtový výkaz vytisknout i za kratší období než měsíc. Stačí zadat
+období za jeden týden (`1.9.2026 - 7.9.2026`) a naimportovat ho jako každý
+jiný — panel pozná z hlavičky, že jde o týden, a uloží ho do sekce **Týdny**.
+
+Týdny se vedou **odděleně od měsíců**. Sečíst týden s měsícem, který ho
+obsahuje, by hodiny zdvojilo, takže se nikde nemíchají: měsíční pohledy
+zůstávají měsíční a týdenní týdenní.
+
+Přírůstek konta se u týdne počítá proti **předchozímu týdnu**, ne proti
+předchozímu měsíci. Nejstarší načtený týden proto nemá od čeho se odrazit a
+je označený, stejně jako u měsíců.
+
+Klíč týdne je podle ISO 8601 (týden začíná pondělím). Když výkaz pondělím
+nezačíná, bere se týden, do kterého spadá jeho první den; sekce vždycky vypíše
+i skutečné období z hlavičky, aby byl případný rozdíl vidět.
+
+Období, které není ani celý kalendářní měsíc, ani nanejvýš osm dní, panel
+**odmítne** — půlměsíc v jedné řadě s měsíci by znamenal sčítat nesrovnatelná
+období.
+
+### Prahy na týden
+
+**8 h / 12 h** na osobu. Zákoník práce počítá
+přesčas v průměru **8 h týdně** ve vyrovnávacím období, takže oranžová svítí
+od osmi hodin.
+
 ## Živé sdílení souhrnů
 
 Nahrávat soubor po každém importu je otrava. Když se zapne živé sdílení,

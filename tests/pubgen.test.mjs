@@ -83,7 +83,7 @@ const markup = html
   .replace(/<style[\s\S]*?<\/style>/gi, '')
 check('nezůstal vykreslený obsah panelů',
   /class="(card|kpi|tag)\b|data-pick=|link-person/.test(markup) ? 'zůstal' : 'ne', 'ne')
-check('prázdné panely', (markup.match(/<section class="panel"[^>]*><\/section>/g) || []).length, 8)
+check('prázdné panely', (markup.match(/<section class="panel"[^>]*><\/section>/g) || []).length, 9)
 
 /* ---------- výstup je funkční panel ---------- */
 const page2 = await browser.newPage({ viewport: { width: 1440, height: 1000 } })

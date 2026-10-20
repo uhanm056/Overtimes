@@ -2,7 +2,8 @@
 ;(function (PP) {
   'use strict'
 
-  const { esc, hm, h1, num, pct, czk, fold, mark, level, monthName, monthShort, centerName, $, $$ } = PP
+  const { esc, hm, h1, num, pct, czk, fold, mark, level, monthName, monthShort,
+    weekName, weekShort, periodName, centerName, $, $$ } = PP
   const CFG = PP.CFG
 
   const ICONS = {
@@ -11,6 +12,7 @@
     ranking: '<path d="M6 20v-6M12 20V4M18 20v-9"/>',
     compare: '<path d="M4 7h10M4 7l3-3M4 7l3 3M20 17H10M20 17l-3-3M20 17l-3 3"/>',
     period: '<path d="M3 20h18M7 20V9M12 20V4M17 20v-7"/>',
+    weeks: '<path d="M4 7h16v13H4zM4 7V4h16v3M9 3v4M15 3v4M8 13h3M8 17h8"/>',
     year: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 7v5l3.2 2"/>',
     import: '<path d="M12 3v11M8 10.5l4 4 4-4M4 20h16"/>',
     method: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.6"/>',
@@ -19,6 +21,7 @@
   const SECTIONS = [
     { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
     { id: 'period', label: 'Souhrn období', title: 'Souhrn za celé období', sub: 'Součet přes všechny načtené měsíce — hodiny, proplacení i náklady.' },
+    { id: 'weeks', label: 'Týdny', title: 'Týdny', sub: 'Přesčas po týdnech — z výkazů za týdenní období.' },
     { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska.' },
     { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
     { id: 'compare', label: 'Vývoj a srovnání', title: 'Vývoj a srovnání', sub: 'Jak se přesčas vyvíjí a co se změnilo mezi dvěma obdobími.' },
@@ -49,6 +52,7 @@
     topBy: 'total',      // TOP střediska: podle součtu, nebo Ø na osobu
     topOpen: {},         // rozbalená střediska v TOP přehledu
     topMonths: null,     // měsíce v TOP kartě; null = jen ten vybraný nahoře
+    week: null,          // vybraný týden v sekci Týdny
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
     personOpen: {},      // rozbalené měsíce v detailu člověka (rozpad složek)
@@ -113,7 +117,7 @@
     /* Souhrn za období sčítá všechny měsíce, takže by volič měsíce jen mátl —
      a zrovna tahle záměna je důvod, proč sekce vznikla. */
     const picker = document.querySelector('.month-picker')
-    if (picker) picker.hidden = id === 'period'
+    if (picker) picker.hidden = id === 'period' || id === 'weeks'
     render()
   }
 
@@ -179,10 +183,14 @@
   }
 
   /* ---------- ukázková data ---------- */
+  const MONTH_SECTIONS = ['overview', 'centers', 'ranking', 'compare', 'year']
+
   function renderDemoBanner() {
     const rec = currentMonth()
     const box = $('#demo-banner')
-    if (!rec || !rec.demo) { box.hidden = true; box.innerHTML = ''; return }
+    if (!rec || !rec.demo || !MONTH_SECTIONS.includes(ui.section)) {
+      box.hidden = true; box.innerHTML = ''; return
+    }
     box.hidden = false
     box.className = 'demo-banner'
     // Ve veřejném vydání není kam odkazovat — sekce Import tam neexistuje.
@@ -1278,6 +1286,148 @@
     }))
   }
 
+  /* ---------- Týdny ----------
+     Mzdy umí Součtový výkaz vytisknout i za týden. Takové výkazy drží panel
+     ve vlastní řadě vedle měsíců — sečíst týden s měsícem, který ho obsahuje,
+     by hodiny zdvojilo. */
+
+  const WEEK_TOP_PEOPLE = 15
+
+  function renderWeeks() {
+    const el = $('#panel-weeks')
+    const keys = PP.data.weekKeys()
+
+    if (!keys.length) {
+      el.innerHTML = `<div class="card"><div class="prose">
+        <h3>Zatím žádný týdenní výkaz</h3>
+        <p>Panel pozná týden sám: vytiskněte <strong>tentýž Součtový výkaz</strong>, jen
+        s obdobím za jeden týden (například <code>1.9.2026 - 7.9.2026</code>), a naimportujte
+        ho jako každý jiný. Měsíční výkazy tím nijak neutrpí — týdny se vedou zvlášť.</p>
+        <p class="hint">Období delší než osm dní, které není celý kalendářní měsíc, panel
+        odmítne; smíchat měsíce s půlměsíci by znamenalo sčítat nesrovnatelná období.</p>
+      </div></div>`
+      return
+    }
+
+    if (!ui.week || !keys.includes(ui.week)) ui.week = keys[0]
+    const rec = PP.data.week(ui.week)
+    const s2 = PP.stats(rec)
+    const prevKey = keys[keys.indexOf(ui.week) + 1] || null
+    const prev = prevKey ? PP.stats(PP.data.week(prevKey)) : null
+
+    const vyber = `<div class="month-pick" role="group" aria-label="Výběr týdne">
+      <span class="month-pick-label">Týden:</span>
+      ${keys.map((k) => `<button type="button" class="chip sm" data-week="${esc(k)}"
+        aria-pressed="${k === ui.week}">${esc(weekShort(k))}</button>`).join('')}
+    </div>`
+
+    const delta = (now, before, fmt) => before == null ? ''
+      : `proti ${weekShort(prevKey)} ${now - before >= 0 ? '+' : '−'}${fmt(Math.abs(now - before))}`
+
+    const kpis = `<div class="grid kpis">
+      ${kpi('Přesčas celkem', h1(s2.total) + ' h', delta(s2.total, prev && prev.total, (v) => h1(v) + ' h'))}
+      ${kpi('Lidí s přesčasem', num(s2.withOvertime), `z ${num(rec.people)} osob`)}
+      ${kpi('Ø na osobu', hm(s2.avg), delta(s2.avg, prev && prev.avg, hm), level(s2.avg, CFG.week))}
+      ${kpi('Nad ' + CFG.week.crit + ' h za týden', num(s2.ranking.filter((r) => r.t >= CFG.week.crit).length),
+        `nad ${CFG.week.warn} h: ${num(s2.ranking.filter((r) => r.t >= CFG.week.warn).length)}`,
+        s2.ranking.some((r) => r.t >= CFG.week.crit) ? 'crit' : '')}
+    </div>`
+
+    const graf = keys.length < 2 ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Vývoj po týdnech</h2>
+        <span class="hint">${esc(weekShort(keys[keys.length - 1]))} – ${esc(weekShort(keys[0]))} · přesčas celkem</span>
+      </div>
+      <div class="chart-host" id="chart-weeks"></div>
+    </div>`
+
+    const strediska = `<div class="card">
+      <div class="card-head">
+        <h2>Střediska <span class="period-chip">${esc(weekShort(ui.week))}</span></h2>
+        <span class="hint">${num(s2.centers.length)} středisek · práh ${CFG.week.warn} h / ${CFG.week.crit} h na osobu</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Středisko</th><th class="num">Lidí</th><th class="num">Přesčas</th>
+          <th class="num">Ø / osoba</th><th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th></tr></thead>
+        <tbody>${s2.byTotal.map((c) => {
+          const lvl = level(c.avg, CFG.week)
+          return `<tr>
+            <td><button type="button" class="link-center" data-center="${esc(c.name)}"
+              title="Otevřít detail střediska">${esc(c.name)}</button>
+              ${lvl ? ` <span class="tag ${lvl}">${lvl === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
+            <td class="num">${num(c.people)}</td>
+            <td class="num">${h1(c.total)}</td>
+            <td class="num">${hm(c.avg)}</td>
+            <td class="num">${h1(c.m)}</td>
+            <td class="num">${h1(c.e)}</td>
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    const lide = PUBLIC ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Nejvíc přesčasu <span class="period-chip">${esc(weekShort(ui.week))}</span></h2>
+        <span class="hint">${WEEK_TOP_PEOPLE} lidí</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th class="rank">#</th><th>Jméno</th><th>Středisko</th>
+          <th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>
+          <th class="num">Přesčas</th></tr></thead>
+        <tbody>${s2.ranking.slice(0, WEEK_TOP_PEOPLE).map((r, i) => {
+          const lvl = level(r.t, CFG.week)
+          return `<tr>
+            <td class="rank">${i + 1}</td>
+            <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+              title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button></td>
+            <td>${esc(r.s)}</td>
+            <td class="num">${hm(r.m)}</td>
+            <td class="num">${hm(r.de != null ? r.de : r.e)}</td>
+            <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    /* Výkaz nemusí začínat pondělím. Klíč se bere podle ISO týdne, ve kterém
+       období začíná, ale ukázat se musí to, co je ve výkazu doopravdy. */
+    const rozsah = `<p class="hint" style="margin:0 0 18px">
+      ${esc(weekName(ui.week))} · ve výkazu období <strong>${esc(rec.period || '—')}</strong>${rec.methodIncomplete
+        ? ' · <strong>nejstarší načtený týden</strong>, přírůstek konta se u něj nemá od čeho odrazit'
+        : ''}
+    </p>`
+
+    el.innerHTML = vyber + rozsah + kpis + graf + strediska + lide
+
+    if (keys.length > 1) drawWeekChart(keys)
+    PP.watchCharts(() => { if (PP.data.weekKeys().length > 1) drawWeekChart(PP.data.weekKeys()) })
+    bindCenterLinks('#panel-weeks')
+    if (!PUBLIC) bindPersonLinks('#panel-weeks')
+    $$('#panel-weeks [data-week]').forEach((b) => b.addEventListener('click', () => {
+      ui.week = b.dataset.week
+      renderWeeks()
+    }))
+  }
+
+  function drawWeekChart(keys) {
+    const host = $('#chart-weeks')
+    if (!host) return
+    const rada = keys.slice().reverse()          // od nejstaršího
+    PP.lineChart(host, {
+      labels: rada.map(weekShort),
+      format: (v) => h1(v) + ' h',
+      tickFormat: (v) => h1(v),
+      area: true,
+      height: 250,
+      ariaLabel: 'Přesčas závodu po týdnech',
+      series: [{
+        name: 'Přesčas celkem',
+        color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0f9e91',
+        values: rada.map((k) => PP.stats(PP.data.week(k)).total),
+      }],
+    })
+  }
+
   /* ---------- Souhrn za období ----------
      Přehled ukazuje jeden měsíc. Tahle sekce sčítá všechny načtené měsíce
      dohromady a přidává to, co z hodin plyne v penězích. */
@@ -1596,7 +1746,7 @@
   /* ---------- Import ---------- */
   function renderImport() {
     const el = $('#panel-import')
-    const keys = PP.data.keys()
+    const keys = PP.data.allKeys()
 
     el.innerHTML = `<div class="card">
       <div class="card-head">
@@ -1615,21 +1765,21 @@
 
     <div class="card">
       <div class="card-head">
-        <h2>Načtené měsíce</h2>
-        <span class="hint">${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</span>
+        <h2>Načtená období</h2>
+        <span class="hint">${keys.length} ${keys.length === 1 ? 'období' : 'období'}</span>
       </div>
 
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>Měsíc</th><th>Období</th><th class="num">Lidí</th><th class="num">Přesčas</th>
+          <th>Období</th><th>Rozsah</th><th class="num">Lidí</th><th class="num">Přesčas</th>
           <th>Zdroj</th><th>Soubor</th><th></th>
         </tr></thead>
         <tbody>${keys.map((k) => {
-          const rec = PP.data.month(k)
+          const rec = PP.data.record(k)
           const st = PP.stats(rec)
           const imported = PP.data.isImported(k)
           return `<tr>
-            <td>${esc(monthName(k))}</td>
+            <td>${esc(periodName(k))}</td>
             <td>${esc(rec.period || '—')}</td>
             <td class="num">${num(st.withOvertime)}</td>
             <td class="num">${h1(st.total)} h</td>
@@ -1687,9 +1837,9 @@
     })
     $$('#panel-import [data-remove]').forEach((b) => b.addEventListener('click', async () => {
       const key = b.dataset.remove
-      if (!window.confirm(`Opravdu smazat naimportovaný měsíc ${monthName(key)}?`)) return
+      if (!window.confirm(`Opravdu smazat naimportované období ${periodName(key)}?`)) return
       await PP.data.removeMonth(key)
-      log('ok', `${monthName(key)} smazán.`)
+      log('ok', `${periodName(key)} smazáno.`)
       refreshAll()
     }))
 
@@ -1973,15 +2123,17 @@
       const busy = log('busy', `Zpracovávám <strong>${esc(file.name)}</strong>…`)
       try {
         const { key, record, kind, skipped } = await PP.parseReport(file)
-        const replaced = PP.data.month(key)
+        const replaced = PP.data.record(key)
         await PP.data.addMonth(key, record)
-        const st = PP.stats(PP.data.month(key))
+        // týden i měsíc chodí stejnou cestou, jen se ukládají jinam
+        const st = PP.stats(PP.data.record(key))
         busy.kind = 'ok'
-        busy.html = `<strong>${esc(monthName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
+        busy.html = `<strong>${esc(periodName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
           ${num(st.withOvertime)} lidí s přesčasem, ${h1(st.total)} h, ${num(record.people)} osob ve výkazu.
           <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>
           ${compSummary(record)}`
-        ui.month = key
+        if (PP.isWeekKey(key)) ui.week = key
+        else ui.month = key
       } catch (err) {
         busy.kind = 'err'
         busy.html = `<strong>${esc(file.name)}</strong> — ${esc(err && err.message ? err.message : String(err))}`
@@ -2122,6 +2274,7 @@
       case 'centers': return renderCenters()
       case 'ranking': return renderRanking()
       case 'compare': return renderCompare()
+      case 'weeks': return renderWeeks()
       case 'period': return renderPeriod()
       case 'year': return renderYear()
       case 'import': {

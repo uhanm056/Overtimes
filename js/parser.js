@@ -196,15 +196,39 @@ window.PP = window.PP || {}
     return null
   }
 
-  /** "1.8.2026 - 31.8.2026" → { key: '2026-08', period: '1. 8. – 31. 8. 2026', rawPeriod } */
+  /**
+   * "1.8.2026 - 31.8.2026" → { key: '2026-08', grain: 'month', … }
+   * "1.9.2026 - 7.9.2026"  → { key: '2026-W36', grain: 'week', … }
+   *
+   * Rozlišuje se podle rozsahu: celý kalendářní měsíc je měsíc, nanejvýš
+   * osm dní je týden. Cokoli mezi tím panel odmítne — smíchat v jedné řadě
+   * měsíce s půlměsíci by znamenalo sčítat nesrovnatelná období.
+   */
   function describePeriod(m) {
-    const [, d1, m1, y1, d2, m2, y2] = m.map(String)
-    const key = y1 + '-' + String(Number(m1)).padStart(2, '0')
-    const left = Number(y1) === Number(y2) && Number(m1) === Number(m2)
-      ? `${Number(d1)}. ${Number(m1)}.`
-      : `${Number(d1)}. ${Number(m1)}. ${y1}`
-    const period = `${left} – ${Number(d2)}. ${Number(m2)}. ${y2}`
-    return { key, period, rawPeriod: m[0].trim() }
+    const [, d1, m1, y1, d2, m2, y2] = m.map(Number)
+    const od = new Date(y1, m1 - 1, d1)
+    const doD = new Date(y2, m2 - 1, d2)
+    if (isNaN(od) || isNaN(doD) || doD < od) {
+      throw new Error('Období ve výkazu nedává smysl: ' + m[0].trim())
+    }
+
+    const dni = Math.round((doD - od) / 86400000) + 1
+    const celyMesic = d1 === 1 && y1 === y2 && m1 === m2 &&
+      d2 === new Date(y2, m2, 0).getDate()
+
+    const left = y1 === y2 && m1 === m2 ? `${d1}. ${m1}.` : `${d1}. ${m1}. ${y1}`
+    const period = `${left} – ${d2}. ${m2}. ${y2}`
+
+    if (celyMesic) {
+      return { key: y1 + '-' + String(m1).padStart(2, '0'), grain: 'month', period, rawPeriod: m[0].trim() }
+    }
+    if (dni <= 8) {
+      return { key: PP.weekKey(od), grain: 'week', period, rawPeriod: m[0].trim() }
+    }
+    throw new Error(
+      `Období ${m[0].trim()} není ani celý měsíc, ani týden (${dni} dní). ` +
+      'Panel umí výkaz za kalendářní měsíc, nebo za jeden týden.'
+    )
   }
 
   /* ---------- hodnoty ---------- */
@@ -384,9 +408,11 @@ window.PP = window.PP || {}
 
     return {
       key: period.key,
+      grain: period.grain,
       kind,
       skipped,
       record: {
+        grain: period.grain,
         period: period.period,
         rawPeriod: period.rawPeriod,
         // pojistka pro výkazy bez osobních čísel — stav nesmí být menší

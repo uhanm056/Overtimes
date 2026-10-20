@@ -6,6 +6,7 @@ window.PP = window.PP || {}
 
   const state = {
     months: {},        // 'YYYY-MM' → record
+    weeks: {},         // 'YYYY-Www' → record; drží se odděleně od měsíců
     imported: {},      // podmnožina, kterou lze smazat
     method: null,      // 'move' | 'balance' | 'unclear' | null — co znamená sloupec evidence
     methodInfo: null,  // čím se to rozhodlo
@@ -19,12 +20,32 @@ window.PP = window.PP || {}
       const builtin = window.PP_BUILTIN_MONTHS || {}
       state.imported = await PP.store.loadImported()
       state.months = {}
-      for (const key in builtin) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
-      for (const key in state.imported) {
-        state.months[key] = Object.assign({ source: 'imported' }, state.imported[key])
+      state.weeks = {}
+      /* Týdenní výkazy se poznají podle klíče a jdou do vlastní řady. Smíchat
+         je s měsíci by znamenalo sčítat týden s měsícem, který ho obsahuje. */
+      const put = (key, rec, source) => {
+        const cil = PP.isWeekKey(key) ? state.weeks : state.months
+        cil[key] = Object.assign({ source }, rec)
       }
+      for (const key in builtin) put(key, builtin[key], 'builtin')
+      for (const key in state.imported) put(key, state.imported[key], 'imported')
       applyMethodology()
       return state.months
+    },
+
+    /** Klíče týdnů od nejnovějšího. */
+    weekKeys() {
+      return Object.keys(state.weeks).sort().reverse()
+    },
+
+    week(key) { return state.weeks[key] || null },
+
+    /** Záznam podle klíče, ať je to měsíc nebo týden. */
+    record(key) { return (PP.isWeekKey(key) ? state.weeks : state.months)[key] || null },
+
+    /** Klíče všech období, měsíce i týdny — pro import a mazání. */
+    allKeys() {
+      return Object.keys(state.months).concat(Object.keys(state.weeks)).sort().reverse()
     },
 
     /** Co vyšlo z měření: 'move', 'balance', 'unclear', nebo null když není co měřit. */
@@ -53,7 +74,8 @@ window.PP = window.PP || {}
     async addMonth(key, record) {
       await PP.store.saveImported(key, record)
       state.imported[key] = record
-      state.months[key] = Object.assign({ source: 'imported' }, record)
+      const cil = PP.isWeekKey(key) ? state.weeks : state.months
+      cil[key] = Object.assign({ source: 'imported' }, record)
       applyMethodology()
     },
 
@@ -77,8 +99,9 @@ window.PP = window.PP || {}
       await PP.store.removeImported(key)
       delete state.imported[key]
       const builtin = window.PP_BUILTIN_MONTHS || {}
-      if (builtin[key]) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
-      else delete state.months[key]
+      const cil = PP.isWeekKey(key) ? state.weeks : state.months
+      if (builtin[key]) cil[key] = Object.assign({ source: 'builtin' }, builtin[key])
+      else delete cil[key]
       applyMethodology()
     },
   }
@@ -101,20 +124,20 @@ window.PP = window.PP || {}
   /* Ukázkové měsíce se do měření nepočítají a nepřepočítávají. Je to
      vygenerovaný vzorek a nemá rozhodovat, jak se čtou reálné výkazy —
      ani se jím nechat přepsat. */
-  function realKeys() {
-    return Object.keys(state.months)
-      .filter((k) => state.months[k] && !state.months[k].demo && state.months[k].rows)
+  function realKeys(bucket) {
+    return Object.keys(bucket)
+      .filter((k) => bucket[k] && !bucket[k].demo && bucket[k].rows)
       .sort()
   }
 
-  function measureMethod(keys) {
+  function measureMethod(bucket, keys) {
     let checked = 0
     let okMove = 0
     let okBalance = 0
 
     for (let i = 1; i < keys.length; i++) {
-      const cur = state.months[keys[i]]
-      const prev = state.months[keys[i - 1]]
+      const cur = bucket[keys[i]]
+      const prev = bucket[keys[i - 1]]
       if (!cur || !prev || !cur.rows || !prev.rows) continue
       const prevById = new Map(prev.rows.map((r) => [String(r.o), r]))
       for (const row of cur.rows) {
@@ -137,10 +160,22 @@ window.PP = window.PP || {}
 
   /** Dosadí do každého řádku `t` podle toho, co měření ukázalo. */
   function applyMethodology() {
-    const keys = realKeys()
-    const info = measureMethod(keys)
-    state.method = info.verdict
-    state.methodInfo = info
+    applyTo(state.months)
+    /* Týdny tvoří vlastní řadu: přírůstek konta se u nich počítá proti
+       předchozímu týdnu, ne proti předchozímu měsíci. */
+    applyTo(state.weeks)
+    cache = new WeakMap()
+  }
+
+  function applyTo(bucket) {
+    const keys = realKeys(bucket)
+    const info = measureMethod(bucket, keys)
+    /* Rozhoduje měsíční řada; týdny jen přebírají, co se u nich naměří.
+       Když se v týdnech nic měřit nedá, zůstává verdikt z měsíců. */
+    if (bucket === state.months || info.checked) {
+      state.method = info.verdict
+      state.methodInfo = info
+    }
 
     /* Agregáty z webu řádky s lidmi nemají, takže se v nich nedá nic změřit.
        Metodiku s sebou nesou od toho, kdo je zveřejnil — bez ní by veřejná
@@ -153,8 +188,8 @@ window.PP = window.PP || {}
     }
 
     // ukázkové měsíce zůstávají, jak jsou
-    for (const k of Object.keys(state.months)) {
-      const rec = state.months[k]
+    for (const k of Object.keys(bucket)) {
+      const rec = bucket[k]
       if (!rec || !rec.rows || !rec.demo) continue
       rec.methodIncomplete = false
       for (const row of rec.rows) {
@@ -165,9 +200,9 @@ window.PP = window.PP || {}
     }
 
     for (let i = 0; i < keys.length; i++) {
-      const rec = state.months[keys[i]]
+      const rec = bucket[keys[i]]
       if (!rec || !rec.rows) continue
-      const prev = i > 0 ? state.months[keys[i - 1]] : null
+      const prev = i > 0 ? bucket[keys[i - 1]] : null
       const prevById = prev && prev.rows
         ? new Map(prev.rows.map((r) => [String(r.o), r]))
         : null
@@ -186,7 +221,6 @@ window.PP = window.PP || {}
         row.t = p ? round2(row.m + row.de) : row.tRaw
       }
     }
-    cache = new WeakMap()
   }
 
   PP.measureMethod = measureMethod
