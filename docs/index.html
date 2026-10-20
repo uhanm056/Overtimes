@@ -715,7 +715,7 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 }
 </style>
 <meta name="robots" content="noindex">
-<meta name="generator" content="build-public.mjs · 2026-10-15">
+<meta name="generator" content="build-public.mjs · 2026-10-20">
 </head>
 <body>
 
@@ -765,6 +765,7 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 
     <div class="content">
       <section class="panel" id="panel-overview" aria-labelledby="section-title"></section>
+      <section class="panel" id="panel-weeks" hidden></section>
       <section class="panel" id="panel-centers" hidden></section>
       <section class="panel" id="panel-ranking" hidden></section>
       <section class="panel" id="panel-compare" hidden></section>
@@ -820,6 +821,8 @@ window.PP = window.PP || {}
     person: { warn: 40, crit: 60 },
     // průměr na osobu za středisko
     center: { warn: 35, crit: 45 },
+    // přesčas jednotlivce za týden; zákoník práce počítá 8 h/týden v průměru
+    week: { warn: 8, crit: 12 },
     // roční součet přesčasu
     year: { warn: 150, crit: 250, cap: 416 },
     /* Náklady na přesčas. Skutečné mzdy panel nezná a znát nemá — počítá se
@@ -895,6 +898,73 @@ window.PP = window.PP || {}
     const m = /^(\d{4})-(\d{2})$/.exec(key || '')
     if (!m) return key || '—'
     return Number(m[2]) + '/' + m[1]
+  }
+
+  /* ---------- týdny ----------
+     Součtový výkaz jde z mezd vytisknout i za kratší období než měsíc. Týden
+     se klíčuje podle ISO 8601 (týden začíná pondělím a patří do roku, do
+     kterého spadá jeho čtvrtek), ať se panel shoduje s tím, co lidem ukazuje
+     docházka i kalendář v Outlooku. */
+
+  const DAY = 86400000
+
+  /** Datum → { year, week } podle ISO 8601. */
+  PP.isoWeek = function (date) {
+    // posun na čtvrtek téhož týdne: ten určuje, do kterého roku týden patří
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const den = (d.getUTCDay() + 6) % 7            // pondělí = 0
+    d.setUTCDate(d.getUTCDate() - den + 3)
+    const ctvrtek = d.getTime()
+    const prvni = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+    const prvniDen = (prvni.getUTCDay() + 6) % 7
+    prvni.setUTCDate(prvni.getUTCDate() - prvniDen + 3)
+    return {
+      year: d.getUTCFullYear(),
+      week: 1 + Math.round((ctvrtek - prvni.getTime()) / (7 * DAY)),
+    }
+  }
+
+  /** Datum → klíč týdne "2026-W36". */
+  PP.weekKey = function (date) {
+    const w = PP.isoWeek(date)
+    return w.year + '-W' + String(w.week).padStart(2, '0')
+  }
+
+  PP.isWeekKey = function (key) { return /^\d{4}-W\d{2}$/.test(key || '') }
+
+  /** Pondělí daného ISO týdne. */
+  PP.weekStart = function (key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key || '')
+    if (!m) return null
+    const ctvrtek = new Date(Date.UTC(Number(m[1]), 0, 4))
+    const den = (ctvrtek.getUTCDay() + 6) % 7
+    ctvrtek.setUTCDate(ctvrtek.getUTCDate() - den + (Number(m[2]) - 1) * 7)
+    return ctvrtek
+  }
+
+  /** Klíč týdne → "36. týden 2026 (31. 8. – 6. 9.)". */
+  PP.weekName = function (key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key || '')
+    if (!m) return key || '—'
+    const od = PP.weekStart(key)
+    if (!od) return key
+    const doD = new Date(od.getTime() + 6 * DAY)
+    const d = (x) => x.getUTCDate() + '. ' + (x.getUTCMonth() + 1) + '.'
+    return Number(m[2]) + '. týden ' + m[1] + ' (' + d(od) + ' – ' + d(doD) + ')'
+  }
+
+  /** Klíč týdne → "36/2026". */
+  PP.weekShort = function (key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key || '')
+    return m ? Number(m[2]) + '/' + m[1] : (key || '—')
+  }
+
+  /** Název období podle toho, jestli je klíč měsíc nebo týden. */
+  PP.periodName = function (key) {
+    return PP.isWeekKey(key) ? PP.weekName(key) : PP.monthName(key)
+  }
+  PP.periodShort = function (key) {
+    return PP.isWeekKey(key) ? 'týden ' + PP.weekShort(key) : PP.monthShort(key)
   }
 
   /* ---------- text ---------- */
@@ -1241,15 +1311,39 @@ window.PP = window.PP || {}
     return null
   }
 
-  /** "1.8.2026 - 31.8.2026" → { key: '2026-08', period: '1. 8. – 31. 8. 2026', rawPeriod } */
+  /**
+   * "1.8.2026 - 31.8.2026" → { key: '2026-08', grain: 'month', … }
+   * "1.9.2026 - 7.9.2026"  → { key: '2026-W36', grain: 'week', … }
+   *
+   * Rozlišuje se podle rozsahu: celý kalendářní měsíc je měsíc, nanejvýš
+   * osm dní je týden. Cokoli mezi tím panel odmítne — smíchat v jedné řadě
+   * měsíce s půlměsíci by znamenalo sčítat nesrovnatelná období.
+   */
   function describePeriod(m) {
-    const [, d1, m1, y1, d2, m2, y2] = m.map(String)
-    const key = y1 + '-' + String(Number(m1)).padStart(2, '0')
-    const left = Number(y1) === Number(y2) && Number(m1) === Number(m2)
-      ? `${Number(d1)}. ${Number(m1)}.`
-      : `${Number(d1)}. ${Number(m1)}. ${y1}`
-    const period = `${left} – ${Number(d2)}. ${Number(m2)}. ${y2}`
-    return { key, period, rawPeriod: m[0].trim() }
+    const [, d1, m1, y1, d2, m2, y2] = m.map(Number)
+    const od = new Date(y1, m1 - 1, d1)
+    const doD = new Date(y2, m2 - 1, d2)
+    if (isNaN(od) || isNaN(doD) || doD < od) {
+      throw new Error('Období ve výkazu nedává smysl: ' + m[0].trim())
+    }
+
+    const dni = Math.round((doD - od) / 86400000) + 1
+    const celyMesic = d1 === 1 && y1 === y2 && m1 === m2 &&
+      d2 === new Date(y2, m2, 0).getDate()
+
+    const left = y1 === y2 && m1 === m2 ? `${d1}. ${m1}.` : `${d1}. ${m1}. ${y1}`
+    const period = `${left} – ${d2}. ${m2}. ${y2}`
+
+    if (celyMesic) {
+      return { key: y1 + '-' + String(m1).padStart(2, '0'), grain: 'month', period, rawPeriod: m[0].trim() }
+    }
+    if (dni <= 8) {
+      return { key: PP.weekKey(od), grain: 'week', period, rawPeriod: m[0].trim() }
+    }
+    throw new Error(
+      `Období ${m[0].trim()} není ani celý měsíc, ani týden (${dni} dní). ` +
+      'Panel umí výkaz za kalendářní měsíc, nebo za jeden týden.'
+    )
   }
 
   /* ---------- hodnoty ---------- */
@@ -1429,9 +1523,11 @@ window.PP = window.PP || {}
 
     return {
       key: period.key,
+      grain: period.grain,
       kind,
       skipped,
       record: {
+        grain: period.grain,
         period: period.period,
         rawPeriod: period.rawPeriod,
         // pojistka pro výkazy bez osobních čísel — stav nesmí být menší
@@ -1879,6 +1975,7 @@ window.PP = window.PP || {}
 
   const state = {
     months: {},        // 'YYYY-MM' → record
+    weeks: {},         // 'YYYY-Www' → record; drží se odděleně od měsíců
     imported: {},      // podmnožina, kterou lze smazat
     method: null,      // 'move' | 'balance' | 'unclear' | null — co znamená sloupec evidence
     methodInfo: null,  // čím se to rozhodlo
@@ -1892,12 +1989,32 @@ window.PP = window.PP || {}
       const builtin = window.PP_BUILTIN_MONTHS || {}
       state.imported = await PP.store.loadImported()
       state.months = {}
-      for (const key in builtin) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
-      for (const key in state.imported) {
-        state.months[key] = Object.assign({ source: 'imported' }, state.imported[key])
+      state.weeks = {}
+      /* Týdenní výkazy se poznají podle klíče a jdou do vlastní řady. Smíchat
+         je s měsíci by znamenalo sčítat týden s měsícem, který ho obsahuje. */
+      const put = (key, rec, source) => {
+        const cil = PP.isWeekKey(key) ? state.weeks : state.months
+        cil[key] = Object.assign({ source }, rec)
       }
+      for (const key in builtin) put(key, builtin[key], 'builtin')
+      for (const key in state.imported) put(key, state.imported[key], 'imported')
       applyMethodology()
       return state.months
+    },
+
+    /** Klíče týdnů od nejnovějšího. */
+    weekKeys() {
+      return Object.keys(state.weeks).sort().reverse()
+    },
+
+    week(key) { return state.weeks[key] || null },
+
+    /** Záznam podle klíče, ať je to měsíc nebo týden. */
+    record(key) { return (PP.isWeekKey(key) ? state.weeks : state.months)[key] || null },
+
+    /** Klíče všech období, měsíce i týdny — pro import a mazání. */
+    allKeys() {
+      return Object.keys(state.months).concat(Object.keys(state.weeks)).sort().reverse()
     },
 
     /** Co vyšlo z měření: 'move', 'balance', 'unclear', nebo null když není co měřit. */
@@ -1926,7 +2043,8 @@ window.PP = window.PP || {}
     async addMonth(key, record) {
       await PP.store.saveImported(key, record)
       state.imported[key] = record
-      state.months[key] = Object.assign({ source: 'imported' }, record)
+      const cil = PP.isWeekKey(key) ? state.weeks : state.months
+      cil[key] = Object.assign({ source: 'imported' }, record)
       applyMethodology()
     },
 
@@ -1950,8 +2068,9 @@ window.PP = window.PP || {}
       await PP.store.removeImported(key)
       delete state.imported[key]
       const builtin = window.PP_BUILTIN_MONTHS || {}
-      if (builtin[key]) state.months[key] = Object.assign({ source: 'builtin' }, builtin[key])
-      else delete state.months[key]
+      const cil = PP.isWeekKey(key) ? state.weeks : state.months
+      if (builtin[key]) cil[key] = Object.assign({ source: 'builtin' }, builtin[key])
+      else delete cil[key]
       applyMethodology()
     },
   }
@@ -1974,20 +2093,20 @@ window.PP = window.PP || {}
   /* Ukázkové měsíce se do měření nepočítají a nepřepočítávají. Je to
      vygenerovaný vzorek a nemá rozhodovat, jak se čtou reálné výkazy —
      ani se jím nechat přepsat. */
-  function realKeys() {
-    return Object.keys(state.months)
-      .filter((k) => state.months[k] && !state.months[k].demo && state.months[k].rows)
+  function realKeys(bucket) {
+    return Object.keys(bucket)
+      .filter((k) => bucket[k] && !bucket[k].demo && bucket[k].rows)
       .sort()
   }
 
-  function measureMethod(keys) {
+  function measureMethod(bucket, keys) {
     let checked = 0
     let okMove = 0
     let okBalance = 0
 
     for (let i = 1; i < keys.length; i++) {
-      const cur = state.months[keys[i]]
-      const prev = state.months[keys[i - 1]]
+      const cur = bucket[keys[i]]
+      const prev = bucket[keys[i - 1]]
       if (!cur || !prev || !cur.rows || !prev.rows) continue
       const prevById = new Map(prev.rows.map((r) => [String(r.o), r]))
       for (const row of cur.rows) {
@@ -2010,10 +2129,22 @@ window.PP = window.PP || {}
 
   /** Dosadí do každého řádku `t` podle toho, co měření ukázalo. */
   function applyMethodology() {
-    const keys = realKeys()
-    const info = measureMethod(keys)
-    state.method = info.verdict
-    state.methodInfo = info
+    applyTo(state.months)
+    /* Týdny tvoří vlastní řadu: přírůstek konta se u nich počítá proti
+       předchozímu týdnu, ne proti předchozímu měsíci. */
+    applyTo(state.weeks)
+    cache = new WeakMap()
+  }
+
+  function applyTo(bucket) {
+    const keys = realKeys(bucket)
+    const info = measureMethod(bucket, keys)
+    /* Rozhoduje měsíční řada; týdny jen přebírají, co se u nich naměří.
+       Když se v týdnech nic měřit nedá, zůstává verdikt z měsíců. */
+    if (bucket === state.months || info.checked) {
+      state.method = info.verdict
+      state.methodInfo = info
+    }
 
     /* Agregáty z webu řádky s lidmi nemají, takže se v nich nedá nic změřit.
        Metodiku s sebou nesou od toho, kdo je zveřejnil — bez ní by veřejná
@@ -2026,8 +2157,8 @@ window.PP = window.PP || {}
     }
 
     // ukázkové měsíce zůstávají, jak jsou
-    for (const k of Object.keys(state.months)) {
-      const rec = state.months[k]
+    for (const k of Object.keys(bucket)) {
+      const rec = bucket[k]
       if (!rec || !rec.rows || !rec.demo) continue
       rec.methodIncomplete = false
       for (const row of rec.rows) {
@@ -2038,9 +2169,9 @@ window.PP = window.PP || {}
     }
 
     for (let i = 0; i < keys.length; i++) {
-      const rec = state.months[keys[i]]
+      const rec = bucket[keys[i]]
       if (!rec || !rec.rows) continue
-      const prev = i > 0 ? state.months[keys[i - 1]] : null
+      const prev = i > 0 ? bucket[keys[i - 1]] : null
       const prevById = prev && prev.rows
         ? new Map(prev.rows.map((r) => [String(r.o), r]))
         : null
@@ -2059,7 +2190,6 @@ window.PP = window.PP || {}
         row.t = p ? round2(row.m + row.de) : row.tRaw
       }
     }
-    cache = new WeakMap()
   }
 
   PP.measureMethod = measureMethod
@@ -2958,7 +3088,8 @@ window.PP = window.PP || {}
 ;(function (PP) {
   'use strict'
 
-  const { esc, hm, h1, num, pct, czk, fold, mark, level, monthName, monthShort, centerName, $, $$ } = PP
+  const { esc, hm, h1, num, pct, czk, fold, mark, level, monthName, monthShort,
+    weekName, weekShort, periodName, centerName, $, $$ } = PP
   const CFG = PP.CFG
 
   const ICONS = {
@@ -2967,6 +3098,7 @@ window.PP = window.PP || {}
     ranking: '<path d="M6 20v-6M12 20V4M18 20v-9"/>',
     compare: '<path d="M4 7h10M4 7l3-3M4 7l3 3M20 17H10M20 17l-3-3M20 17l-3 3"/>',
     period: '<path d="M3 20h18M7 20V9M12 20V4M17 20v-7"/>',
+    weeks: '<path d="M4 7h16v13H4zM4 7V4h16v3M9 3v4M15 3v4M8 13h3M8 17h8"/>',
     year: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 7v5l3.2 2"/>',
     import: '<path d="M12 3v11M8 10.5l4 4 4-4M4 20h16"/>',
     method: '<path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.6"/>',
@@ -2975,6 +3107,7 @@ window.PP = window.PP || {}
   const SECTIONS = [
     { id: 'overview', label: 'Přehled', title: 'Přehled', sub: 'Celkový obrázek za vybraný měsíc.' },
     { id: 'period', label: 'Souhrn období', title: 'Souhrn za celé období', sub: 'Součet přes všechny načtené měsíce — hodiny, proplacení i náklady.' },
+    { id: 'weeks', label: 'Týdny', title: 'Týdny', sub: 'Přesčas po týdnech — z výkazů za týdenní období.' },
     { id: 'centers', label: 'Střediska', title: 'Střediska', sub: 'Detail jednoho střediska.' },
     { id: 'ranking', label: 'Žebříček závodu', title: 'Žebříček závodu', sub: 'Kdo v závodě odpracoval nejvíc přesčasu.' },
     { id: 'compare', label: 'Vývoj a srovnání', title: 'Vývoj a srovnání', sub: 'Jak se přesčas vyvíjí a co se změnilo mezi dvěma obdobími.' },
@@ -3005,6 +3138,7 @@ window.PP = window.PP || {}
     topBy: 'total',      // TOP střediska: podle součtu, nebo Ø na osobu
     topOpen: {},         // rozbalená střediska v TOP přehledu
     topMonths: null,     // měsíce v TOP kartě; null = jen ten vybraný nahoře
+    week: null,          // vybraný týden v sekci Týdny
     person: null,        // osobní číslo sledovaného člověka
     personMetric: 'month',
     personOpen: {},      // rozbalené měsíce v detailu člověka (rozpad složek)
@@ -3069,7 +3203,7 @@ window.PP = window.PP || {}
     /* Souhrn za období sčítá všechny měsíce, takže by volič měsíce jen mátl —
      a zrovna tahle záměna je důvod, proč sekce vznikla. */
     const picker = document.querySelector('.month-picker')
-    if (picker) picker.hidden = id === 'period'
+    if (picker) picker.hidden = id === 'period' || id === 'weeks'
     render()
   }
 
@@ -3135,10 +3269,14 @@ window.PP = window.PP || {}
   }
 
   /* ---------- ukázková data ---------- */
+  const MONTH_SECTIONS = ['overview', 'centers', 'ranking', 'compare', 'year']
+
   function renderDemoBanner() {
     const rec = currentMonth()
     const box = $('#demo-banner')
-    if (!rec || !rec.demo) { box.hidden = true; box.innerHTML = ''; return }
+    if (!rec || !rec.demo || !MONTH_SECTIONS.includes(ui.section)) {
+      box.hidden = true; box.innerHTML = ''; return
+    }
     box.hidden = false
     box.className = 'demo-banner'
     // Ve veřejném vydání není kam odkazovat — sekce Import tam neexistuje.
@@ -4234,6 +4372,148 @@ window.PP = window.PP || {}
     }))
   }
 
+  /* ---------- Týdny ----------
+     Mzdy umí Součtový výkaz vytisknout i za týden. Takové výkazy drží panel
+     ve vlastní řadě vedle měsíců — sečíst týden s měsícem, který ho obsahuje,
+     by hodiny zdvojilo. */
+
+  const WEEK_TOP_PEOPLE = 15
+
+  function renderWeeks() {
+    const el = $('#panel-weeks')
+    const keys = PP.data.weekKeys()
+
+    if (!keys.length) {
+      el.innerHTML = `<div class="card"><div class="prose">
+        <h3>Zatím žádný týdenní výkaz</h3>
+        <p>Panel pozná týden sám: vytiskněte <strong>tentýž Součtový výkaz</strong>, jen
+        s obdobím za jeden týden (například <code>1.9.2026 - 7.9.2026</code>), a naimportujte
+        ho jako každý jiný. Měsíční výkazy tím nijak neutrpí — týdny se vedou zvlášť.</p>
+        <p class="hint">Období delší než osm dní, které není celý kalendářní měsíc, panel
+        odmítne; smíchat měsíce s půlměsíci by znamenalo sčítat nesrovnatelná období.</p>
+      </div></div>`
+      return
+    }
+
+    if (!ui.week || !keys.includes(ui.week)) ui.week = keys[0]
+    const rec = PP.data.week(ui.week)
+    const s2 = PP.stats(rec)
+    const prevKey = keys[keys.indexOf(ui.week) + 1] || null
+    const prev = prevKey ? PP.stats(PP.data.week(prevKey)) : null
+
+    const vyber = `<div class="month-pick" role="group" aria-label="Výběr týdne">
+      <span class="month-pick-label">Týden:</span>
+      ${keys.map((k) => `<button type="button" class="chip sm" data-week="${esc(k)}"
+        aria-pressed="${k === ui.week}">${esc(weekShort(k))}</button>`).join('')}
+    </div>`
+
+    const delta = (now, before, fmt) => before == null ? ''
+      : `proti ${weekShort(prevKey)} ${now - before >= 0 ? '+' : '−'}${fmt(Math.abs(now - before))}`
+
+    const kpis = `<div class="grid kpis">
+      ${kpi('Přesčas celkem', h1(s2.total) + ' h', delta(s2.total, prev && prev.total, (v) => h1(v) + ' h'))}
+      ${kpi('Lidí s přesčasem', num(s2.withOvertime), `z ${num(rec.people)} osob`)}
+      ${kpi('Ø na osobu', hm(s2.avg), delta(s2.avg, prev && prev.avg, hm), level(s2.avg, CFG.week))}
+      ${kpi('Nad ' + CFG.week.crit + ' h za týden', num(s2.ranking.filter((r) => r.t >= CFG.week.crit).length),
+        `nad ${CFG.week.warn} h: ${num(s2.ranking.filter((r) => r.t >= CFG.week.warn).length)}`,
+        s2.ranking.some((r) => r.t >= CFG.week.crit) ? 'crit' : '')}
+    </div>`
+
+    const graf = keys.length < 2 ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Vývoj po týdnech</h2>
+        <span class="hint">${esc(weekShort(keys[keys.length - 1]))} – ${esc(weekShort(keys[0]))} · přesčas celkem</span>
+      </div>
+      <div class="chart-host" id="chart-weeks"></div>
+    </div>`
+
+    const strediska = `<div class="card">
+      <div class="card-head">
+        <h2>Střediska <span class="period-chip">${esc(weekShort(ui.week))}</span></h2>
+        <span class="hint">${num(s2.centers.length)} středisek · práh ${CFG.week.warn} h / ${CFG.week.crit} h na osobu</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Středisko</th><th class="num">Lidí</th><th class="num">Přesčas</th>
+          <th class="num">Ø / osoba</th><th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th></tr></thead>
+        <tbody>${s2.byTotal.map((c) => {
+          const lvl = level(c.avg, CFG.week)
+          return `<tr>
+            <td><button type="button" class="link-center" data-center="${esc(c.name)}"
+              title="Otevřít detail střediska">${esc(c.name)}</button>
+              ${lvl ? ` <span class="tag ${lvl}">${lvl === 'crit' ? 'kritické' : 'sledovat'}</span>` : ''}</td>
+            <td class="num">${num(c.people)}</td>
+            <td class="num">${h1(c.total)}</td>
+            <td class="num">${hm(c.avg)}</td>
+            <td class="num">${h1(c.m)}</td>
+            <td class="num">${h1(c.e)}</td>
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    const lide = PUBLIC ? '' : `<div class="card">
+      <div class="card-head">
+        <h2>Nejvíc přesčasu <span class="period-chip">${esc(weekShort(ui.week))}</span></h2>
+        <span class="hint">${WEEK_TOP_PEOPLE} lidí</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th class="rank">#</th><th>Jméno</th><th>Středisko</th>
+          <th class="num">Do MEZD</th><th class="num">${esc(evidenceLabel())}</th>
+          <th class="num">Přesčas</th></tr></thead>
+        <tbody>${s2.ranking.slice(0, WEEK_TOP_PEOPLE).map((r, i) => {
+          const lvl = level(r.t, CFG.week)
+          return `<tr>
+            <td class="rank">${i + 1}</td>
+            <td class="name"><button type="button" class="link-person" data-person="${esc(String(r.o))}"
+              title="Zobrazit vývoj přes měsíce">${esc(r.n)}</button></td>
+            <td>${esc(r.s)}</td>
+            <td class="num">${hm(r.m)}</td>
+            <td class="num">${hm(r.de != null ? r.de : r.e)}</td>
+            <td class="num">${lvl ? `<span class="tag ${lvl}">${hm(r.t)}</span>` : hm(r.t)}</td>
+          </tr>`
+        }).join('')}</tbody>
+      </table></div>
+    </div>`
+
+    /* Výkaz nemusí začínat pondělím. Klíč se bere podle ISO týdne, ve kterém
+       období začíná, ale ukázat se musí to, co je ve výkazu doopravdy. */
+    const rozsah = `<p class="hint" style="margin:0 0 18px">
+      ${esc(weekName(ui.week))} · ve výkazu období <strong>${esc(rec.period || '—')}</strong>${rec.methodIncomplete
+        ? ' · <strong>nejstarší načtený týden</strong>, přírůstek konta se u něj nemá od čeho odrazit'
+        : ''}
+    </p>`
+
+    el.innerHTML = vyber + rozsah + kpis + graf + strediska + lide
+
+    if (keys.length > 1) drawWeekChart(keys)
+    PP.watchCharts(() => { if (PP.data.weekKeys().length > 1) drawWeekChart(PP.data.weekKeys()) })
+    bindCenterLinks('#panel-weeks')
+    if (!PUBLIC) bindPersonLinks('#panel-weeks')
+    $$('#panel-weeks [data-week]').forEach((b) => b.addEventListener('click', () => {
+      ui.week = b.dataset.week
+      renderWeeks()
+    }))
+  }
+
+  function drawWeekChart(keys) {
+    const host = $('#chart-weeks')
+    if (!host) return
+    const rada = keys.slice().reverse()          // od nejstaršího
+    PP.lineChart(host, {
+      labels: rada.map(weekShort),
+      format: (v) => h1(v) + ' h',
+      tickFormat: (v) => h1(v),
+      area: true,
+      height: 250,
+      ariaLabel: 'Přesčas závodu po týdnech',
+      series: [{
+        name: 'Přesčas celkem',
+        color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0f9e91',
+        values: rada.map((k) => PP.stats(PP.data.week(k)).total),
+      }],
+    })
+  }
+
   /* ---------- Souhrn za období ----------
      Přehled ukazuje jeden měsíc. Tahle sekce sčítá všechny načtené měsíce
      dohromady a přidává to, co z hodin plyne v penězích. */
@@ -4552,7 +4832,7 @@ window.PP = window.PP || {}
   /* ---------- Import ---------- */
   function renderImport() {
     const el = $('#panel-import')
-    const keys = PP.data.keys()
+    const keys = PP.data.allKeys()
 
     el.innerHTML = `<div class="card">
       <div class="card-head">
@@ -4571,21 +4851,21 @@ window.PP = window.PP || {}
 
     <div class="card">
       <div class="card-head">
-        <h2>Načtené měsíce</h2>
-        <span class="hint">${keys.length} ${keys.length === 1 ? 'měsíc' : keys.length < 5 ? 'měsíce' : 'měsíců'}</span>
+        <h2>Načtená období</h2>
+        <span class="hint">${keys.length} ${keys.length === 1 ? 'období' : 'období'}</span>
       </div>
 
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>Měsíc</th><th>Období</th><th class="num">Lidí</th><th class="num">Přesčas</th>
+          <th>Období</th><th>Rozsah</th><th class="num">Lidí</th><th class="num">Přesčas</th>
           <th>Zdroj</th><th>Soubor</th><th></th>
         </tr></thead>
         <tbody>${keys.map((k) => {
-          const rec = PP.data.month(k)
+          const rec = PP.data.record(k)
           const st = PP.stats(rec)
           const imported = PP.data.isImported(k)
           return `<tr>
-            <td>${esc(monthName(k))}</td>
+            <td>${esc(periodName(k))}</td>
             <td>${esc(rec.period || '—')}</td>
             <td class="num">${num(st.withOvertime)}</td>
             <td class="num">${h1(st.total)} h</td>
@@ -4643,9 +4923,9 @@ window.PP = window.PP || {}
     })
     $$('#panel-import [data-remove]').forEach((b) => b.addEventListener('click', async () => {
       const key = b.dataset.remove
-      if (!window.confirm(`Opravdu smazat naimportovaný měsíc ${monthName(key)}?`)) return
+      if (!window.confirm(`Opravdu smazat naimportované období ${periodName(key)}?`)) return
       await PP.data.removeMonth(key)
-      log('ok', `${monthName(key)} smazán.`)
+      log('ok', `${periodName(key)} smazáno.`)
       refreshAll()
     }))
 
@@ -4929,15 +5209,17 @@ window.PP = window.PP || {}
       const busy = log('busy', `Zpracovávám <strong>${esc(file.name)}</strong>…`)
       try {
         const { key, record, kind, skipped } = await PP.parseReport(file)
-        const replaced = PP.data.month(key)
+        const replaced = PP.data.record(key)
         await PP.data.addMonth(key, record)
-        const st = PP.stats(PP.data.month(key))
+        // týden i měsíc chodí stejnou cestou, jen se ukládají jinam
+        const st = PP.stats(PP.data.record(key))
         busy.kind = 'ok'
-        busy.html = `<strong>${esc(monthName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
+        busy.html = `<strong>${esc(periodName(key))}</strong> ${replaced ? 'přepsán' : 'přidán'} —
           ${num(st.withOvertime)} lidí s přesčasem, ${h1(st.total)} h, ${num(record.people)} osob ve výkazu.
           <span class="hint">Formát: ${esc(kind)}${skipped ? ` · přeskočeno ${num(skipped)} nepřesčasových řádků` : ''}</span>
           ${compSummary(record)}`
-        ui.month = key
+        if (PP.isWeekKey(key)) ui.week = key
+        else ui.month = key
       } catch (err) {
         busy.kind = 'err'
         busy.html = `<strong>${esc(file.name)}</strong> — ${esc(err && err.message ? err.message : String(err))}`
@@ -5078,6 +5360,7 @@ window.PP = window.PP || {}
       case 'centers': return renderCenters()
       case 'ranking': return renderRanking()
       case 'compare': return renderCompare()
+      case 'weeks': return renderWeeks()
       case 'period': return renderPeriod()
       case 'year': return renderYear()
       case 'import': {
