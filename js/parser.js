@@ -101,6 +101,30 @@ window.PP = window.PP || {}
     return String(v)
   }
 
+  /* Přehledový výkaz docházky píše čísla jen do atributu x:num a buňku nechá
+     prázdnou (<td class="d5TV" x:num="1.5625"/>). Kolik je to hodin, říká
+     formát čísla ve stylopisu: "[h]:mm" znamená excelovský čas, tedy podíl
+     dne — 1.5625 dne = 37,5 h. Mapu tříd se čte ze souboru, ne z názvů, aby
+     import nepadl, až generátor třídy přejmenuje. */
+  const TIME_FORMAT = /\[h\]/i
+  function timeClasses(doc) {
+    const out = new Set()
+    for (const style of doc.querySelectorAll('style')) {
+      const css = style.textContent || ''
+      const re = /([^{}]+)\{([^{}]*)\}/g
+      let m
+      while ((m = re.exec(css))) {
+        const fmt = /mso-number-format\s*:\s*"([^"]*)"/i.exec(m[2])
+        if (!fmt || !TIME_FORMAT.test(fmt[1].replace(/\\/g, ''))) continue
+        for (const sel of m[1].split(',')) {
+          const cls = /^\s*\.([\w-]+)\s*$/.exec(sel)
+          if (cls) out.add(cls[1])
+        }
+      }
+    }
+    return out
+  }
+
   /** Vybere <table> s nejvíc řádky a převede ji na matici textů. */
   function htmlToMatrix(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -108,11 +132,33 @@ window.PP = window.PP || {}
     if (!tables.length) throw new Error('V souboru není žádná tabulka.')
     let best = tables[0]
     for (const t of tables) if (t.rows.length > best.rows.length) best = t
-    return Array.prototype.map.call(best.rows, (tr) =>
-      Array.prototype.map.call(tr.cells, (td) =>
-        td.textContent.replace(/\u00a0/g, ' ').trim()
-      )
-    )
+
+    const times = timeClasses(doc)
+    const isTime = (td) => {
+      const cls = td.getAttribute('class')
+      if (!cls) return false
+      return cls.split(/\s+/).some((c) => times.has(c))
+    }
+
+    return Array.prototype.map.call(best.rows, (tr) => {
+      const out = []
+      Array.prototype.forEach.call(tr.cells, (td) => {
+        let text = td.textContent.replace(/\u00a0/g, ' ').trim()
+        if (!text) {
+          const raw = td.getAttribute('x:num')
+          if (raw) {
+            const n = Number(raw)
+            if (isFinite(n)) text = String(isTime(td) ? n * 24 : n)
+          }
+        }
+        /* Hlavička má nad dvojicí sloupců colspan="2"; aby popisek seděl na
+           svůj první datový sloupec, opakovaná místa zůstanou prázdná. */
+        const span = Math.min(Math.max(Number(td.getAttribute('colspan')) || 1, 1), 50)
+        out.push(text)
+        for (let i = 1; i < span; i++) out.push('')
+      })
+      return out
+    })
   }
 
   /** CSV s automatickou detekcí oddělovače, respektuje uvozovky. */
@@ -265,6 +311,132 @@ window.PP = window.PP || {}
     return null
   }
 
+  /* ---------- Přehledový výkaz docházky (týdny) ----------
+     Druhá sestava, druhá metodika. Součtový výkaz z mezd mluví mzdovými
+     složkami, docházka mluví odpracovaným časem proti fondu:
+
+         přesčas = Celkem odpracováno − Fond
+
+     Jenže fond platí jen za dny, kdy měl člověk být v práci. Kdo si vybral
+     týden dovolené, má odpracováno 0 a fond 37,5 — holý rozdíl by u něj
+     ukázal −37,5 h přesčasu, což není přesčas, ale dovolená. Placená
+     nepřítomnost proto fond snižuje:
+
+         přesčas = Celkem odpracováno − (Fond − placená nepřítomnost)
+
+     Oprava umí jen zrušit nesmyslné minus; komu přesčas opravdu vznikl,
+     tomu se nesáhne (nepřítomnost má nulovou). Holý rozdíl zůstává vidět
+     ve vlastním sloupci.
+
+     Služební cesta ani Přestávka se nepřičítají: služební cesta už je
+     uvnitř „Celkem odpracováno“ (kdo byl na cestě celý týden, má
+     odpracováno plný fond) a přestávka se do odpracované doby nepočítá. */
+  const ATT_WORKED = (c) => c.includes('celkem') && c.includes('odpracovano')
+  const ATT_FUND = (c) => c === 'fond'
+
+  /** Sloupce, které snižují fond — placená nepřítomnost. */
+  function reducesFund(label) {
+    const c = PP.fold(label)
+    if (!c) return false
+    return c.includes('dovolena') || c.includes('nemoc') || c.includes('lekar') ||
+      c.includes('prekazka') || c.includes('osetrovani') || c.includes('ocr') ||
+      c.includes('karantena') || c.includes('nahradni volno') || c.includes('svatek')
+  }
+
+  /** Sloupce, které se do výpočtu nepletou, a je to tak správně. */
+  const ATT_IGNORED = (c) => c.includes('sluzebni cesta') || c.includes('prestavka') ||
+    c.includes('rozdil')
+
+  function findAttendanceHeader(matrix) {
+    const limit = Math.min(matrix.length, HEADER_SCAN_ROWS)
+    for (let r = 0; r < limit; r++) {
+      const cells = matrix[r].map(PP.fold)
+      const worked = cells.findIndex(ATT_WORKED)
+      const fund = cells.findIndex(ATT_FUND)
+      const name = cells.findIndex((c) => c === 'prijmeni')
+      const id = cells.findIndex((c) => c.includes('osobni'))
+      const center = cells.findIndex((c) => c.includes('stredisko'))
+      if (worked >= 0 && fund >= 0 && name >= 0 && id >= 0 && center >= 0) {
+        return { row: r, worked, fund, name, id, center, labels: matrix[r] }
+      }
+    }
+    return null
+  }
+
+  function parseAttendance(matrix, header, period, kind, file) {
+    const { labels } = header
+    /* Jméno skládá Příjmení + Jméno. Sloupec Titul tady nenese „Ing.“, ale
+       pozici („TR-G463 PREFIX“), takže do jména nepatří. */
+    const nameCols = [header.name]
+    for (let i = header.name + 1; i < header.center; i++) {
+      if (PP.fold(labels[i]) === 'jmeno') nameCols.push(i)
+    }
+
+    const absCols = []
+    const ignored = []
+    for (let i = 0; i < labels.length; i++) {
+      const label = String(labels[i] || '').trim()
+      if (!label || i === header.worked || i === header.fund) continue
+      if (i < header.worked) continue
+      if (reducesFund(label)) absCols.push({ i, label })
+      else if (!ATT_IGNORED(PP.fold(label))) ignored.push(label)
+      else ignored.push(label)
+    }
+
+    const round2 = (v) => Math.round(v * 100) / 100
+    const rows = []
+    const everyone = new Set()
+    let skipped = 0
+
+    for (let r = header.row + 1; r < matrix.length; r++) {
+      const row = matrix[r]
+      if (!row || !row.length) continue
+      const id = String(row[header.id] || '').trim()
+      const center = String(row[header.center] || '').trim()
+      const name = nameCols.map((i) => String(row[i] || '').trim()).filter(Boolean).join(' ')
+      // „Součet za středisko“ a celkový řádek sestavy přeskočit
+      if (!id || SUMMARY.test(PP.fold(String(row[header.name] || '')))) { skipped++; continue }
+
+      const w = parseHours(row[header.worked])
+      const fo = parseHours(row[header.fund])
+      const ab = absCols.reduce((sum, c) => sum + parseHours(row[c.i]), 0)
+      everyone.add(id + '|' + center)
+
+      /* Fond snížený o placenou nepřítomnost je to, co měl člověk ten týden
+         opravdu odpracovat. Nad ním je přesčas, pod ním schází. */
+      const fund = fo - ab
+      rows.push({
+        n: name, o: /^\d+$/.test(id) ? Number(id) : id, s: center,
+        w: round2(w), fo: round2(fo), ab: round2(ab),
+        rd: round2(w - fo),
+        t: round2(Math.max(0, w - fund)),
+        u: round2(Math.max(0, fund - w)),
+      })
+    }
+
+    if (!rows.length) throw new Error('Ve výkazu docházky nejsou žádní lidé.')
+    rows.sort((a, b) => b.t - a.t || String(a.n).localeCompare(String(b.n), 'cs'))
+
+    return {
+      key: period.key,
+      grain: period.grain,
+      kind,
+      skipped,
+      record: {
+        grain: period.grain,
+        src: 'dochazka',
+        period: period.period,
+        rawPeriod: period.rawPeriod,
+        people: everyone.size,
+        comps: absCols.map((c) => c.label),
+        otherComps: ignored.map((l) => [l, 0]),
+        rows,
+        importedAt: new Date().toISOString(),
+        file: file.name,
+      },
+    }
+  }
+
   /* ---------- hlavní vstupní bod ---------- */
   /**
    * Rozparsuje soubor na záznam měsíce.
@@ -274,14 +446,33 @@ window.PP = window.PP || {}
     const { matrix, kind } = await toMatrix(file)
     if (!matrix.length) throw new Error('Soubor je prázdný.')
 
-    const header = findHeader(matrix)
-    const cols = header.cols
+    /* Dvě sestavy, dvě metodiky. Která přišla, se pozná z hlavičky:
+       docházka má „Celkem odpracováno“ a „Fond“, Součtový výkaz z mezd
+       „Mzdová složka“ a „Hodiny“. */
+    const att = findAttendanceHeader(matrix)
+    const header = att ? null : findHeader(matrix)
+    const headerRow = att ? att.row : header.row
 
-    const periodMatch = findPeriod(matrix, header.row)
+    const periodMatch = findPeriod(matrix, headerRow)
     if (!periodMatch) {
       throw new Error('Nenašel jsem období výkazu (řádek „Období: d.m.rrrr - d.m.rrrr“).')
     }
     const period = describePeriod(periodMatch)
+
+    if (att) {
+      /* Měsíční přehled stojí na mzdových složkách — konto, do MEZD, roční
+         součet. Docházka o nich neví, takže by měsíc vedle ostatních
+         neporovnal nikdo. Týdny jsou naopak její doména. */
+      if (period.grain !== 'week') {
+        throw new Error(
+          'Přehledový výkaz docházky panel bere jen za jeden týden; tenhle je za ' +
+          period.period + '. Měsíční přehled se počítá ze Součtového výkazu z mezd.'
+        )
+      }
+      return parseAttendance(matrix, att, period, kind, file)
+    }
+
+    const cols = header.cols
 
     const byPerson = new Map()      // osobní číslo|středisko → agregovaný řádek
     const everyone = new Set()      // všichni lidé ve výkazu, i bez přesčasu
@@ -434,5 +625,6 @@ window.PP = window.PP || {}
   PP.loadSheetJS = loadSheetJS
 
   // vystaveno kvůli testům a případnému CLI použití
-  PP.parserInternals = { parseHours, classify, csvToMatrix, htmlToMatrix, findHeader, describePeriod, DATE_RANGE }
+  PP.parserInternals = { parseHours, classify, csvToMatrix, htmlToMatrix, findHeader,
+    findAttendanceHeader, reducesFund, describePeriod, DATE_RANGE }
 })(window.PP)

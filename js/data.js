@@ -124,9 +124,14 @@ window.PP = window.PP || {}
   /* Ukázkové měsíce se do měření nepočítají a nepřepočítávají. Je to
      vygenerovaný vzorek a nemá rozhodovat, jak se čtou reálné výkazy —
      ani se jím nechat přepsat. */
+  /* Záznamy z Přehledového výkazu docházky stojí na jiné metodice —
+     odpracováno proti fondu, žádné mzdové složky. Měření vzorce ani
+     přepočet přes konto se jich proto netýká. */
+  const isPayroll = (rec) => !!rec && rec.src !== 'dochazka'
+
   function realKeys(bucket) {
     return Object.keys(bucket)
-      .filter((k) => bucket[k] && !bucket[k].demo && bucket[k].rows)
+      .filter((k) => bucket[k] && !bucket[k].demo && bucket[k].rows && isPayroll(bucket[k]))
       .sort()
   }
 
@@ -190,7 +195,7 @@ window.PP = window.PP || {}
     // ukázkové měsíce zůstávají, jak jsou
     for (const k of Object.keys(bucket)) {
       const rec = bucket[k]
-      if (!rec || !rec.rows || !rec.demo) continue
+      if (!rec || !rec.rows || !rec.demo || !isPayroll(rec)) continue
       rec.methodIncomplete = false
       for (const row of rec.rows) {
         if (row.tRaw === undefined) row.tRaw = round2(row.m + row.e)
@@ -289,6 +294,11 @@ window.PP = window.PP || {}
     const sum = (f) => rows.reduce((a, r) => a + (Number(r[f]) || 0), 0)
     const total = sum('t')
     const mezdy = sum('m')
+    /* Docházka má ve výkazu úplně každého, i toho, kdo zrovna přesčas neměl.
+       Součtový výkaz z mezd naopak jen lidi s přesčasovou složkou, takže se
+       u něj „lidí s přesčasem“ rovná počtu řádků. */
+    const dochazka = record.src === 'dochazka'
+    const withOT = dochazka ? rows.filter((r) => r.t > 0).length : rows.length
     /* Druhá složka je to, co k proplaceným hodinám zbývá do celku — ne syrový
        sloupec evidence. Když se počítá přes přírůstek konta, je zbytek právě
        ten přírůstek; sečíst syrové zůstatky by dalo číslo, které k součtu
@@ -304,8 +314,8 @@ window.PP = window.PP || {}
       }
       c.people++
       c.total += r.t
-      c.m += r.m
-      c.e += r.t - r.m
+      c.m += r.m || 0
+      c.e += r.t - (r.m || 0)
       if (r.t > c.max) c.max = r.t
       c.rows.push(r)
     }
@@ -325,12 +335,12 @@ window.PP = window.PP || {}
     const out = {
       key: null,
       people: record.people || rows.length,
-      withOvertime: rows.length,
+      withOvertime: withOT,
       total,
       mezdy,
       evidence,
       paidShare: total !== 0 ? mezdy / total : 0,
-      avg: rows.length ? total / rows.length : 0,
+      avg: withOT ? total / withOT : 0,
       max: rows.length ? Math.max.apply(null, rows.map((r) => r.t)) : 0,
       overWarn: rows.filter((r) => r.t >= PP.CFG.person.warn).length,
       overCrit: rows.filter((r) => r.t >= PP.CFG.person.crit).length,
@@ -343,6 +353,15 @@ window.PP = window.PP || {}
       year250: rows.filter((r) => r.r > PP.CFG.year.crit).length,
       yearCap: rows.filter((r) => r.r >= PP.CFG.year.cap).length,
       ranking: rows.slice().sort((a, b) => b.t - a.t),
+      /* Jen pro docházku: odpracováno proti fondu. „under“ je čas, který
+         lidem do fondu schází — záporné hodnoty se nezapočítávají proti
+         přesčasu, protože ten se už odpracoval a nikdo ho neodečte. */
+      dochazka,
+      worked: dochazka ? round2(sum('w')) : null,
+      fund: dochazka ? round2(sum('fo')) : null,
+      absence: dochazka ? round2(sum('ab')) : null,
+      under: dochazka ? round2(sum('u')) : null,
+      underPeople: dochazka ? rows.filter((r) => r.u > 0).length : 0,
     }
     cache.set(record, out)
     return out
