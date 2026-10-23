@@ -18,7 +18,12 @@
   <!-- boční rail -->
   <aside class="rail">
     <div class="brand">
-      <div class="brand-mark">PP</div>
+      <!-- Značka: dokud tu není logo, stojí tu zkratka. Firemní logo se
+           vloží jako <svg> nebo <img src="data:image/svg+xml;base64,…">
+           sem dovnitř; .brand-mark se pak samo přepne na průhledné pozadí.
+           Jeden soubor k rozeslání znamená, že logo musí být vložené
+           přímo v HTML, ne odkazem na soubor vedle. -->
+      <div class="brand-mark" id="brand-mark">PP</div>
       <div>
         <div class="brand-name">Přesčasy</div>
         <div class="brand-sub">Závod Planá</div>
@@ -30,6 +35,11 @@
     <div class="rail-foot">
       <p class="rail-note" id="rail-note"></p>
       <p class="rail-build" id="rail-build"></p>
+      <div class="brand-pick">
+        <label for="brand-color">Firemní barva</label>
+        <input type="color" id="brand-color" value="#0f9e91">
+        <button type="button" id="brand-reset" title="Zpět na výchozí barvu">Zpět</button>
+      </div>
       <button class="theme-toggle" id="fmt-toggle" type="button"
               title="Jak panel píše hodiny: 61:05, nebo 61,1 h">
         <span id="fmt-label">Hodiny: 61:05</span>

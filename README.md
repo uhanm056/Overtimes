@@ -53,6 +53,43 @@ takže zmizení ze žebříčku není chyba — je to informace (dovolená, nemo
 odchod, nebo prostě žádný přesčas). Porovnává se osobní číslo, ne klíč se
 střediskem, aby přeřazený člověk nevyšel jako nový.
 
+## Firemní vzhled
+
+Celý panel visí na **jedné barvě**. V `styles.css` je úplně nahoře:
+
+```css
+:root {
+  --brand: #0f9e91;    /* ← firemní barva */
+  --on-brand: #ffffff; /* text na ní */
+}
+```
+
+Z ní se přes `color-mix()` dopočítá rail, navigace, tlačítka, chipy, grafy
+i světlejší odstín pro tmavý režim. Za každou dopočtenou hodnotou stojí
+i natvrdo zapsaná záloha — starší prohlížeč `color-mix()` zahodí a zůstane
+mu ta první, takže panel nikdy neskončí bez barev. `tests/brand.test.mjs`
+hlídá, že na žádnou zálohu nikdo nezapomněl.
+
+**Semaforové barvy se neodvozují.** Oranžová, červená a zelená zůstávají
+oranžová, červená a zelená, ať je firemní barva jakákoli — jinak by se
+v přehledu ztratilo, co je varování a co jen zvýraznění.
+
+> Pozor: je-li firemní barva sama červená nebo oranžová, splyne s pruhy
+> u překročených prahů. V takovém případě je potřeba přebarvit datové pruhy
+> na neutrální odstín a barvu nechat jen na railu, tlačítkách a odkazech.
+
+Zkoušet se dá rovnou v panelu — vlevo dole je políčko **Firemní barva**,
+volba se pamatuje v prohlížeči. Je to jen pro vyzkoušení; aby barvu měli
+i kolegové, musí se přepsat `--brand` ve `styles.css` a panel znovu sestavit.
+
+### Logo
+
+V railu je místo značky `<div class="brand-mark" id="brand-mark">PP</div>`.
+Firemní logo se vloží přímo dovnitř jako `<svg>` nebo
+`<img src="data:image/svg+xml;base64,…">` — barevná dlaždice pod ním sama
+ustoupí. Odkaz na soubor vedle nefunguje: panel se rozesílá jako jeden
+soubor, takže logo musí být vložené v HTML.
+
 ## Struktura
 
 ```

@@ -97,6 +97,35 @@
     })
   }
 
+  /* ---------- firemní barva ----------
+     Celý panel visí na jednom tokenu --brand, takže si barvu může zkusit
+     kdokoli rovnou tady a nemusí čekat na nové sestavení. Odstíny i rail
+     se z ní dopočítají v CSS. */
+  const BRAND_KEY = 'prescasy.barva.v1'
+  const BRAND_DEFAULT = '#0f9e91'
+  function applyBrand(hex, save) {
+    const root = document.documentElement
+    const ok = /^#[0-9a-f]{6}$/i.test(String(hex || ''))
+    if (ok) root.style.setProperty('--brand', hex)
+    else root.style.removeProperty('--brand')
+    const input = $('#brand-color')
+    if (input) input.value = ok ? hex : BRAND_DEFAULT
+    if (!save) return
+    try {
+      if (ok) window.localStorage.setItem(BRAND_KEY, hex)
+      else window.localStorage.removeItem(BRAND_KEY)
+    } catch (err) { /* jen preference */ }
+  }
+  function initBrand() {
+    let saved = ''
+    try { saved = window.localStorage.getItem(BRAND_KEY) || '' } catch (err) { saved = '' }
+    applyBrand(saved, false)
+    const input = $('#brand-color')
+    if (input) input.addEventListener('input', () => applyBrand(input.value, true))
+    const reset = $('#brand-reset')
+    if (reset) reset.addEventListener('click', () => applyBrand('', true))
+  }
+
   /* ---------- zápis hodin ----------
      Kdo čte výkaz, chce h:mm jako v mzdovém systému; kdo s čísly dál počítá,
      chce desetinné hodiny. Jedno nastavení pro celý panel, ať se oba zápisy
@@ -2603,6 +2632,7 @@
   /* ---------- start ---------- */
   async function init() {
     initTheme()
+    initBrand()
     initFormat()
     renderNav()
     loadRate()
