@@ -15,68 +15,99 @@
    Tmavý boční rail + světlý/tmavý obsah. Barvy jsou tokeny v :root,
    tmavý režim se přebírá z prefers-color-scheme a přebíjí přepínačem [data-theme]. */
 
+/* ---------- firemní barva ----------
+   Celý panel visí na jedné hodnotě. Změnou `--brand` se přebarví rail,
+   tlačítka, grafy, odznaky i zvýraznění — odstíny se z ní dopočítají přes
+   color-mix(). Za každým dopočteným tokenem stojí i natvrdo zapsaná
+   hodnota: starší prohlížeč color-mix() zahodí a zůstane mu ta první,
+   takže panel nikdy neskončí bez barev.
+
+   Semaforové barvy (warn / crit / good) se zásadně neodvozují — oranžová
+   a červená musí zůstat oranžová a červená, ať je firemní barva jakákoli. */
+:root {
+  --brand: #0f9e91;         /* ← firemní barva Yanfengu, jediná hodnota k úpravě */
+  --on-brand: #ffffff;      /* text na firemní barvě: #ffffff nebo tmavá */
+  /* Světlejší odstín pro tmavý režim se dopočítá; dá se i přepsat ručně. */
+  --brand-light: #25c9b6;
+  --brand-light: color-mix(in srgb, var(--brand) 70%, #ffffff);
+}
+
 /* ---------- tokeny: světlý režim ---------- */
 :root {
   color-scheme: light;
 
-  --bg: #f4f6f6;
+  --bg: #f5f6f7;
   --surface: #ffffff;
-  --surface-2: #eef1f1;
-  --surface-3: #e3e8e8;
-  --line: #d9e0df;
-  --line-soft: #e8eded;
+  --surface-2: #eff1f3;
+  --surface-3: #e3e7ea;
+  --line: #dadee2;
+  --line-soft: #e9ecef;
 
-  --text: #14201f;
-  --text-2: #4d5f5d;
-  --text-3: #7a8b89;
+  --text: #16191c;
+  --text-2: #51585f;
+  --text-3: #7d858d;
 
-  --accent: #0f9e91;
-  --accent-2: #25c9b6;
+  --accent: var(--brand);
+  --accent-2: var(--brand-light);
   --accent-soft: #e0f4f1;
-  --on-accent: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--brand) 13%, #ffffff);
+  --on-accent: var(--on-brand);
 
-  --warn: #c07f00;
+  --warn: #b57400;
   --warn-soft: #fbf0d8;
-  --crit: #d24842;
+  --crit: #c9403a;
   --crit-soft: #fbe4e3;
-  --good: #1a9963;
+  --good: #16855a;
   --good-soft: #ddf3e8;
 
-  --rail-bg: #0e1a1c;
-  --rail-bg-2: #16292b;
-  --rail-text: #d7e4e3;
-  --rail-text-2: #7f9997;
-  --rail-line: #23393b;
+  /* Rail je skoro černý, ale s nádechem firemní barvy — jinak by vedle
+     barevného obsahu působil jako cizí prvek. */
+  --rail-bg: #11181c;
+  --rail-bg: color-mix(in srgb, var(--brand) 12%, #0c1013);
+  --rail-bg-2: #18222a;
+  --rail-bg-2: color-mix(in srgb, var(--brand) 18%, #11171c);
+  --rail-text: #dde3e8;
+  --rail-text-2: #8d979f;
+  --rail-text-2: color-mix(in srgb, var(--brand) 22%, #8b949c);
+  --rail-line: #26313a;
+  --rail-line: color-mix(in srgb, var(--brand) 20%, #1d262d);
 
   --radius: 14px;
   --radius-sm: 9px;
-  --shadow: 0 1px 2px rgba(16, 33, 32, .06), 0 8px 24px -14px rgba(16, 33, 32, .28);
+  --shadow: 0 1px 2px rgba(16, 24, 32, .06), 0 8px 24px -14px rgba(16, 24, 32, .28);
 
   --font-display: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
   --font-text: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
 
-/* ---------- tokeny: tmavý režim ---------- */
+/* ---------- tokeny: tmavý režim ----------
+   Tentýž blok dvakrát, protože se tmavý režim zapíná dvěma cestami —
+   podle nastavení systému a ručním přepínačem — a čisté CSS je bez
+   preprocesoru nespojí. Firemní barva se tu neopakuje, ta je jen nahoře;
+   co se tu liší, jsou šedi a odstín, kterým barva v tmavém svítí.
+   Při úpravě je potřeba sáhnout do obou. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --bg: #0f1718;
-    --surface: #162224;
-    --surface-2: #1c2b2d;
-    --surface-3: #24373a;
-    --line: #2a3f42;
-    --line-soft: #223336;
+    --bg: #101416;
+    --surface: #171c20;
+    --surface-2: #1e252a;
+    --surface-3: #273036;
+    --line: #2d373e;
+    --line-soft: #232b31;
 
-    --text: #e7f0ef;
-    --text-2: #a3b7b5;
-    --text-3: #7a908e;
+    --text: #e8edf0;
+    --text-2: #a7b1b8;
+    --text-3: #7e888f;
 
-    --accent: #25c9b6;
-    --accent-2: #4fe0cf;
+    --accent: var(--brand-light);
+    --accent-2: var(--brand);
     --accent-soft: #16383a;
-    --on-accent: #04211f;
+    --accent-soft: color-mix(in srgb, var(--brand) 26%, #10161a);
+    --on-accent: #06211f;
+    --on-accent: color-mix(in srgb, var(--brand) 22%, #04100f);
 
     --warn: #e0a52a;
     --warn-soft: #3a2f11;
@@ -85,9 +116,12 @@
     --good: #3fc98a;
     --good-soft: #12352a;
 
-    --rail-bg: #0a1314;
-    --rail-bg-2: #12211f;
-    --rail-line: #1e3134;
+    --rail-bg: #0b0f12;
+    --rail-bg: color-mix(in srgb, var(--brand) 9%, #080b0d);
+    --rail-bg-2: #131a1f;
+    --rail-bg-2: color-mix(in srgb, var(--brand) 14%, #0e1316);
+    --rail-line: #202a31;
+    --rail-line: color-mix(in srgb, var(--brand) 16%, #192026);
 
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .7);
   }
@@ -96,21 +130,23 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #0f1718;
-  --surface: #162224;
-  --surface-2: #1c2b2d;
-  --surface-3: #24373a;
-  --line: #2a3f42;
-  --line-soft: #223336;
+  --bg: #101416;
+  --surface: #171c20;
+  --surface-2: #1e252a;
+  --surface-3: #273036;
+  --line: #2d373e;
+  --line-soft: #232b31;
 
-  --text: #e7f0ef;
-  --text-2: #a3b7b5;
-  --text-3: #7a908e;
+  --text: #e8edf0;
+  --text-2: #a7b1b8;
+  --text-3: #7e888f;
 
-  --accent: #25c9b6;
-  --accent-2: #4fe0cf;
+  --accent: var(--brand-light);
+  --accent-2: var(--brand);
   --accent-soft: #16383a;
-  --on-accent: #04211f;
+  --accent-soft: color-mix(in srgb, var(--brand) 26%, #10161a);
+  --on-accent: #06211f;
+  --on-accent: color-mix(in srgb, var(--brand) 22%, #04100f);
 
   --warn: #e0a52a;
   --warn-soft: #3a2f11;
@@ -119,9 +155,12 @@
   --good: #3fc98a;
   --good-soft: #12352a;
 
-  --rail-bg: #0a1314;
-  --rail-bg-2: #12211f;
-  --rail-line: #1e3134;
+  --rail-bg: #0b0f12;
+  --rail-bg: color-mix(in srgb, var(--brand) 9%, #080b0d);
+  --rail-bg-2: #131a1f;
+  --rail-bg-2: color-mix(in srgb, var(--brand) 14%, #0e1316);
+  --rail-line: #202a31;
+  --rail-line: color-mix(in srgb, var(--brand) 16%, #192026);
 
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .7);
 }
@@ -184,10 +223,17 @@ a { color: var(--accent); }
 .brand-mark {
   width: 34px; height: 34px; border-radius: 10px; flex: none;
   background: linear-gradient(140deg, var(--accent-2), var(--accent));
-  color: #04211f;
+  color: var(--on-accent);
   display: grid; place-items: center;
   font-family: var(--font-display); font-weight: 700; font-size: 15px;
+  overflow: hidden;
 }
+/* S vloženým logem dlaždice ustoupí — barevný čtvereček pod cizí značkou
+   vypadá jako omyl. Logo se vejde do 34×34 a nepřeteče. */
+.brand-mark:has(svg), .brand-mark:has(img) {
+  background: none; border-radius: 0; width: auto; max-width: 132px;
+}
+.brand-mark svg, .brand-mark img { display: block; max-width: 100%; max-height: 34px; }
 .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; line-height: 1.15; }
 .brand-sub { color: var(--rail-text-2); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; }
 
@@ -775,9 +821,31 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
 .method-headline p { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--text-2); }
 .method-headline.warn { border-left-color: var(--warn); background: var(--warn-soft); }
 .method-headline.muted { border-left-color: var(--line); background: var(--surface-2); }
+
+/* ---------- volba firemní barvy ----------
+   Celý panel visí na jednom tokenu, tak ať se dá zkusit rovnou tady. */
+.brand-pick {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  background: var(--rail-bg-2); border: 1px solid var(--rail-line);
+  color: var(--rail-text-2); font-size: 11.5px;
+}
+.brand-pick label { flex: 1 1 auto; }
+.brand-pick input[type='color'] {
+  width: 26px; height: 20px; flex: none; padding: 0; cursor: pointer;
+  background: none; border: 1px solid var(--rail-line); border-radius: 5px;
+}
+.brand-pick input[type='color']::-webkit-color-swatch-wrapper { padding: 2px; }
+.brand-pick input[type='color']::-webkit-color-swatch { border: none; border-radius: 3px; }
+.brand-pick button {
+  flex: none; font: inherit; cursor: pointer;
+  background: none; border: 0; padding: 2px 4px;
+  color: var(--rail-text-2); text-decoration: underline;
+}
+.brand-pick button:hover { color: var(--rail-text); }
 </style>
 <meta name="robots" content="noindex">
-<meta name="generator" content="build-public.mjs · 2026-10-20">
+<meta name="generator" content="build-public.mjs · 2026-10-23">
 </head>
 <body>
 
@@ -785,7 +853,12 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
   <!-- boční rail -->
   <aside class="rail">
     <div class="brand">
-      <div class="brand-mark">PP</div>
+      <!-- Značka: dokud tu není logo, stojí tu zkratka. Firemní logo se
+           vloží jako <svg> nebo <img src="data:image/svg+xml;base64,…">
+           sem dovnitř; .brand-mark se pak samo přepne na průhledné pozadí.
+           Jeden soubor k rozeslání znamená, že logo musí být vložené
+           přímo v HTML, ne odkazem na soubor vedle. -->
+      <div class="brand-mark" id="brand-mark">PP</div>
       <div>
         <div class="brand-name">Přesčasy</div>
         <div class="brand-sub">Závod Planá</div>
@@ -797,6 +870,11 @@ hr.pub-split { border: 0; border-top: 1px solid var(--line); margin: 22px 0 18px
     <div class="rail-foot">
       <p class="rail-note" id="rail-note"></p>
       <p class="rail-build" id="rail-build"></p>
+      <div class="brand-pick">
+        <label for="brand-color">Firemní barva</label>
+        <input type="color" id="brand-color" value="#0f9e91">
+        <button type="button" id="brand-reset" title="Zpět na výchozí barvu">Zpět</button>
+      </div>
       <button class="theme-toggle" id="fmt-toggle" type="button"
               title="Jak panel píše hodiny: 61:05, nebo 61,1 h">
         <span id="fmt-label">Hodiny: 61:05</span>
@@ -3489,6 +3567,35 @@ window.PP = window.PP || {}
     })
   }
 
+  /* ---------- firemní barva ----------
+     Celý panel visí na jednom tokenu --brand, takže si barvu může zkusit
+     kdokoli rovnou tady a nemusí čekat na nové sestavení. Odstíny i rail
+     se z ní dopočítají v CSS. */
+  const BRAND_KEY = 'prescasy.barva.v1'
+  const BRAND_DEFAULT = '#0f9e91'
+  function applyBrand(hex, save) {
+    const root = document.documentElement
+    const ok = /^#[0-9a-f]{6}$/i.test(String(hex || ''))
+    if (ok) root.style.setProperty('--brand', hex)
+    else root.style.removeProperty('--brand')
+    const input = $('#brand-color')
+    if (input) input.value = ok ? hex : BRAND_DEFAULT
+    if (!save) return
+    try {
+      if (ok) window.localStorage.setItem(BRAND_KEY, hex)
+      else window.localStorage.removeItem(BRAND_KEY)
+    } catch (err) { /* jen preference */ }
+  }
+  function initBrand() {
+    let saved = ''
+    try { saved = window.localStorage.getItem(BRAND_KEY) || '' } catch (err) { saved = '' }
+    applyBrand(saved, false)
+    const input = $('#brand-color')
+    if (input) input.addEventListener('input', () => applyBrand(input.value, true))
+    const reset = $('#brand-reset')
+    if (reset) reset.addEventListener('click', () => applyBrand('', true))
+  }
+
   /* ---------- zápis hodin ----------
      Kdo čte výkaz, chce h:mm jako v mzdovém systému; kdo s čísly dál počítá,
      chce desetinné hodiny. Jedno nastavení pro celý panel, ať se oba zápisy
@@ -5995,6 +6102,7 @@ window.PP = window.PP || {}
   /* ---------- start ---------- */
   async function init() {
     initTheme()
+    initBrand()
     initFormat()
     renderNav()
     loadRate()
